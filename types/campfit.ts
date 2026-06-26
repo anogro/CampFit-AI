@@ -18,6 +18,12 @@ export type LevelOption = (typeof levelOptions)[number]
 export const budgetRangeOptions = ["under_3m", "3m_5m", "5m_8m", "over_8m"] as const
 export type BudgetRange = (typeof budgetRangeOptions)[number]
 
+export const destinationPreferenceOptions = ["no_preference", "southeast_asia", "oceania", "north_america"] as const
+export type DestinationPreference = (typeof destinationPreferenceOptions)[number]
+
+export const travelReadinessOptions = ["short_flight_care", "moderate_distance", "long_flight_independent"] as const
+export type TravelReadiness = (typeof travelReadinessOptions)[number]
+
 export const durationWeekOptions = ["1w", "2w", "3_4w", "over_4w"] as const
 export type DurationWeeks = (typeof durationWeekOptions)[number]
 
@@ -62,6 +68,8 @@ export type CampfitInput = {
   readonly shynessLevel: LevelOption
   readonly separationTolerance: LevelOption
   readonly budgetRange: BudgetRange
+  readonly destinationPreference: DestinationPreference
+  readonly travelReadiness: TravelReadiness
   readonly durationWeeks: DurationWeeks
   readonly parentAccompanied: ParentAccompaniedPreference
   readonly koreanManagerRequired: KoreanManagerRequired

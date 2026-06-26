@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { z } from "zod"
 import { ParentAnalysisSchema, RecommendationResultSchema } from "@/schemas/campfit/campfitSchemas"
 import type { CampfitInput, ParentAnalysis, ReadinessAnswers } from "@/types/campfit"
-import { CampfitStepper } from "@/components/campfit/CampfitStepper"
+import { CampfitProgress } from "@/components/campfit/CampfitStepper"
 import { CampReadinessCheck } from "@/components/campfit/CampReadinessCheck"
 import { ConcernStep, FollowUpStep, Header, NavButtons } from "@/components/campfit/FlowSections"
 import { ParentInputForm } from "@/components/campfit/ParentInputForm"
@@ -25,6 +25,8 @@ const initialInput: CampfitInput = {
   shynessLevel: "high",
   separationTolerance: "medium",
   budgetRange: "3m_5m",
+  destinationPreference: "no_preference",
+  travelReadiness: "moderate_distance",
   durationWeeks: "2w",
   parentAccompanied: "preferred",
   koreanManagerRequired: "required",
@@ -142,10 +144,10 @@ export function CampfitFlow() {
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-[1180px] gap-8 px-4 py-8 md:px-6 md:py-10">
+    <div className="mx-auto grid min-h-dvh w-full max-w-[1180px] gap-6 px-4 py-6 md:px-6 md:py-8">
       <Header />
-      <CampfitStepper currentStep={step} />
-      <main className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-5 shadow-[0_14px_40px_rgb(21_94_239_/_0.10)] md:p-8">
+      <CampfitProgress currentStep={step} />
+      <main className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 shadow-[0_14px_40px_rgb(21_94_239_/_0.10)] md:p-7">
         {step === 1 ? <ParentInputForm input={input} onChange={setInput} /> : null}
         {step === 2 ? <ConcernStep input={input} onChange={setInput} /> : null}
         {step === 3 && analysis ? <ParentInsightSummary analysis={analysis} /> : null}
@@ -168,10 +170,11 @@ export function CampfitFlow() {
           />
         ) : null}
       </main>
-      <p className="max-w-3xl text-sm leading-6 text-[var(--text-tertiary)]">
-        본 결과는 학부모 입력과 간단한 캠프 적응도 체크를 바탕으로 한 해외캠프 선택 참고자료입니다.
-        정식 영어 레벨테스트, 심리검사, 전문 상담을 대체하지 않습니다.
-      </p>
+      <aside className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] px-4 py-3 text-sm leading-6 text-[var(--text-tertiary)]">
+        <p className="[word-break:keep-all]">
+          이 결과는 캠프 비교를 돕는 참고자료입니다. 영어 레벨테스트, 심리검사, 전문 상담을 대체하지 않습니다.
+        </p>
+      </aside>
     </div>
   )
 }

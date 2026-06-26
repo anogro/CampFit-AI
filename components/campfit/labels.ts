@@ -25,6 +25,17 @@ export const optionLabels = {
     "5m_8m": "500만-800만 원",
     over_8m: "800만 원 이상",
   },
+  destinationPreference: {
+    no_preference: "아직 모르겠음",
+    southeast_asia: "동남아 관리형",
+    oceania: "호주/뉴질랜드",
+    north_america: "미국/캐나다",
+  },
+  travelReadiness: {
+    short_flight_care: "짧은 비행과 촘촘한 관리",
+    moderate_distance: "거리보다 프로그램 적합도",
+    long_flight_independent: "장거리·독립형도 가능",
+  },
   durationWeeks: {
     "1w": "1주",
     "2w": "2주",

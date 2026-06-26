@@ -31,7 +31,11 @@ NEXT_PUBLIC_SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-If Gemini or Supabase variables are missing, the app still runs with fallback analysis and skips persistence.
+Set the same variables in Vercel under Project Settings -> Environment Variables.
+
+If `GEMINI_API_KEY` is missing, CampFit still recommends camps with the rule-based matching engine.
+Gemini is used for parent-input analysis and more natural recommendation wording.
+If Supabase variables are missing, persistence is skipped.
 
 ## Supabase
 

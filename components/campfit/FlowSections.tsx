@@ -1,18 +1,29 @@
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2 } from "lucide-react"
 import type { CampfitInput, ParentAnalysis } from "@/types/campfit"
 
 export function Header() {
   return (
-    <header className="grid gap-4">
-      <p className="text-sm font-bold text-[var(--accent-primary)]">우리아이 캠프핏 AI</p>
-      <div className="grid gap-3 lg:grid-cols-[1fr_360px] lg:items-end">
-        <h1 className="text-4xl font-black leading-tight text-[var(--text-primary)] md:text-5xl">
-          해외 영어캠프, 난이도와 완충장치까지 같이 봅니다.
-        </h1>
-        <p className="text-base leading-7 text-[var(--text-secondary)]">
-          학부모 고민, 아이의 간단한 캠프 영어 적응도, 캠프별 도전 강도를 함께 비교해 Top 3를 추천합니다.
+    <header className="grid gap-6 rounded-lg bg-[var(--surface-secondary)] p-5 shadow-[0_1px_2px_rgb(16_32_51_/_0.04)] md:p-8">
+      <div className="grid gap-5 lg:grid-cols-[1fr_360px] lg:items-end">
+        <div className="grid gap-4">
+          <p className="text-sm font-bold text-[var(--accent-primary)]">CampFit AI</p>
+          <h1 className="max-w-3xl text-3xl font-black leading-tight text-[var(--text-primary)] [word-break:keep-all] sm:text-4xl md:text-5xl">
+            <span className="block">우리 아이에게 맞는</span>
+            <span className="block">캠프를 찾아보세요.</span>
+          </h1>
+        </div>
+        <p className="text-base leading-7 text-[var(--text-secondary)] [word-break:keep-all]">
+          영어 수준, 분리 적응, 예산, 보호 장치를 함께 보고 무리한 추천을 걸러냅니다.
         </p>
       </div>
+      <ul className="grid gap-2 text-sm text-[var(--text-secondary)] sm:grid-cols-3">
+        {["나이만 입력하면 학년은 자동 반영", "처음엔 대략 선택해도 추천 가능", "상담 전 비교용 결과 저장"].map((item) => (
+          <li key={item} className="flex items-center gap-2">
+            <CheckCircle2 size={17} className="text-[var(--status-success)]" aria-hidden="true" />
+            <span className="[word-break:keep-all]">{item}</span>
+          </li>
+        ))}
+      </ul>
     </header>
   )
 }
@@ -96,7 +107,7 @@ export function NavButtons({
         disabled={!canContinue || isLoading}
       >
         {isLoading ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : null}
-        {step === 2 ? "AI 분석하기" : step === 5 ? "추천 결과 보기" : "다음"}
+        {step === 1 ? "아이 상황 이어서 입력" : step === 2 ? "AI 분석하기" : step === 5 ? "추천 결과 보기" : "다음"}
         <ArrowRight size={17} aria-hidden="true" />
       </button>
     </div>

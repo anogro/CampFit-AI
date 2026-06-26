@@ -1,6 +1,7 @@
 import { z } from "zod"
 import {
   budgetRangeOptions,
+  destinationPreferenceOptions,
   durationWeekOptions,
   englishSelfLevels,
   fitTypes,
@@ -11,6 +12,7 @@ import {
   parentAccompaniedOptions,
   programTypeOptions,
   supportKeys,
+  travelReadinessOptions,
 } from "@/types/campfit"
 
 export const CampfitInputSchema = z.object({
@@ -21,6 +23,8 @@ export const CampfitInputSchema = z.object({
   shynessLevel: z.enum(levelOptions),
   separationTolerance: z.enum(levelOptions),
   budgetRange: z.enum(budgetRangeOptions),
+  destinationPreference: z.enum(destinationPreferenceOptions),
+  travelReadiness: z.enum(travelReadinessOptions),
   durationWeeks: z.enum(durationWeekOptions),
   parentAccompanied: z.enum(parentAccompaniedOptions),
   koreanManagerRequired: z.enum(koreanManagerRequiredOptions),

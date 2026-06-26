@@ -11,7 +11,14 @@ export function buildAnalyzeParentInputPrompt(input: CampfitInput): string {
 - 아이를 부정적으로 평가하지 않는다.
 - 영어 초급 또는 낯가림이 있다는 이유만으로 영어몰입형을 배제하지 않는다.
 - 부모의 성장 목표와 캠프 완충장치 가능성을 함께 고려한다.
+- 동남아, 호주/뉴질랜드, 북미는 단순 가격 차이가 아니라 비행거리, 관리 밀도,
+  영어 노출 강도, 아이의 독립 생활 부담이 다르다는 점을 반영한다.
+- destinationPreference와 travelReadiness를 지역 추천 해석에 반드시 사용한다.
 - followUpQuestions는 추천 정확도를 높이는 질문 1~2개만 생성한다.
+- followUpQuestions는 학부모가 바로 답할 수 있는 자연스러운 한국어로 쓴다.
+- "허용", "독립 경험", "부모 동반보다" 같은 딱딱하거나 비교가 어색한 표현은 쓰지 않는다.
+- 좋은 질문 예: "부모님이 함께하지 않는 시간은 하루에 어느 정도까지 괜찮을까요?"
+- 좋은 질문 예: "아이 혼자 참여하는 일정에서 어느 정도의 관리가 필요할까요?"
 - 모든 숫자는 0~1 사이로 반환한다.
 - 지원 키는 beginner_class, korean_manager, korean_dorm_option, parent_accompanied,
   buddy_system, early_adaptation_support, daily_parent_report,

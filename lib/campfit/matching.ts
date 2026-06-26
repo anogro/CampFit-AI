@@ -10,6 +10,7 @@ import type {
   RecommendationExplanation,
   SupportKey,
 } from "@/types/campfit"
+import { calculateDestinationFit, calculateTravelFit } from "@/lib/campfit/destinationFit"
 import { average, clamp01, toPercentScore, weightedAverage } from "@/lib/campfit/utils"
 
 const budgetMaxByRange = {
@@ -81,10 +82,17 @@ function scoreCamp(camp: Camp, matchInput: MatchInput): CampRecommendation {
     ...matchInput.analysis.supportNeeded,
     ...matchInput.readiness.recommendedSupport,
   ])
+  const destinationFit = calculateDestinationFit(camp, matchInput.input.destinationPreference)
+  const travelFit = calculateTravelFit(camp, matchInput.input.travelReadiness)
   const residualRisk = clamp01(challengeLoad - childReadiness - supportBuffer * 0.45)
   const growthPotential = calculateGrowthPotential(camp, matchInput.analysis, childReadiness)
   const finalScore = clamp01(
-    goalFit * 0.33 + supportFit * 0.25 + growthPotential * 0.24 + (1 - residualRisk) * 0.18,
+    goalFit * 0.28 +
+      supportFit * 0.21 +
+      growthPotential * 0.21 +
+      (1 - residualRisk) * 0.14 +
+      destinationFit * 0.09 +
+      travelFit * 0.07,
   )
   const fitType = classifyFit({ challengeLoad, childReadiness, supportBuffer, growthPotential })
 
@@ -224,7 +232,7 @@ function buildRuleBasedExplanation(
     questionsBeforeConsultation: [
       "초급반 또는 적응 지원이 실제로 어떤 방식으로 운영되는지 확인해 주세요.",
       camp.parentAccompanied
-        ? "부모 동반 일정에서 아이가 독립적으로 참여하는 시간이 어느 정도인지 확인해 주세요."
+        ? "부모님과 떨어져 참여하는 시간이 하루에 어느 정도인지 확인해 주세요."
         : "초기 3-5일 생활 적응을 누가 어떻게 확인하는지 상담 전에 물어보세요.",
       "최종 비용에 포함되지 않는 교재, 액티비티, 생활 관리 비용이 있는지 확인해 주세요.",
     ],

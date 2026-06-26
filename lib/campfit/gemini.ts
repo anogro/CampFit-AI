@@ -43,7 +43,10 @@ export async function analyzeParentInput(input: CampfitInput): Promise<ParentAna
     return fallbackAnalysis(input)
   }
 
-  return result.data
+  return {
+    ...result.data,
+    followUpQuestions: polishFollowUpQuestions(result.data.followUpQuestions, input),
+  }
 }
 
 export async function enrichRecommendationExplanations(
@@ -191,11 +194,31 @@ function fallbackAnalysis(input: CampfitInput): ParentAnalysis {
       "처음 적응을 돕는 완충장치가 추천 품질에 중요한 조건입니다.",
       "캠프 난이도는 낮추기보다 지원 구조와 함께 비교하는 방향이 적합합니다.",
     ],
-    followUpQuestions: [
-      "캠프 초반 3일 동안 아이가 가장 걱정할 만한 상황은 무엇인가요?",
-      "부모 동반보다 아이의 독립 경험을 어느 정도까지 허용할 수 있나요?",
-    ],
+    followUpQuestions: buildDefaultFollowUpQuestions(input),
   }
+}
+
+function buildDefaultFollowUpQuestions(input: CampfitInput): readonly string[] {
+  const separationQuestion =
+    input.parentAccompanied === "required" || input.parentAccompanied === "preferred"
+      ? "부모님이 함께하지 않는 시간은 하루에 어느 정도까지 괜찮을까요?"
+      : "아이 혼자 참여하는 일정에서 어느 정도의 관리가 필요할까요?"
+
+  return ["캠프 초반에 아이가 가장 어려워할 것 같은 상황은 무엇인가요?", separationQuestion]
+}
+
+function polishFollowUpQuestions(questions: readonly string[], input: CampfitInput): readonly string[] {
+  return questions.map((question) => {
+    if (question.includes("부모 동반보다") || question.includes("독립 경험") || question.includes("허용")) {
+      return buildDefaultFollowUpQuestions(input)[1] ?? question
+    }
+
+    if (question.includes("캠프 초반 3일 동안 아이가 가장 걱정할 만한 상황")) {
+      return "캠프 초반에 아이가 가장 어려워할 것 같은 상황은 무엇인가요?"
+    }
+
+    return question
+  })
 }
 
 function englishReadinessFromSelfLevel(level: CampfitInput["englishSelfLevel"]): number {

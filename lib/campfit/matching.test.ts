@@ -36,6 +36,8 @@ const baseInput: CampfitInput = {
   shynessLevel: "high",
   separationTolerance: "medium",
   budgetRange: "5m_8m",
+  destinationPreference: "no_preference",
+  travelReadiness: "moderate_distance",
   durationWeeks: "2w",
   parentAccompanied: "preferred",
   koreanManagerRequired: "required",
@@ -96,6 +98,8 @@ describe("recommendCamps", () => {
         shynessLevel: "low",
         separationTolerance: "high",
         budgetRange: "over_8m",
+        destinationPreference: "north_america",
+        travelReadiness: "long_flight_independent",
         durationWeeks: "3_4w",
         koreanManagerRequired: "not_needed",
         preferredProgramType: "international_camp",
@@ -118,5 +122,23 @@ describe("recommendCamps", () => {
 
     expect(recommendations.length).toBeGreaterThan(0)
     expect(recommendations.some((item) => item.camp.country === "New Zealand" || item.camp.country === "Canada")).toBe(true)
+  })
+
+  it("Given same budget but Southeast Asia preference When recommending Then nearby managed options rank higher", () => {
+    const readiness = scoreCampReadiness(basicAnswers)
+
+    const recommendations = recommendCamps({
+      input: {
+        ...baseInput,
+        budgetRange: "over_8m",
+        destinationPreference: "southeast_asia",
+        travelReadiness: "short_flight_care",
+      },
+      analysis: baseAnalysis,
+      readiness,
+    })
+
+    expect(recommendations.length).toBeGreaterThan(0)
+    expect(["Philippines", "Singapore", "Malaysia"]).toContain(recommendations[0]?.camp.country)
   })
 })
