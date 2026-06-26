@@ -11,10 +11,17 @@ const parentConcernExamples = [
   "만 12세 아이이고 영어 회화는 어느 정도 됩니다. 이번에는 독립심과 현지 친구 경험을 기대하고 있습니다. 다만 장거리 이동과 기숙사 생활은 처음이라 생활 관리가 어느 정도 있는지 확인하고 싶습니다.",
 ] as const
 
-const followUpExamples = [
-  "첫날 밤 잠자리와 낯선 환경을 가장 힘들어할 것 같아요.",
-  "영어로 도움을 요청하지 못하고 혼자 참을까 봐 걱정됩니다.",
-  "처음 며칠은 한국어로 상황을 확인해 줄 수 있으면 좋겠습니다.",
+const followUpExampleSets = [
+  [
+    "첫날 밤 잠자리와 낯선 환경을 가장 힘들어할 것 같아요.",
+    "영어로 도움을 요청하지 못하고 혼자 참을까 봐 걱정됩니다.",
+    "처음 며칠은 한국어로 상황을 확인해 줄 수 있으면 좋겠습니다.",
+  ],
+  [
+    "친구 관계가 어색해 보이면 선생님이 먼저 짝 활동이나 소그룹 활동으로 연결해 주면 좋겠습니다.",
+    "아이가 혼자 있거나 말수가 줄어들 때 한국어로 짧게 상태를 확인해 주면 좋겠습니다.",
+    "초반에는 룸메이트나 같은 조 친구와 자연스럽게 어울릴 수 있도록 생활 관리자가 한 번씩 챙겨주면 좋겠습니다.",
+  ],
 ] as const
 
 export function Header() {
@@ -133,7 +140,7 @@ export function FollowUpStep({
               {question}
             </label>
             <ExamplePicker
-              examples={followUpExamples}
+              examples={followUpExampleSets[index] ?? followUpExampleSets[0]}
               onSelect={(example) =>
                 onChange(answers.map((answer, answerIndex) => (answerIndex === index ? example : answer)))
               }
