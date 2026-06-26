@@ -29,11 +29,15 @@ export async function POST(request: Request) {
   const baseResult = {
     sessionId,
     analysis: parsed.data.analysis,
+    aiUsage: {
+      parentAnalysis: parsed.data.aiUsage?.parentAnalysis ?? false,
+      recommendationExplanation: enriched.aiUsed,
+    },
     readiness,
-    recommendations: enriched,
+    recommendations: enriched.recommendations,
   }
   const result: RecommendationResult =
-    enriched.length === 0
+    enriched.recommendations.length === 0
       ? { ...baseResult, noCandidateMessage: buildNoCandidateMessage(parsed.data.input) }
       : baseResult
 

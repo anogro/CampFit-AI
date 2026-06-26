@@ -38,19 +38,20 @@ export function ParentInputForm({ input, onChange }: ParentInputFormProps) {
   return (
     <section className="grid gap-6" aria-labelledby="basic-profile-title">
       <div className="grid gap-2">
-        <p className="text-sm font-bold text-[var(--accent-primary)]">30초 기본 진단</p>
-        <h2 id="basic-profile-title" className="text-2xl font-black leading-tight text-[var(--text-primary)] [word-break:keep-all]">
+        <p className="text-xs font-semibold tracking-[0.01em] text-[var(--accent-primary)]">30초 기본 진단</p>
+        <h2 id="basic-profile-title" className="text-[1.625rem] font-bold leading-tight tracking-[-0.02em] text-[var(--text-primary)] [word-break:keep-all]">
           먼저 아이에게 맞는 캠프 범위를 좁혀볼게요.
         </h2>
         <p className="max-w-2xl text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">
-          학년은 나이로 자동 반영합니다. 처음에는 정확한 답보다 현재 느낌에 가까운 선택이 더 도움이 됩니다.
+          학년은 만 나이로 자동 반영합니다. 처음에는 정확한 답보다 현재 느낌에 가까운 선택이 더 도움이 됩니다.
         </p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-        <div className="grid gap-4 rounded-lg bg-[var(--surface-elevated)] p-4">
+        <div className="grid content-start gap-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+          <SectionLabel eyebrow="기본 정보" title="나이와 영어 출발점" />
           <NumberField
-            label="아이 나이"
+            label="아이 나이 (만 나이)"
             hint={`추천에는 ${inferredGrade} 기준을 함께 사용합니다.`}
             value={input.childAge}
             min={6}
@@ -74,6 +75,7 @@ export function ParentInputForm({ input, onChange }: ParentInputFormProps) {
         </div>
 
         <div className="grid gap-4">
+          <SectionLabel eyebrow="캠프 조건" title="지역, 거리, 관리 방식" />
           <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
               label="낯가림"
@@ -158,10 +160,10 @@ type SelectFieldProps<T extends string> = {
 
 function SelectField<T extends string>({ label, value, options, getLabel, onChange }: SelectFieldProps<T>) {
   return (
-    <label className="grid gap-2 text-sm font-bold text-[var(--text-primary)]">
+    <label className="grid gap-2 text-sm font-semibold text-[var(--text-primary)] [word-break:keep-all]">
       {label}
       <select
-        className="min-h-12 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 text-base text-[var(--text-primary)]"
+        className="min-h-11 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 text-base text-[var(--text-primary)] transition hover:border-[var(--text-tertiary)]"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
@@ -186,18 +188,27 @@ type NumberFieldProps = {
 
 function NumberField({ label, hint, value, min, max, onChange }: NumberFieldProps) {
   return (
-    <label className="grid gap-2 text-sm font-bold text-[var(--text-primary)]">
+    <label className="grid gap-2 text-sm font-semibold text-[var(--text-primary)] [word-break:keep-all]">
       {label}
       <input
-        className="min-h-12 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 text-base text-[var(--text-primary)]"
+        className="min-h-11 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 text-base text-[var(--text-primary)] transition hover:border-[var(--text-tertiary)]"
         type="number"
         min={min}
         max={max}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
       />
-      <span className="text-xs font-medium text-[var(--text-tertiary)]">{hint}</span>
+      <span className="text-xs font-medium leading-5 text-[var(--text-tertiary)] [word-break:keep-all]">{hint}</span>
     </label>
+  )
+}
+
+function SectionLabel({ eyebrow, title }: { readonly eyebrow: string; readonly title: string }) {
+  return (
+    <div className="grid gap-1 border-b border-[var(--border-subtle)] pb-3">
+      <p className="text-xs font-semibold text-[var(--text-tertiary)]">{eyebrow}</p>
+      <p className="font-semibold text-[var(--text-primary)] [word-break:keep-all]">{title}</p>
+    </div>
   )
 }
 

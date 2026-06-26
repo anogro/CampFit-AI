@@ -2,10 +2,10 @@ import type { CampReadinessResult, ReadinessAnswers, SupportKey } from "@/types/
 import { average } from "@/lib/campfit/utils"
 
 const correctAnswers = {
-  q1: "A",
-  q2: "A",
-  q3: "A",
-  q4: "A",
+  q1: "B",
+  q2: "C",
+  q3: "D",
+  q4: "B",
 } as const
 
 export function scoreCampReadiness(answers: ReadinessAnswers): CampReadinessResult {

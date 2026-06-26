@@ -13,6 +13,6 @@ export async function POST(request: Request) {
     )
   }
 
-  const analysis = await analyzeParentInput(parsed.data.input)
-  return NextResponse.json({ analysis })
+  const result = await analyzeParentInput(parsed.data.input)
+  return NextResponse.json({ analysis: result.analysis, aiUsed: result.aiUsed })
 }

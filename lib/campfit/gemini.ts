@@ -1,23 +1,19 @@
 import { z } from "zod"
 import { ParentAnalysisSchema } from "@/schemas/campfit/campfitSchemas"
 import type { CampRecommendation, CampfitInput, ParentAnalysis } from "@/types/campfit"
+import { callGemini } from "@/lib/campfit/geminiClient"
+import { normalizeParentAnalysisCandidate } from "@/lib/campfit/geminiNormalization"
 import { buildAnalyzeParentInputPrompt, buildRecommendationExplainerPrompt } from "@/lib/campfit/prompts"
 
-const defaultModel = "gemini-1.5-flash"
+export type ParentAnalysisResult = {
+  readonly analysis: ParentAnalysis
+  readonly aiUsed: boolean
+}
 
-const GeminiResponseSchema = z.object({
-  candidates: z
-    .array(
-      z.object({
-        content: z
-          .object({
-            parts: z.array(z.object({ text: z.string().optional() })).optional(),
-          })
-          .optional(),
-      }),
-    )
-    .optional(),
-})
+export type RecommendationExplanationResult = {
+  readonly recommendations: readonly CampRecommendation[]
+  readonly aiUsed: boolean
+}
 
 const ExplainerSchema = z.object({
   items: z.array(
@@ -30,98 +26,70 @@ const ExplainerSchema = z.object({
   ),
 })
 
-export async function analyzeParentInput(input: CampfitInput): Promise<ParentAnalysis> {
+export async function analyzeParentInput(input: CampfitInput): Promise<ParentAnalysisResult> {
   const prompt = buildAnalyzeParentInputPrompt(input)
   const text = await callGemini(prompt)
   if (text === null) {
-    return fallbackAnalysis(input)
+    return { analysis: fallbackAnalysis(input), aiUsed: false }
   }
 
-  const parsed = parseJsonObject(text)
+  const fallback = fallbackAnalysis(input)
+  const parsed = normalizeParentAnalysisCandidate(parseJsonObject(text), fallback)
   const result = ParentAnalysisSchema.safeParse(parsed)
   if (!result.success) {
-    return fallbackAnalysis(input)
+    console.error(
+      "Gemini parent analysis schema validation failed",
+      result.error.issues.map((issue) => issue.path.join(".")).join(", "),
+    )
+    return { analysis: fallback, aiUsed: false }
   }
 
   return {
-    ...result.data,
-    followUpQuestions: polishFollowUpQuestions(result.data.followUpQuestions, input),
+    analysis: {
+      ...result.data,
+      followUpQuestions: polishFollowUpQuestions(result.data.followUpQuestions, input),
+    },
+    aiUsed: true,
   }
 }
 
 export async function enrichRecommendationExplanations(
   analysis: ParentAnalysis,
   recommendations: readonly CampRecommendation[],
-): Promise<readonly CampRecommendation[]> {
+): Promise<RecommendationExplanationResult> {
   const prompt = buildRecommendationExplainerPrompt(analysis, recommendations)
   const text = await callGemini(prompt)
   if (text === null) {
-    return recommendations
+    return { recommendations, aiUsed: false }
   }
 
   const parsed = parseJsonObject(text)
   const verified = ExplainerSchema.safeParse(parsed)
   if (!verified.success) {
-    return recommendations
+    console.error(
+      "Gemini recommendation explanation schema validation failed",
+      verified.error.issues.map((issue) => issue.path.join(".")).join(", "),
+    )
+    return { recommendations, aiUsed: false }
   }
 
-  return recommendations.map((recommendation) => {
-    const item = verified.data.items.find((candidate) => candidate.campId === recommendation.camp.id)
-    if (!item) {
-      return recommendation
-    }
+  return {
+    recommendations: recommendations.map((recommendation) => {
+      const item = verified.data.items.find((candidate) => candidate.campId === recommendation.camp.id)
+      if (!item) {
+        return recommendation
+      }
 
-    return {
-      ...recommendation,
-      explanation: {
-        reason: item.reason,
-        caution: item.caution,
-        questionsBeforeConsultation: item.questionsBeforeConsultation,
-      },
-    }
-  })
-}
-
-async function callGemini(prompt: string): Promise<string | null> {
-  const apiKey = process.env["GEMINI_API_KEY"]
-  if (!apiKey) {
-    return null
-  }
-
-  const model = process.env["GEMINI_MODEL"] ?? defaultModel
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
-
-  try {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0.2,
+      return {
+        ...recommendation,
+        explanation: {
+          reason: item.reason,
+          caution: item.caution,
+          questionsBeforeConsultation: item.questionsBeforeConsultation,
         },
-      }),
-    })
-
-    if (!response.ok) {
-      return null
-    }
-
-    const json = await response.json()
-    const parsed = GeminiResponseSchema.safeParse(json)
-    if (!parsed.success) {
-      return null
-    }
-
-    return parsed.data.candidates?.[0]?.content?.parts?.[0]?.text ?? null
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error("Gemini request failed", error.message)
-      return null
-    }
-
-    throw error
+      }
+    }),
+    aiUsed: true,
   }
 }
 
@@ -223,6 +191,8 @@ function polishFollowUpQuestions(questions: readonly string[], input: CampfitInp
 
 function englishReadinessFromSelfLevel(level: CampfitInput["englishSelfLevel"]): number {
   switch (level) {
+    case "unsure":
+      return 0.36
     case "almost_none":
       return 0.25
     case "basic_expression":

@@ -98,6 +98,11 @@ export const RecommendRequestSchema = z.object({
   sessionId: z.string().optional(),
   input: CampfitInputSchema,
   analysis: ParentAnalysisSchema,
+  aiUsage: z
+    .object({
+      parentAnalysis: z.boolean(),
+    })
+    .optional(),
   followUpAnswers: z.array(z.string().max(500)).max(2),
   readinessAnswers: ReadinessAnswersSchema,
 })
@@ -155,6 +160,10 @@ const CampSchema = z.object({
 export const RecommendationResultSchema = z.object({
   sessionId: z.string(),
   analysis: ParentAnalysisSchema,
+  aiUsage: z.object({
+    parentAnalysis: z.boolean(),
+    recommendationExplanation: z.boolean(),
+  }),
   readiness: CampReadinessResultSchema,
   recommendations: z.array(
     z.object({

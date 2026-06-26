@@ -4,6 +4,7 @@ export const gradeLabels = ["초1", "초2", "초3", "초4", "초5", "초6", "중
 
 export const optionLabels = {
   englishSelfLevel: {
+    unsure: "아직 모르겠음",
     almost_none: "거의 처음",
     basic_expression: "간단한 단어/표현",
     simple_conversation: "짧은 대화 가능",

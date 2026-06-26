@@ -46,10 +46,10 @@ const baseInput: CampfitInput = {
 }
 
 const basicAnswers: ReadinessAnswers = {
-  q1: "A",
-  q2: "A",
-  q3: "A",
-  q4: "A",
+  q1: "B",
+  q2: "C",
+  q3: "D",
+  q4: "B",
   q5: "I like soccer.",
   q6: "B",
 }

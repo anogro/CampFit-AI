@@ -2,6 +2,7 @@ export const gradeOptions = ["초1", "초2", "초3", "초4", "초5", "초6", "�
 export type Grade = (typeof gradeOptions)[number]
 
 export const englishSelfLevels = [
+  "unsure",
   "almost_none",
   "basic_expression",
   "simple_conversation",
@@ -123,13 +124,30 @@ export type ParentAnalysis = {
   readonly followUpQuestions: readonly string[]
 }
 
+export type AiUsageStatus = {
+  readonly parentAnalysis: boolean
+  readonly recommendationExplanation: boolean
+}
+
+export type ReadinessChoice = "A" | "B" | "C" | "D"
+export type ReadinessDraftChoice = ReadinessChoice | ""
+
 export type ReadinessAnswers = {
-  readonly q1: "A" | "B" | "C" | "D"
-  readonly q2: "A" | "B" | "C" | "D"
-  readonly q3: "A" | "B" | "C" | "D"
-  readonly q4: "A" | "B" | "C" | "D"
+  readonly q1: ReadinessChoice
+  readonly q2: ReadinessChoice
+  readonly q3: ReadinessChoice
+  readonly q4: ReadinessChoice
   readonly q5: string
-  readonly q6: "A" | "B" | "C" | "D"
+  readonly q6: ReadinessChoice
+}
+
+export type ReadinessDraftAnswers = {
+  readonly q1: ReadinessDraftChoice
+  readonly q2: ReadinessDraftChoice
+  readonly q3: ReadinessDraftChoice
+  readonly q4: ReadinessDraftChoice
+  readonly q5: string
+  readonly q6: ReadinessDraftChoice
 }
 
 export type CampReadinessResult = {
@@ -203,6 +221,7 @@ export type RecommendRequest = {
   readonly sessionId?: string
   readonly input: CampfitInput
   readonly analysis: ParentAnalysis
+  readonly aiUsage?: Pick<AiUsageStatus, "parentAnalysis">
   readonly followUpAnswers: readonly string[]
   readonly readinessAnswers: ReadinessAnswers
 }
@@ -210,6 +229,7 @@ export type RecommendRequest = {
 export type RecommendationResult = {
   readonly sessionId: string
   readonly analysis: ParentAnalysis
+  readonly aiUsage: AiUsageStatus
   readonly readiness: CampReadinessResult
   readonly recommendations: readonly CampRecommendation[]
   readonly noCandidateMessage?: string
