@@ -34,12 +34,12 @@ export function RecommendationProgramCard({ recommendation, rank, onFeedback }: 
   return (
     <article
       className={[
-        "relative overflow-hidden rounded-lg border bg-[var(--surface-secondary)] p-5 shadow-[var(--shadow-card)]",
-        isTopRecommendation ? "border-[var(--accent-primary)] ring-4 ring-[rgb(9_127_232_/_0.10)]" : "border-[var(--border-default)]",
+        "apple-glass relative overflow-hidden rounded-[28px] p-5",
+        isTopRecommendation ? "ring-4 ring-[var(--accent-soft)]" : "",
       ].join(" ")}
     >
       {isTopRecommendation ? (
-        <div className="-mx-5 -mt-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[rgb(9_127_232_/_0.18)] bg-[var(--surface-tint-blue)] px-5 py-3">
+        <div className="-mx-5 -mt-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-tint-blue)] px-5 py-3">
           <p className="text-sm font-bold text-[var(--accent-primary)] [word-break:keep-all]">가장 먼저 상담해볼 추천</p>
           <p className="text-xs font-semibold text-[var(--text-secondary)] [word-break:keep-all]">
             입력 조건과 아이 적응 신호를 함께 봤을 때 우선순위가 가장 높습니다.
@@ -52,14 +52,14 @@ export function RecommendationProgramCard({ recommendation, rank, onFeedback }: 
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={[
-                "rounded-md px-2 py-1 text-xs font-semibold",
+                "apple-pill px-3 py-1 text-xs font-semibold",
                 isTopRecommendation ? "bg-[var(--accent-primary)] text-white" : "bg-[var(--text-primary)] text-white",
               ].join(" ")}
             >
               {rank}순위
             </span>
             <FitTypeBadge fitType={recommendation.fitType} />
-            <span className="rounded-md bg-[var(--surface-tint-blue)] px-2 py-1 text-xs font-semibold text-[var(--status-info)]">
+            <span className="apple-pill bg-[var(--surface-tint-blue)] px-3 py-1 text-xs font-semibold text-[var(--status-info)]">
               {recommendation.score}점
             </span>
           </div>
@@ -76,14 +76,14 @@ export function RecommendationProgramCard({ recommendation, rank, onFeedback }: 
 
         <div
           className={[
-            "rounded-lg border p-4",
+            "rounded-[22px] border p-4 shadow-[var(--shadow-soft)] backdrop-blur-xl",
             isTopRecommendation
-              ? "border-[rgb(9_127_232_/_0.18)] bg-[var(--surface-tint-blue)]"
-              : "border-[var(--border-subtle)] bg-[var(--surface-elevated)]",
+              ? "border-[var(--accent-soft)] bg-[var(--surface-tint-blue)]"
+              : "border-[var(--border-subtle)] bg-[var(--surface-glass)]",
           ].join(" ")}
         >
           {isTopRecommendation ? (
-            <div className="mb-4 rounded-md bg-[var(--surface-secondary)] p-3">
+            <div className="mb-4 rounded-[18px] bg-[var(--surface-glass)] p-3 shadow-[var(--shadow-soft)]">
               <p className="text-xs font-semibold text-[var(--text-tertiary)]">종합 추천 점수</p>
               <p className="mt-1 text-4xl font-bold tracking-[-0.03em] text-[var(--accent-primary)] tabular-nums">
                 {recommendation.score}
@@ -100,7 +100,7 @@ export function RecommendationProgramCard({ recommendation, rank, onFeedback }: 
         </div>
       </div>
 
-      <details className="group mt-5 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)]">
+      <details className="group mt-5 rounded-[22px] border border-[var(--border-subtle)] bg-[var(--surface-glass)] shadow-[var(--shadow-soft)] backdrop-blur-xl">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold text-[var(--text-primary)]">
           상세 근거와 상담 질문 보기
           <ChevronDown
@@ -130,7 +130,7 @@ export function RecommendationProgramCard({ recommendation, rank, onFeedback }: 
         href={anogroHref}
         target="_blank"
         rel="noreferrer"
-        className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--accent-primary)] px-4 text-[15px] font-semibold text-white transition hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+        className="apple-pill mt-5 inline-flex min-h-11 items-center gap-2 bg-[var(--accent-primary)] px-5 text-[15px] font-semibold text-white shadow-[var(--shadow-soft)] transition hover:bg-[var(--accent-hover)] active:scale-[0.98]"
         onClick={() => onFeedback("consultation_requested", recommendation.camp.id)}
       >
         <Send size={17} aria-hidden="true" />
@@ -159,7 +159,7 @@ function ScoreBar({ label, value, tone }: { readonly label: string; readonly val
 
 function InfoBlock({ title, body, warning = false }: { readonly title: string; readonly body: string; readonly warning?: boolean }) {
   return (
-    <div className={warning ? "rounded-md bg-[var(--surface-tint-yellow)] p-4" : "rounded-md bg-[var(--surface-secondary)] p-4"}>
+    <div className={warning ? "rounded-[18px] bg-[rgb(255_204_0_/_0.12)] p-4" : "rounded-[18px] bg-[var(--surface-secondary)] p-4"}>
       <p className={warning ? "font-semibold text-[var(--status-warning)]" : "font-semibold text-[var(--accent-primary)]"}>
         {title}
       </p>

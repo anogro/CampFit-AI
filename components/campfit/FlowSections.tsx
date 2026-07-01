@@ -26,7 +26,7 @@ const followUpExampleSets = [
 
 export function Header() {
   return (
-    <header className="grid gap-6 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-5 shadow-[var(--shadow-card)] md:p-8">
+    <header className="apple-glass grid gap-6 rounded-[28px] p-5 md:p-8">
       <div className="grid gap-5 lg:grid-cols-[1fr_340px] lg:items-end">
         <div className="grid gap-3">
           <p className="text-xs font-semibold tracking-[0.01em] text-[var(--accent-primary)]">CampFit AI</p>
@@ -78,7 +78,7 @@ export function StartScreen({ onStart }: { readonly onStart: () => void }) {
 
       <div>
         <button
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--accent-primary)] px-5 text-[15px] font-semibold text-white transition hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+          className="apple-pill inline-flex min-h-11 items-center justify-center gap-2 bg-[var(--accent-primary)] px-5 text-[15px] font-semibold text-white transition hover:bg-[var(--accent-hover)] active:scale-[0.98]"
           type="button"
           onClick={onStart}
         >
@@ -113,7 +113,7 @@ export function ConcernStep({
       </div>
       <textarea
         id="parent-concern-text"
-        className="min-h-56 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-base font-normal leading-7 text-[var(--text-primary)] transition hover:border-[var(--text-tertiary)]"
+        className="min-h-56 rounded-[18px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 text-base font-normal leading-7 text-[var(--text-primary)] transition hover:border-[var(--text-tertiary)]"
         value={input.parentConcernText}
         onChange={(event) => onChange({ ...input, parentConcernText: event.target.value })}
         placeholder="아이의 현재 소통 수준, 걱정되는 점, 기대하는 변화, 꼭 필요한 관리 조건을 적어 주세요."
@@ -135,8 +135,8 @@ export function FollowUpStep({
     <div className="grid gap-5">
       {analysis.followUpQuestions.map((question, index) => (
         <div key={question} className="grid gap-3">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <label className="text-sm font-semibold text-[var(--text-primary)] [word-break:keep-all]" htmlFor={`follow-up-${index}`}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <label className="min-w-0 text-sm font-semibold leading-6 text-[var(--text-primary)] [word-break:keep-all]" htmlFor={`follow-up-${index}`}>
               {question}
             </label>
             <ExamplePicker
@@ -148,7 +148,7 @@ export function FollowUpStep({
           </div>
           <input
             id={`follow-up-${index}`}
-            className="min-h-11 rounded-md border border-[var(--border-default)] px-3 text-base font-normal transition hover:border-[var(--text-tertiary)]"
+            className="min-h-11 rounded-[18px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-base font-normal transition hover:border-[var(--text-tertiary)]"
             value={answers[index] ?? ""}
             onChange={(event) => onChange(answers.map((answer, answerIndex) => (answerIndex === index ? event.target.value : answer)))}
           />
@@ -174,7 +174,7 @@ export function NavButtons({
   return (
     <div className="mt-8 flex flex-col-reverse gap-3 border-t border-[var(--border-subtle)] pt-5 sm:flex-row sm:justify-between">
       <button
-        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 text-[15px] font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)] active:scale-[0.98] disabled:opacity-50"
+        className="apple-pill inline-flex min-h-11 items-center justify-center gap-2 border border-[var(--border-default)] bg-[var(--surface-secondary)] px-5 text-[15px] font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)] active:scale-[0.98] disabled:opacity-50"
         type="button"
         onClick={onBack}
         disabled={step === 1 || isLoading}
@@ -183,7 +183,7 @@ export function NavButtons({
         이전
       </button>
       <button
-        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--accent-primary)] px-5 text-[15px] font-semibold text-white transition hover:bg-[var(--accent-hover)] active:scale-[0.98] disabled:opacity-50"
+        className="apple-pill inline-flex min-h-11 items-center justify-center gap-2 bg-[var(--accent-primary)] px-6 text-[15px] font-semibold text-white transition hover:bg-[var(--accent-hover)] active:scale-[0.98] disabled:opacity-50"
         type="button"
         onClick={onNext}
         disabled={!canContinue || isLoading}

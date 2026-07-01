@@ -2,9 +2,9 @@
 
 ## 1. Atmosphere & Identity
 
-CampFit AI should feel like a quiet consulting note inside a workspace app: warm, minimal, and parent-friendly. The UI borrows from Notion-style document products: white paper surfaces, warm gray canvas, thin dividers, restrained blue actions, and practical copy.
+CampFit AI should feel like a calm Apple-style decision surface for parents: spacious, cinematic, glassy, and precise. The UI borrows from Apple product pages and iOS glass surfaces: pale neutral canvas, translucent cards, thin hairline borders, capsule actions, restrained blue links, and practical copy.
 
-The product should not feel like a marketing landing page or an admin form. Parents should feel they are calmly narrowing a decision with a consultant, not completing a test.
+The product should not feel like a generic SaaS dashboard or an admin form. Parents should feel they are calmly narrowing a decision in a polished consulting product, not completing a test.
 
 ## 2. Color
 
@@ -12,19 +12,20 @@ The product should not feel like a marketing landing page or an admin form. Pare
 
 | Role | Token | Light | Usage |
 |------|-------|-------|-------|
-| Surface/primary | --surface-primary | #F6F5F4 | Page background |
-| Surface/secondary | --surface-secondary | #FFFFFF | Main cards and form blocks |
-| Surface/elevated | --surface-elevated | #FBFBFA | Quiet callouts and nested work areas |
-| Surface/tint blue | --surface-tint-blue | #F2F9FF | Selected states and info badges |
+| Surface/primary | --surface-primary | #F5F5F7 | Page background |
+| Surface/secondary | --surface-secondary | rgb(255 255 255 / 0.74) | Main glass cards and form blocks |
+| Surface/elevated | --surface-elevated | rgb(255 255 255 / 0.56) | Quiet glass callouts and nested work areas |
+| Surface/glass | --surface-glass | rgb(255 255 255 / 0.68) | Frosted panels |
+| Surface/tint blue | --surface-tint-blue | rgb(0 113 227 / 0.08) | Selected states and info badges |
 | Surface/tint green | --surface-tint-green | #EDF3EC | Positive fit badges |
 | Surface/tint yellow | --surface-tint-yellow | #FBF3DB | Cautions and tension notes |
-| Text/primary | --text-primary | rgb(0 0 0 / 0.95) | Headlines and main text |
-| Text/secondary | --text-secondary | #615D59 | Supporting text |
-| Text/tertiary | --text-tertiary | #A39E98 | Captions and hints |
+| Text/primary | --text-primary | #1D1D1F | Headlines and main text |
+| Text/secondary | --text-secondary | #6E6E73 | Supporting text |
+| Text/tertiary | --text-tertiary | #86868B | Captions and hints |
 | Border/default | --border-default | rgb(0 0 0 / 0.10) | Cards, inputs, controls |
 | Border/subtle | --border-subtle | rgb(0 0 0 / 0.06) | Internal dividers |
-| Accent/primary | --accent-primary | #0075DE | Primary CTA, links, progress |
-| Accent/hover | --accent-hover | #005BAB | Primary hover |
+| Accent/primary | --accent-primary | #0071E3 | Primary CTA, links, progress |
+| Accent/hover | --accent-hover | #0066CC | Primary hover |
 | Accent/soft | --accent-soft | #F2F9FF | Soft selected surface |
 | Status/success | --status-success | #346538 | Positive fit |
 | Status/warning | --status-warning | #956400 | Cautions |
@@ -35,7 +36,7 @@ The product should not feel like a marketing landing page or an admin form. Pare
 ### Rules
 
 - Blue is used sparingly: progress, primary actions, and selected states only.
-- Surfaces stay warm white or white; avoid large saturated sections.
+- Surfaces stay frosted white, pale gray, or white; avoid large saturated sections.
 - Warnings use pale yellow backgrounds, not red blocks.
 
 ## 3. Typography
@@ -101,17 +102,17 @@ All spacing derives from a base of 4px.
 - **States**: current progress only; no visible six-step navigation.
 - **Motion**: width transition only.
 
-### Workspace Card
+### Glass Workspace Card
 
-- **Structure**: white paper surface, 1px warm border, 8px radius, soft Notion-style shadow.
+- **Structure**: translucent white surface, 1px hairline border, 24-32px radius, backdrop blur, restrained Apple-style shadow.
 - **Usage**: main form and result cards.
-- **Motion**: hover is optional; no floating card drama.
+- **Motion**: hover may lift 2-4px with opacity/transform only.
 
 ### Form Control
 
 - **Structure**: label, optional hint, input/select/textarea.
 - **Variants**: text, number, select, textarea, radio tile.
-- **Radius**: 6px for inputs and buttons.
+- **Radius**: 14-18px for inputs and utility controls; CTAs use capsules.
 - **States**: hover border, focus outline, selected blue tint.
 - **Accessibility**: labels are always connected to controls.
 
@@ -158,4 +159,4 @@ Borders provide most separation. Shadows are quiet and only used on the primary 
 
 | Token | Value |
 |-------|-------|
-| --shadow-card | 0 4px 18px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.027), 0 1px 3px rgb(0 0 0 / 0.02) |
+| --shadow-card | 0 24px 70px rgb(0 0 0 / 0.10), 0 8px 24px rgb(0 0 0 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.70) |

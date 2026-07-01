@@ -48,7 +48,7 @@ export function ParentInputForm({ input, onChange }: ParentInputFormProps) {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-        <div className="grid content-start gap-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+        <div className="apple-glass-soft grid content-start gap-4 rounded-[24px] p-5">
           <SectionLabel eyebrow="기본 정보" title="나이와 현재 소통 수준" />
           <NumberField
             label="아이 나이 (만 나이)"
@@ -74,7 +74,7 @@ export function ParentInputForm({ input, onChange }: ParentInputFormProps) {
           />
         </div>
 
-        <div className="grid gap-4">
+        <div className="apple-glass-soft grid gap-4 rounded-[24px] p-5">
           <SectionLabel eyebrow="캠프 조건" title="지역, 거리, 관리 방식" />
           <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
@@ -163,7 +163,7 @@ function SelectField<T extends string>({ label, value, options, getLabel, onChan
     <label className="grid gap-2 text-sm font-semibold text-[var(--text-primary)] [word-break:keep-all]">
       {label}
       <select
-        className="min-h-11 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 text-base text-[var(--text-primary)] transition hover:border-[var(--text-tertiary)]"
+        className="min-h-11 rounded-[18px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-base text-[var(--text-primary)] transition hover:border-[var(--text-tertiary)]"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       >
@@ -191,7 +191,7 @@ function NumberField({ label, hint, value, min, max, onChange }: NumberFieldProp
     <label className="grid gap-2 text-sm font-semibold text-[var(--text-primary)] [word-break:keep-all]">
       {label}
       <input
-        className="min-h-11 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 text-base text-[var(--text-primary)] transition hover:border-[var(--text-tertiary)]"
+        className="min-h-11 rounded-[18px] border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-base text-[var(--text-primary)] transition hover:border-[var(--text-tertiary)]"
         type="number"
         min={min}
         max={max}

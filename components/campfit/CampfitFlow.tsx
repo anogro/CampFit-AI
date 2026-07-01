@@ -148,7 +148,7 @@ export function CampfitFlow() {
     <div className="mx-auto grid min-h-dvh w-full max-w-[1120px] gap-5 px-4 py-5 md:px-6 md:py-8">
       <Header />
       {step > 0 ? <CampfitProgress currentStep={step} /> : null}
-      <main className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 shadow-[var(--shadow-card)] md:p-6">
+      <main className="apple-glass rounded-[28px] p-4 md:p-6">
         {step === 1 ? <ParentInputForm input={input} onChange={setInput} /> : null}
         {step === 2 ? <ConcernStep input={input} onChange={setInput} /> : null}
         {step === 3 && analysis ? <ParentInsightSummary analysis={analysis} aiUsed={analysisAiUsed} /> : null}

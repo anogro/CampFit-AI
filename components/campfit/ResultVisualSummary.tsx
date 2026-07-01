@@ -50,7 +50,7 @@ export function ResultVisualSummary({ result }: { readonly result: Recommendatio
   ] as const
 
   return (
-    <section className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-5 shadow-[var(--shadow-card)]">
+    <section className="apple-glass rounded-[28px] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold text-[var(--accent-primary)]">결과 리포트</p>
@@ -95,7 +95,7 @@ export function ResultVisualSummary({ result }: { readonly result: Recommendatio
           ))}
         </div>
         <button
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 text-sm font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-tint-blue)] active:scale-[0.98]"
+          className="apple-pill inline-flex min-h-11 items-center justify-center gap-2 border border-[var(--border-default)] bg-[var(--surface-glass)] px-5 text-sm font-semibold text-[var(--text-primary)] shadow-[var(--shadow-soft)] transition hover:bg-[var(--surface-tint-blue)] active:scale-[0.98]"
           type="button"
           onClick={() => downloadReport(result)}
         >
@@ -109,7 +109,7 @@ export function ResultVisualSummary({ result }: { readonly result: Recommendatio
 
 function Metric({ metric }: { readonly metric: MetricCard }) {
   return (
-    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+    <div className="apple-glass-soft rounded-[22px] p-4">
       <p className="text-xs font-semibold text-[var(--text-tertiary)]">{metric.label}</p>
       <p className="mt-2 line-clamp-2 font-semibold leading-6 text-[var(--text-primary)] [word-break:keep-all]">{metric.value}</p>
       <p className="mt-1 text-xs leading-5 text-[var(--text-tertiary)] [word-break:keep-all]">{metric.helper}</p>
@@ -119,7 +119,7 @@ function Metric({ metric }: { readonly metric: MetricCard }) {
 
 function ScoreList({ title, scores }: { readonly title: string; readonly scores: readonly AxisScore[] }) {
   return (
-    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+    <div className="apple-glass-soft rounded-[22px] p-4">
       <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
       <div className="mt-3 grid gap-3">
         {scores.map((score) => (
@@ -150,14 +150,14 @@ function SupportPanel({ result }: { readonly result: RecommendationResultView })
   const supportItems = [...new Set([...result.analysis.supportNeeded, ...result.readiness.recommendedSupport])].slice(0, 6)
 
   return (
-    <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-tint-yellow)] p-4">
+    <div className="rounded-[22px] border border-[rgb(255_204_0_/_0.32)] bg-[rgb(255_204_0_/_0.12)] p-4 shadow-[var(--shadow-soft)] backdrop-blur-xl">
       <div className="flex items-center gap-2">
         <FileText size={17} className="text-[var(--status-warning)]" aria-hidden="true" />
         <p className="text-sm font-semibold text-[var(--text-primary)]">상담 전 확인할 보호 장치</p>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {supportItems.map((item) => (
-          <span key={item} className="rounded-md bg-[var(--surface-secondary)] px-2 py-1 text-xs font-semibold text-[var(--text-secondary)]">
+          <span key={item} className="apple-pill bg-[var(--surface-glass)] px-3 py-1 text-xs font-semibold text-[var(--text-secondary)]">
             {supportLabels[item]}
           </span>
         ))}

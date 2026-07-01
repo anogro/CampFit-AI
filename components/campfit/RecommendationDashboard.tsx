@@ -22,13 +22,13 @@ export function RecommendationDashboard({ result, onFeedback, feedbackStatus }: 
       <ResultVisualSummary result={result} />
 
       {result.noCandidateMessage ? (
-        <section className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-tint-yellow)] p-5">
+        <section className="rounded-[24px] border border-[rgb(255_204_0_/_0.32)] bg-[rgb(255_204_0_/_0.12)] p-5 shadow-[var(--shadow-soft)] backdrop-blur-xl">
           <p className="font-semibold leading-7 text-[var(--status-warning)] [word-break:keep-all]">{result.noCandidateMessage}</p>
         </section>
       ) : null}
 
       {cityRecommendations.length > 0 ? (
-        <section className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-5 shadow-[var(--shadow-card)]">
+        <section className="apple-glass rounded-[28px] p-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-[var(--accent-primary)]">도시 추천</p>
@@ -67,7 +67,7 @@ export function RecommendationDashboard({ result, onFeedback, feedbackStatus }: 
         ))}
       </div>
 
-      <section className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-5">
+      <section className="apple-glass-soft rounded-[24px] p-5">
         <div className="flex items-center gap-2">
           <MessageCircle size={19} aria-hidden="true" />
           <h3 className="text-lg font-semibold text-[var(--text-primary)]">추천 피드백</h3>
@@ -117,14 +117,14 @@ function CityCard({ city, rank }: { readonly city: CitySummary; readonly rank: n
   return (
     <article
       className={[
-        "rounded-lg border p-4",
+        "rounded-[24px] border p-4 shadow-[var(--shadow-soft)] backdrop-blur-xl",
         rank === 1
           ? "border-[var(--accent-primary)] bg-[var(--surface-tint-blue)]"
-          : "border-[var(--border-subtle)] bg-[var(--surface-elevated)]",
+          : "border-[var(--border-subtle)] bg-[var(--surface-glass)]",
       ].join(" ")}
     >
       <div className="flex items-center justify-between gap-3">
-        <span className="rounded-md bg-[var(--text-primary)] px-2 py-1 text-xs font-semibold text-white">{rank}순위</span>
+        <span className="apple-pill bg-[var(--text-primary)] px-3 py-1 text-xs font-semibold text-white">{rank}순위</span>
         <span className="text-sm font-bold tabular-nums text-[var(--accent-primary)]">{city.averageScore}점</span>
       </div>
       <h4 className="mt-4 text-lg font-bold text-[var(--text-primary)] [word-break:keep-all]">
@@ -135,7 +135,7 @@ function CityCard({ city, rank }: { readonly city: CitySummary; readonly rank: n
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {city.traits.map((trait) => (
-          <span key={trait} className="rounded-md bg-[var(--surface-secondary)] px-2 py-1 text-xs font-semibold text-[var(--text-secondary)]">
+          <span key={trait} className="apple-pill bg-[var(--surface-secondary)] px-3 py-1 text-xs font-semibold text-[var(--text-secondary)]">
             {trait}
           </span>
         ))}
@@ -150,7 +150,7 @@ function CityCard({ city, rank }: { readonly city: CitySummary; readonly rank: n
 function FeedbackButton({ label, onClick }: { readonly label: string; readonly onClick: () => void }) {
   return (
     <button
-      className="min-h-11 rounded-md border border-[var(--border-default)] px-4 font-semibold text-[var(--text-primary)] transition hover:bg-[var(--surface-elevated)] active:scale-[0.98]"
+      className="apple-pill min-h-11 border border-[var(--border-default)] bg-[var(--surface-glass)] px-5 font-semibold text-[var(--text-primary)] shadow-[var(--shadow-soft)] transition hover:bg-[var(--surface-tint-blue)] active:scale-[0.98]"
       type="button"
       onClick={onClick}
     >

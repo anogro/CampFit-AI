@@ -26,9 +26,9 @@ const infoCards = [
 
 export function CampfitStartHero({ onStart }: { readonly onStart: () => void }) {
   return (
-    <main className="min-h-dvh bg-[var(--surface-primary)]">
+    <main className="min-h-dvh bg-transparent">
       <section className="px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-        <div className="mx-auto flex min-h-[calc(100svh-32px)] w-full max-w-[1280px] flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-5 shadow-[var(--shadow-card)] sm:min-h-[calc(100svh-48px)] sm:px-8 sm:py-7 lg:px-10">
+        <div className="apple-glass mx-auto flex min-h-[calc(100svh-32px)] w-full max-w-[1280px] flex-col overflow-hidden rounded-[32px] px-4 py-5 sm:min-h-[calc(100svh-48px)] sm:px-8 sm:py-7 lg:px-10">
           <header className="flex items-center justify-between gap-4">
             <p className="text-sm font-bold tracking-[0.01em] text-[var(--text-primary)]">CampFit AI</p>
             <p className="hidden text-sm font-medium text-[var(--text-tertiary)] [word-break:keep-all] sm:block">
@@ -40,7 +40,7 @@ export function CampfitStartHero({ onStart }: { readonly onStart: () => void }) 
         </div>
       </section>
 
-      <section className="relative z-10 -mt-8 bg-[var(--surface-primary)] px-4 pb-16 pt-10 md:px-6 md:pb-20">
+      <section className="relative z-10 -mt-8 px-4 pb-16 pt-10 md:px-6 md:pb-20">
         <div className="mx-auto grid max-w-[1120px] gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
           <div className="grid gap-5">
             <p className="text-sm font-bold text-[var(--accent-primary)]">CampFit AI</p>
@@ -62,7 +62,7 @@ export function CampfitStartHero({ onStart }: { readonly onStart: () => void }) 
             </ul>
             <div>
               <button
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-[var(--accent-primary)] px-5 text-base font-bold text-white transition hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+                className="apple-pill inline-flex min-h-12 items-center justify-center gap-2 bg-[var(--accent-primary)] px-6 text-base font-bold text-white transition hover:bg-[var(--accent-hover)] active:scale-[0.98]"
                 type="button"
                 onClick={onStart}
               >
@@ -76,12 +76,12 @@ export function CampfitStartHero({ onStart }: { readonly onStart: () => void }) 
             {infoCards.map((card) => (
               <article
                 key={card.title}
-                className="overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] shadow-[var(--shadow-card)] transition hover:-translate-y-1 hover:shadow-[0_12px_32px_rgb(0_0_0_/_0.10)] motion-reduce:transition-none"
+                className="apple-glass-soft overflow-hidden rounded-[24px] transition hover:-translate-y-1 motion-reduce:transition-none"
               >
                 <div className="aspect-[4/3] overflow-hidden bg-[var(--surface-elevated)]">
                   <img src={card.image} alt={card.alt} className="h-full w-full object-cover" loading="lazy" />
                 </div>
-                <div className="grid gap-2 p-4">
+                <div className="grid gap-2 p-5">
                   <h3 className="text-base font-bold leading-snug text-[var(--text-primary)] [word-break:keep-all]">{card.title}</h3>
                   <p className="text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{card.text}</p>
                 </div>

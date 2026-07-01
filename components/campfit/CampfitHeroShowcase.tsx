@@ -10,35 +10,30 @@ const heroSlides = [
     alt: "해외 도시에서 가족과 즐겁게 여행하는 아이",
     label: "도시 경험",
     title: "낯선 도시도 부모와 함께라면 첫 경험이 됩니다.",
-    cardTone: "bg-[var(--surface-tint-yellow)]",
   },
   {
     src: "/campfit/hero-school.png",
     alt: "해외 학교 교실에서 친구들과 대화하는 아이들",
     label: "학교 수업",
     title: "또래와 대화하는 시간이 영어 자신감의 시작이 됩니다.",
-    cardTone: "bg-[var(--surface-elevated)]",
   },
   {
     src: "/campfit/hero-oneday-class.png",
     alt: "해외 캠프 쿠킹 클래스에서 피자를 만들며 웃는 아이",
     label: "생활 액티비티",
     title: "영어는 책상 밖에서 더 자연스럽게 시작됩니다.",
-    cardTone: "bg-[var(--surface-tint-green)]",
   },
   {
     src: "/campfit/hero-camp.png",
     alt: "자연 속 캠프장에서 함께 놀이 활동을 하는 아이들",
     label: "자연 캠프",
     title: "몸으로 부딪히는 활동은 적응의 긴장을 낮춰줍니다.",
-    cardTone: "bg-[var(--surface-tint-yellow)]",
   },
   {
     src: "/campfit/hero-steam.png",
     alt: "해외 STEAM 수업에서 친구들과 실험하는 아이들",
     label: "또래 STEAM",
     title: "함께 웃는 순간이 적응의 속도를 바꿉니다.",
-    cardTone: "bg-[var(--surface-tint-blue)]",
   },
 ] as const
 
@@ -142,7 +137,7 @@ export function CampfitHeroShowcase({ onStart }: { readonly onStart: () => void 
   return (
     <div className="flex flex-1 flex-col justify-center gap-7 py-8 lg:gap-9 lg:py-10">
       <div className="mx-auto grid w-full max-w-5xl gap-4 text-center">
-        <p className="mx-auto inline-flex w-fit items-center gap-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)]">
+        <p className="apple-pill mx-auto inline-flex w-fit items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-glass)] px-3 py-2 text-xs font-semibold text-[var(--text-secondary)] shadow-[var(--shadow-soft)]">
           <span className="h-2 w-2 rounded-full bg-[var(--accent-primary)]" aria-hidden="true" />
           {currentSlide.label}
         </p>
@@ -177,7 +172,7 @@ export function CampfitHeroShowcase({ onStart }: { readonly onStart: () => void 
           return (
             <button
               key={slide.src}
-              className={`absolute left-1/2 top-1/2 w-[84%] max-w-[340px] overflow-hidden rounded-lg border border-[var(--border-default)] p-2 text-left shadow-[var(--shadow-card)] transition ease-[cubic-bezier(0.2,0.6,0.25,1)] motion-reduce:transition-none sm:w-[34%] sm:max-w-[360px] ${slide.cardTone} ${position.opacityClass} ${
+              className={`apple-glass-soft absolute left-1/2 top-1/2 w-[84%] max-w-[340px] overflow-hidden rounded-[28px] p-2 text-left transition ease-[cubic-bezier(0.2,0.6,0.25,1)] motion-reduce:transition-none sm:w-[34%] sm:max-w-[360px] ${position.opacityClass} ${
                 dragState ? "duration-0" : "duration-700"
               } ${isActive ? "z-20" : Math.abs(offset) === 1 ? "z-10" : "z-0"}`}
               style={cardStyle}
@@ -191,7 +186,7 @@ export function CampfitHeroShowcase({ onStart }: { readonly onStart: () => void 
               }}
             >
               <span className="sr-only">{slide.label}</span>
-              <span className="block aspect-[5/4] overflow-hidden rounded-md bg-[var(--surface-secondary)]">
+              <span className="block aspect-[5/4] overflow-hidden rounded-[22px] bg-[var(--surface-secondary)]">
                 <img
                   src={slide.src}
                   alt={slide.alt}
@@ -215,7 +210,7 @@ export function CampfitHeroShowcase({ onStart }: { readonly onStart: () => void 
           </p>
         </div>
         <button
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-[var(--accent-primary)] px-5 text-base font-bold text-white transition hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+          className="apple-pill inline-flex min-h-12 items-center justify-center gap-2 bg-[var(--accent-primary)] px-6 text-base font-bold text-white transition hover:bg-[var(--accent-hover)] active:scale-[0.98]"
           type="button"
           onClick={onStart}
         >
