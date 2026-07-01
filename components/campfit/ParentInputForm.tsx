@@ -49,7 +49,7 @@ export function ParentInputForm({ input, onChange }: ParentInputFormProps) {
 
       <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
         <div className="grid content-start gap-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
-          <SectionLabel eyebrow="기본 정보" title="나이와 영어 출발점" />
+          <SectionLabel eyebrow="기본 정보" title="나이와 현재 소통 수준" />
           <NumberField
             label="아이 나이 (만 나이)"
             hint={`추천에는 ${inferredGrade} 기준을 함께 사용합니다.`}
@@ -59,7 +59,7 @@ export function ParentInputForm({ input, onChange }: ParentInputFormProps) {
             onChange={(childAge) => onChange({ ...input, childAge, grade: gradeFromAge(childAge) })}
           />
           <SelectField
-            label="영어 수준"
+            label="부모가 보기에 아이의 영어 소통은 어느 정도인가요?"
             value={input.englishSelfLevel}
             options={englishSelfLevels}
             getLabel={(value) => optionLabels.englishSelfLevel[value]}

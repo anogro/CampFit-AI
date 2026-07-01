@@ -121,6 +121,13 @@ All spacing derives from a base of 4px.
 - **Spacing**: 20px between major blocks.
 - **Text**: explanations use keep-all word breaking and line-height 1.5.
 
+### Visual Result Report
+
+- **Structure**: compact metric cards, one radar chart, readiness bars, support tags, report download action.
+- **Usage**: result summary before recommendation cards; it should make the decision criteria visible before long explanations.
+- **Disclosure**: detailed reasons, cautions, and consultation questions stay inside expandable detail blocks.
+- **Tone**: chart styling remains document-like and quiet; avoid saturated dashboard colors.
+
 ## 6. Motion & Interaction
 
 ### Timing

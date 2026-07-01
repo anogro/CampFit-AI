@@ -4,11 +4,11 @@ export const gradeLabels = ["초1", "초2", "초3", "초4", "초5", "초6", "중
 
 export const optionLabels = {
   englishSelfLevel: {
-    unsure: "아직 모르겠음",
-    almost_none: "거의 처음",
-    basic_expression: "간단한 단어/표현",
-    simple_conversation: "짧은 대화 가능",
-    comfortable: "편하게 대화 가능",
+    unsure: "잘 모르겠음",
+    almost_none: "영어를 거의 알아듣기 어렵다",
+    basic_expression: "익숙한 단어와 짧은 표현 위주",
+    simple_conversation: "간단한 질문에는 짧게 답한다",
+    comfortable: "일상 대화를 어느 정도 이어간다",
   },
   overseasExperience: {
     none: "해외 경험 없음",

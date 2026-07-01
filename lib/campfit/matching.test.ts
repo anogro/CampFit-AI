@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { CampfitInput, ParentAnalysis, ReadinessAnswers } from "@/types/campfit"
+import { camps } from "@/data/campfit/camps"
 import { recommendCamps } from "@/lib/campfit/matching"
 import { scoreCampReadiness } from "@/lib/campfit/readiness"
 
@@ -58,7 +59,7 @@ describe("recommendCamps", () => {
   it("Given beginner child and support preference When recommending Then managed immersion stretch fit appears", () => {
     const readiness = scoreCampReadiness(basicAnswers)
 
-    const recommendations = recommendCamps({ input: baseInput, analysis: baseAnalysis, readiness })
+    const recommendations = recommendCamps({ input: baseInput, analysis: baseAnalysis, readiness, camps })
 
     expect(recommendations.length).toBeGreaterThan(0)
     expect(recommendations[0]?.camp.programType).toBe("managed_immersion")
@@ -78,6 +79,7 @@ describe("recommendCamps", () => {
       },
       analysis: { ...baseAnalysis, parentType: "안정 우선형", supportNeeded: ["parent_accompanied", "beginner_class"] },
       readiness,
+      camps,
     })
 
     expect(recommendations.length).toBeGreaterThan(0)
@@ -118,6 +120,7 @@ describe("recommendCamps", () => {
         supportNeeded: ["buddy_system"],
       },
       readiness,
+      camps,
     })
 
     expect(recommendations.length).toBeGreaterThan(0)
@@ -136,6 +139,7 @@ describe("recommendCamps", () => {
       },
       analysis: baseAnalysis,
       readiness,
+      camps,
     })
 
     expect(recommendations.length).toBeGreaterThan(0)

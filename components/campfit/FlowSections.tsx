@@ -36,7 +36,7 @@ export function Header() {
           </h1>
         </div>
         <p className="text-base font-medium leading-7 text-[var(--text-secondary)] [word-break:keep-all]">
-          영어 수준, 분리 적응, 예산, 보호 장치를 함께 보고 무리한 추천을 걸러냅니다.
+          아이 성향에 맞는 도시와 체류 방식을 먼저 보고, 그다음 실제 프로그램 후보를 좁혀갑니다.
         </p>
       </div>
       <ul className="grid gap-2 border-t border-[var(--border-subtle)] pt-4 text-sm text-[var(--text-secondary)] sm:grid-cols-3">
@@ -68,7 +68,7 @@ export function StartScreen({ onStart }: { readonly onStart: () => void }) {
       </div>
 
       <div className="grid gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-sm leading-6 text-[var(--text-secondary)] sm:grid-cols-3">
-        {["만 나이 기준으로 학년 자동 반영", "영어 체크는 정답 표시 없이 진행", "예시 문구는 눌러서 바로 입력"].map((item) => (
+        {["만 나이 기준으로 학년 자동 반영", "영어 테스트 없이 부모 관찰 기준 반영", "예시 문구는 눌러서 바로 입력"].map((item) => (
           <div key={item} className="flex gap-2 [word-break:keep-all]">
             <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-[var(--status-success)]" aria-hidden="true" />
             <span>{item}</span>
@@ -116,7 +116,7 @@ export function ConcernStep({
         className="min-h-56 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-base font-normal leading-7 text-[var(--text-primary)] transition hover:border-[var(--text-tertiary)]"
         value={input.parentConcernText}
         onChange={(event) => onChange({ ...input, parentConcernText: event.target.value })}
-        placeholder="아이의 영어 수준, 걱정되는 점, 기대하는 변화, 꼭 필요한 관리 조건을 적어 주세요."
+        placeholder="아이의 현재 소통 수준, 걱정되는 점, 기대하는 변화, 꼭 필요한 관리 조건을 적어 주세요."
       />
     </div>
   )
@@ -189,7 +189,7 @@ export function NavButtons({
         disabled={!canContinue || isLoading}
       >
         {isLoading ? <Loader2 className="animate-spin" size={17} aria-hidden="true" /> : null}
-        {step === 1 ? "아이 상황 이어서 입력" : step === 2 ? "AI 분석하기" : step === 5 ? "추천 결과 보기" : "다음"}
+        {step === 1 ? "아이 상황 이어서 입력" : step === 2 ? "AI 분석하기" : step === 4 ? "도시와 프로그램 추천 보기" : "다음"}
         <ArrowRight size={17} aria-hidden="true" />
       </button>
     </div>

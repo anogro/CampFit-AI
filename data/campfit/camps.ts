@@ -64,7 +64,8 @@ const highChallengeSupport: SupportBuffer = {
 export const camps: readonly Camp[] = [
   {
     id: "cebu_managed_immersion_01",
-    name: "Cebu Managed Immersion Camp",
+    anogroProgramSlug: "cebu-cij-coei-2026-summer",
+    name: "CIJ 세부 주니어 영어캠프 2026 여름",
     country: "Philippines",
     city: "Cebu",
     programType: "managed_immersion",
@@ -93,7 +94,8 @@ export const camps: readonly Camp[] = [
   },
   {
     id: "cebu_step_up_esl_02",
-    name: "Cebu Step-up ESL Camp",
+    anogroProgramSlug: "cebu-cella-2026-summer",
+    name: "세부 CELLA 어학원 2026년 청소년 여름방학 영어캠프",
     country: "Philippines",
     city: "Cebu",
     programType: "managed_immersion",
@@ -122,7 +124,8 @@ export const camps: readonly Camp[] = [
   },
   {
     id: "cebu_confidence_bridge_03",
-    name: "Cebu Confidence Bridge Camp",
+    anogroProgramSlug: "cebu-ciec-2026-summer",
+    name: "세부 CIEC 2026년 여름방학 영어캠프",
     country: "Philippines",
     city: "Cebu",
     programType: "managed_immersion",
@@ -151,7 +154,8 @@ export const camps: readonly Camp[] = [
   },
   {
     id: "cebu_family_esl_04",
-    name: "Cebu Family ESL Starter Camp",
+    anogroProgramSlug: "cebu-cella-2026-2026-summer",
+    name: "세부 CELLA 어학원 2026년 여름방학 가족캠프",
     country: "Philippines",
     city: "Cebu",
     programType: "family_esl",
@@ -180,7 +184,8 @@ export const camps: readonly Camp[] = [
   },
   {
     id: "cebu_family_esl_05",
-    name: "Cebu Family Confidence ESL Camp",
+    anogroProgramSlug: "cebu-joyful-family-philja",
+    name: "세부 조이풀 2026년 여름방학 가족캠프",
     country: "Philippines",
     city: "Cebu",
     programType: "family_esl",
@@ -354,7 +359,8 @@ export const camps: readonly Camp[] = [
   },
   {
     id: "saipan_schooling_family_11",
-    name: "Saipan Schooling Family Camp",
+    anogroProgramSlug: "saipan-eucon-international-school-gca-school-2026-su-97e9ec",
+    name: "2026 와우영어캠프 사이판 PIC 가족캠프 2주 특선",
     country: "USA",
     city: "Saipan",
     programType: "schooling",
@@ -383,7 +389,8 @@ export const camps: readonly Camp[] = [
   },
   {
     id: "saipan_nature_school_12",
-    name: "Saipan Nature Schooling Camp",
+    anogroProgramSlug: "saipan-eucon-international-school-gca-school-2026-su-wmin2s",
+    name: "2026 와우영어캠프 사이판 PIC 여름방학 영어캠프 3주",
     country: "USA",
     city: "Saipan",
     programType: "schooling",
@@ -499,7 +506,8 @@ export const camps: readonly Camp[] = [
   },
   {
     id: "newzealand_nature_school_16",
-    name: "New Zealand Nature Schooling Camp",
+    anogroProgramSlug: "auckland-nzlc-nzlc-auckland-2026-summer-n15wg7",
+    name: "NZLC Auckland Young Learner English + Activities 2026 여름",
     country: "New Zealand",
     city: "Auckland",
     programType: "schooling",

@@ -2,8 +2,9 @@ import { NextResponse } from "next/server"
 import { RecommendRequestSchema } from "@/schemas/campfit/campfitSchemas"
 import { enrichRecommendationExplanations } from "@/lib/campfit/gemini"
 import { buildNoCandidateMessage, recommendCamps } from "@/lib/campfit/matching"
-import { scoreCampReadiness } from "@/lib/campfit/readiness"
+import { scoreCampReadiness, scoreCampReadinessFromParentInput } from "@/lib/campfit/readiness"
 import { saveCampfitSession } from "@/lib/campfit/supabaseCampfit"
+import { loadCampfitProgramCatalog } from "@/lib/campfit/supabaseProgramCatalog"
 import { createSessionId } from "@/lib/campfit/utils"
 import type { RecommendationResult } from "@/types/campfit"
 
@@ -18,11 +19,15 @@ export async function POST(request: Request) {
     )
   }
 
-  const readiness = scoreCampReadiness(parsed.data.readinessAnswers)
+  const readiness = parsed.data.readinessAnswers
+    ? scoreCampReadiness(parsed.data.readinessAnswers)
+    : scoreCampReadinessFromParentInput(parsed.data.input)
+  const camps = await loadCampfitProgramCatalog()
   const recommendations = recommendCamps({
     input: parsed.data.input,
     analysis: parsed.data.analysis,
     readiness,
+    camps,
   })
   const enriched = await enrichRecommendationExplanations(parsed.data.analysis, recommendations)
   const sessionId = parsed.data.sessionId ?? createSessionId()

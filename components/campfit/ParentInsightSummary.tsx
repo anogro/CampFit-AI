@@ -132,7 +132,7 @@ function getChildInsight(analysis: ParentAnalysis): ChildInsight {
       description:
         "분리 적응, 새로운 환경 적응, 도전 수용도가 함께 높게 나타납니다. 보호 장치가 전혀 필요 없다는 뜻은 아니지만, 지나치게 안전한 선택지만 고르면 성장 자극이 부족할 수 있습니다.",
       coachingPoint:
-        "8유형의 개방형/성장형 요소를 참고하되, 추천에서는 실제 영어 수준과 캠프 난이도의 간격을 함께 계산합니다.",
+        "8유형의 개방형/성장형 요소를 참고하되, 추천에서는 실제 영어 소통 수준과 캠프 난이도의 간격을 함께 계산합니다.",
       familyPersona,
     }
   }
@@ -263,7 +263,7 @@ const familyPersonas: Record<FamilyPersonaKey, FamilyPersona> = {
     headline: "확실한 변화와 거침없는 도전",
     description:
       "명확한 미션과 높은 목표를 세우고 한 단계 성장을 기대하는 가족입니다. 낯선 환경의 경쟁과 단체 생활에도 도전할 수 있습니다.",
-    caution: "아이의 실제 영어 수준이나 성향과 맞지 않으면 과부하가 올 수 있어 도전 강도를 세밀하게 조절해야 합니다.",
+    caution: "아이의 실제 영어 소통 수준이나 성향과 맞지 않으면 과부하가 올 수 있어 도전 강도를 세밀하게 조절해야 합니다.",
   },
   growth_structured_protected: {
     name: "맹자 패밀리",

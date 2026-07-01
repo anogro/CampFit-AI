@@ -1,4 +1,4 @@
-const totalSteps = 6
+const totalSteps = 5
 
 type CampfitStepperProps = {
   readonly currentStep: number

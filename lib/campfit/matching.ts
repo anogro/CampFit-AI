@@ -1,4 +1,3 @@
-import { camps } from "@/data/campfit/camps"
 import type {
   Camp,
   CampReadinessResult,
@@ -24,10 +23,11 @@ export type MatchInput = {
   readonly input: CampfitInput
   readonly analysis: ParentAnalysis
   readonly readiness: CampReadinessResult
+  readonly camps: readonly Camp[]
 }
 
 export function recommendCamps(matchInput: MatchInput): readonly CampRecommendation[] {
-  const candidates = camps.filter((camp) => passesHardFilters(camp, matchInput.input))
+  const candidates = matchInput.camps.filter((camp) => passesHardFilters(camp, matchInput.input))
 
   return candidates
     .map((camp) => scoreCamp(camp, matchInput))

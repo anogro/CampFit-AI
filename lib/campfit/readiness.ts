@@ -1,4 +1,4 @@
-import type { CampReadinessResult, ReadinessAnswers, SupportKey } from "@/types/campfit"
+import type { CampfitInput, CampReadinessResult, EnglishSelfLevel, LevelOption, ReadinessAnswers, SupportKey } from "@/types/campfit"
 import { average } from "@/lib/campfit/utils"
 
 const correctAnswers = {
@@ -42,6 +42,122 @@ export function scoreCampReadiness(answers: ReadinessAnswers): CampReadinessResu
       communicationAttemptTendency: anxiety.communicationAttemptTendency,
       readinessAverage,
     }),
+  }
+}
+
+export function scoreCampReadinessFromParentInput(input: CampfitInput): CampReadinessResult {
+  const englishBase = scoreEnglishObservation(input.englishSelfLevel)
+  const anxiety = scoreAnxietySignals(input.shynessLevel, input.separationTolerance)
+  const basicInstructionUnderstanding = englishBase.basicInstructionUnderstanding
+  const helpRequestAbility = Math.max(0.18, englishBase.helpRequestAbility - anxiety.helpPenalty)
+  const survivalExpression = englishBase.survivalExpression
+  const peerInteractionReadiness = Math.max(0.2, englishBase.peerInteractionReadiness - anxiety.socialPenalty)
+  const basicSelfExpression = englishBase.basicSelfExpression
+
+  const readinessAverage = average([
+    basicInstructionUnderstanding,
+    helpRequestAbility,
+    survivalExpression,
+    peerInteractionReadiness,
+    basicSelfExpression,
+    anxiety.communicationAttemptTendency,
+    1 - anxiety.englishAnxietySignal,
+  ])
+
+  return {
+    basicInstructionUnderstanding,
+    helpRequestAbility,
+    survivalExpression,
+    peerInteractionReadiness,
+    basicSelfExpression,
+    englishAnxietySignal: anxiety.englishAnxietySignal,
+    communicationAttemptTendency: anxiety.communicationAttemptTendency,
+    overallReadiness: classifyReadiness(readinessAverage),
+    recommendedSupport: recommendSupport({
+      helpRequestAbility,
+      basicSelfExpression,
+      englishAnxietySignal: anxiety.englishAnxietySignal,
+      communicationAttemptTendency: anxiety.communicationAttemptTendency,
+      readinessAverage,
+    }),
+  }
+}
+
+function scoreEnglishObservation(level: EnglishSelfLevel): {
+  readonly basicInstructionUnderstanding: number
+  readonly helpRequestAbility: number
+  readonly survivalExpression: number
+  readonly peerInteractionReadiness: number
+  readonly basicSelfExpression: number
+} {
+  switch (level) {
+    case "almost_none":
+      return {
+        basicInstructionUnderstanding: 0.24,
+        helpRequestAbility: 0.2,
+        survivalExpression: 0.18,
+        peerInteractionReadiness: 0.26,
+        basicSelfExpression: 0.18,
+      }
+    case "basic_expression":
+      return {
+        basicInstructionUnderstanding: 0.44,
+        helpRequestAbility: 0.36,
+        survivalExpression: 0.42,
+        peerInteractionReadiness: 0.44,
+        basicSelfExpression: 0.42,
+      }
+    case "simple_conversation":
+      return {
+        basicInstructionUnderstanding: 0.72,
+        helpRequestAbility: 0.68,
+        survivalExpression: 0.7,
+        peerInteractionReadiness: 0.68,
+        basicSelfExpression: 0.7,
+      }
+    case "comfortable":
+      return {
+        basicInstructionUnderstanding: 0.88,
+        helpRequestAbility: 0.84,
+        survivalExpression: 0.86,
+        peerInteractionReadiness: 0.84,
+        basicSelfExpression: 0.86,
+      }
+    case "unsure":
+      return {
+        basicInstructionUnderstanding: 0.4,
+        helpRequestAbility: 0.34,
+        survivalExpression: 0.34,
+        peerInteractionReadiness: 0.38,
+        basicSelfExpression: 0.34,
+      }
+  }
+}
+
+function scoreAnxietySignals(shyness: LevelOption, separation: LevelOption): {
+  readonly englishAnxietySignal: number
+  readonly communicationAttemptTendency: number
+  readonly helpPenalty: number
+  readonly socialPenalty: number
+} {
+  const shynessScore = levelToAnxiety(shyness)
+  const separationScore = levelToAnxiety(separation)
+  return {
+    englishAnxietySignal: average([shynessScore, separationScore * 0.7]),
+    communicationAttemptTendency: 1 - average([shynessScore * 0.75, separationScore * 0.45]),
+    helpPenalty: shynessScore * 0.16,
+    socialPenalty: shynessScore * 0.12 + separationScore * 0.06,
+  }
+}
+
+function levelToAnxiety(level: LevelOption): number {
+  switch (level) {
+    case "low":
+      return 0.22
+    case "medium":
+      return 0.5
+    case "high":
+      return 0.78
   }
 }
 

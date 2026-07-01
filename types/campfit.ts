@@ -174,6 +174,8 @@ export type SupportBuffer = Record<SupportKey, number>
 
 export type Camp = {
   readonly id: string
+  readonly anogroProgramId?: string
+  readonly anogroProgramSlug?: string
   readonly name: string
   readonly country: string
   readonly city: string
@@ -223,7 +225,7 @@ export type RecommendRequest = {
   readonly analysis: ParentAnalysis
   readonly aiUsage?: Pick<AiUsageStatus, "parentAnalysis">
   readonly followUpAnswers: readonly string[]
-  readonly readinessAnswers: ReadinessAnswers
+  readonly readinessAnswers?: ReadinessAnswers
 }
 
 export type RecommendationResult = {

@@ -10,7 +10,9 @@ export function normalizeParentAnalysisCandidate(candidate: unknown, fallback: P
     ...candidate,
     supportNeeded: normalizeSupportNeeded(candidate["supportNeeded"], fallback),
     detectedTensions: normalizeDetectedTensions(candidate["detectedTensions"], fallback),
-    evidence: normalizeEvidence(candidate["evidence"]),
+    evidence: normalizeEvidence(candidate["evidence"], fallback),
+    summaryForParent: normalizeStringArray(candidate["summaryForParent"], fallback.summaryForParent, 2, 5),
+    followUpQuestions: normalizeStringArray(candidate["followUpQuestions"], fallback.followUpQuestions, 1, 2),
   }
 }
 
@@ -32,7 +34,10 @@ function normalizeDetectedTensions(value: unknown, fallback: ParentAnalysis): re
     .filter(isRecord)
     .map((item) => ({
       type: normalizeTensionType(item["type"]),
-      description: typeof item["description"] === "string" ? item["description"] : "상담 전 조건을 함께 확인해야 합니다.",
+      description:
+        typeof item["description"] === "string" && isReadableText(item["description"])
+          ? item["description"]
+          : "상담 전 조건을 함께 확인해야 합니다.",
       confidence: clampScore(item["confidence"]),
     }))
     .slice(0, 5)
@@ -40,19 +45,30 @@ function normalizeDetectedTensions(value: unknown, fallback: ParentAnalysis): re
   return tensions.length > 0 ? tensions : fallback.detectedTensions
 }
 
-function normalizeEvidence(value: unknown) {
+function normalizeEvidence(value: unknown, fallback: ParentAnalysis) {
   if (!Array.isArray(value)) {
-    return []
+    return fallback.evidence
   }
 
-  return value
+  const evidence = value
     .filter(isRecord)
     .map((item) => ({
-      text: typeof item["text"] === "string" ? item["text"] : "입력 내용",
+      text: typeof item["text"] === "string" && isReadableText(item["text"]) ? item["text"] : fallback.evidence[0]?.text ?? "입력 내용",
       mappedTo: typeof item["mappedTo"] === "string" ? item["mappedTo"] : "parentGoal",
       impact: item["impact"] === "decrease" ? "decrease" : "increase",
     }))
     .slice(0, 6)
+
+  return evidence.length > 0 ? evidence : fallback.evidence
+}
+
+function normalizeStringArray(value: unknown, fallback: readonly string[], minLength: number, maxLength: number): readonly string[] {
+  if (!Array.isArray(value)) {
+    return fallback
+  }
+
+  const items = value.filter((item): item is string => typeof item === "string" && isReadableText(item)).slice(0, maxLength)
+  return items.length >= minLength ? items : fallback
 }
 
 function normalizeTensionType(value: unknown): DetectedTension["type"] {
@@ -78,4 +94,9 @@ function isSupportKey(value: unknown): value is SupportKey {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isReadableText(value: string): boolean {
+  const suspiciousMatches = value.match(/[ÃÂ�□]|[ìíëêãð]/gi)
+  return (suspiciousMatches?.length ?? 0) < 2
 }

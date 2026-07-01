@@ -104,7 +104,7 @@ export const RecommendRequestSchema = z.object({
     })
     .optional(),
   followUpAnswers: z.array(z.string().max(500)).max(2),
-  readinessAnswers: ReadinessAnswersSchema,
+  readinessAnswers: ReadinessAnswersSchema.optional(),
 })
 
 export const FeedbackRequestSchema = z.object({
@@ -129,6 +129,8 @@ const SupportBufferSchema = z.record(z.enum(supportKeys), ScoreSchema)
 
 const CampSchema = z.object({
   id: z.string(),
+  anogroProgramId: z.string().optional(),
+  anogroProgramSlug: z.string().optional(),
   name: z.string(),
   country: z.string(),
   city: z.string(),
