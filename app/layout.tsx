@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "CampFit AI",
-  description: "학부모 고민과 캠프 적응도 체크를 바탕으로 해외 영어캠프 Fit을 추천합니다.",
+  title: "CampFit",
+  description: "아이의 성향과 가족 조건을 바탕으로 첫 해외캠프 선택 방향을 차분히 정리합니다.",
 }
 
 type RootLayoutProps = {

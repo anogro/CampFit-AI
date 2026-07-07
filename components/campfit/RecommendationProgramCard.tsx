@@ -15,10 +15,10 @@ type RecommendationProgramCardProps = {
 }
 
 const scoreLabels = {
-  goalFit: "목표 적합도",
-  supportFit: "지원 장치",
-  growthPotential: "성장 여지",
-  residualRisk: "부담 신호",
+  goalFit: "가족 목표와 맞는 정도",
+  supportFit: "아이를 챙겨주는 장치",
+  growthPotential: "성장 경험 가능성",
+  residualRisk: "피로하거나 부담될 신호",
 } as const
 
 export function RecommendationProgramCard({ recommendation, rank, onFeedback }: RecommendationProgramCardProps) {
@@ -40,9 +40,9 @@ export function RecommendationProgramCard({ recommendation, rank, onFeedback }: 
     >
       {isTopRecommendation ? (
         <div className="-mx-5 -mt-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] bg-[var(--surface-tint-blue)] px-5 py-3">
-          <p className="text-sm font-bold text-[var(--accent-primary)] [word-break:keep-all]">가장 먼저 상담해볼 추천</p>
+          <p className="text-sm font-bold text-[var(--accent-primary)] [word-break:keep-all]">가장 먼저 살펴볼 캠프</p>
           <p className="text-xs font-semibold text-[var(--text-secondary)] [word-break:keep-all]">
-            입력 조건과 아이 적응 신호를 함께 봤을 때 우선순위가 가장 높습니다.
+            입력 조건과 아이 적응 신호를 함께 봤을 때 먼저 확인해볼 만합니다.
           </p>
         </div>
       ) : null}
@@ -84,14 +84,14 @@ export function RecommendationProgramCard({ recommendation, rank, onFeedback }: 
         >
           {isTopRecommendation ? (
             <div className="mb-4 rounded-[18px] bg-[var(--surface-glass)] p-3 shadow-[var(--shadow-soft)]">
-              <p className="text-xs font-semibold text-[var(--text-tertiary)]">종합 추천 점수</p>
+              <p className="text-xs font-semibold text-[var(--text-tertiary)]">종합 캠프핏 점수</p>
               <p className="mt-1 text-4xl font-bold tracking-[-0.03em] text-[var(--accent-primary)] tabular-nums">
                 {recommendation.score}
                 <span className="text-base font-semibold text-[var(--text-secondary)]">점</span>
               </p>
             </div>
           ) : null}
-          <p className="text-xs font-semibold text-[var(--text-tertiary)]">판단 항목</p>
+          <p className="text-xs font-semibold text-[var(--text-tertiary)]">왜 이 방향이 맞는지</p>
           <div className="mt-3 grid gap-3">
             {scoreRows.map((row) => (
               <ScoreBar key={row.label} label={row.label} value={row.value} tone={row.tone} />
@@ -102,7 +102,7 @@ export function RecommendationProgramCard({ recommendation, rank, onFeedback }: 
 
       <details className="group mt-5 rounded-[22px] border border-[var(--border-subtle)] bg-[var(--surface-glass)] shadow-[var(--shadow-soft)] backdrop-blur-xl">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 text-sm font-semibold text-[var(--text-primary)]">
-          상세 근거와 상담 질문 보기
+          피하면 좋은 점과 상담 질문 보기
           <ChevronDown
             size={18}
             className="shrink-0 transition group-open:rotate-180 motion-reduce:transition-none"
@@ -110,10 +110,10 @@ export function RecommendationProgramCard({ recommendation, rank, onFeedback }: 
           />
         </summary>
         <div className="grid gap-4 border-t border-[var(--border-subtle)] p-4">
-          <InfoBlock title="추천 이유" body={recommendation.explanation.reason} />
-          <InfoBlock title="주의점" body={recommendation.explanation.caution} warning />
+          <InfoBlock title="왜 이 방향이 맞는지" body={recommendation.explanation.reason} />
+          <InfoBlock title="피하면 좋은 선택지" body={recommendation.explanation.caution} warning />
           <div>
-            <p className="font-semibold text-[var(--text-primary)]">상담 전 확인 질문</p>
+            <p className="font-semibold text-[var(--text-primary)]">다음에 확인할 체크포인트</p>
             <ul className="mt-3 grid gap-2 text-sm leading-6 text-[var(--text-secondary)]">
               {recommendation.explanation.questionsBeforeConsultation.map((question) => (
                 <li key={question} className="flex gap-2 [word-break:keep-all]">
@@ -130,10 +130,10 @@ export function RecommendationProgramCard({ recommendation, rank, onFeedback }: 
         href={anogroHref}
         target="_blank"
         rel="noreferrer"
-        className="apple-pill mt-5 inline-flex min-h-11 items-center gap-2 bg-[var(--accent-primary)] px-5 text-[15px] font-semibold text-white shadow-[var(--shadow-soft)] transition hover:bg-[var(--accent-hover)] active:scale-[0.98]"
+        className="apple-pill glass-cta mt-5 inline-flex min-h-11 items-center gap-2 px-5 text-[15px] font-semibold transition hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
         onClick={() => onFeedback("consultation_requested", recommendation.camp.id)}
       >
-        <Send size={17} aria-hidden="true" />
+        <Send size={17} className="text-[var(--accent-brand-green)]" aria-hidden="true" />
         ANOGRO에서 상세 보기
       </a>
     </article>
@@ -159,7 +159,7 @@ function ScoreBar({ label, value, tone }: { readonly label: string; readonly val
 
 function InfoBlock({ title, body, warning = false }: { readonly title: string; readonly body: string; readonly warning?: boolean }) {
   return (
-    <div className={warning ? "rounded-[18px] bg-[rgb(255_204_0_/_0.12)] p-4" : "rounded-[18px] bg-[var(--surface-secondary)] p-4"}>
+    <div className={warning ? "rounded-[18px] bg-[var(--surface-tint-yellow)] p-4" : "rounded-[18px] bg-[var(--surface-secondary)] p-4"}>
       <p className={warning ? "font-semibold text-[var(--status-warning)]" : "font-semibold text-[var(--accent-primary)]"}>
         {title}
       </p>

@@ -38,18 +38,20 @@ export function ParentInputForm({ input, onChange }: ParentInputFormProps) {
   return (
     <section className="grid gap-6" aria-labelledby="basic-profile-title">
       <div className="grid gap-2">
-        <p className="text-xs font-semibold tracking-[0.01em] text-[var(--accent-primary)]">30초 기본 진단</p>
+        <p className="text-xs font-semibold tracking-[0.01em] text-[var(--accent-primary)]">캠프핏 체크 노트</p>
         <h2 id="basic-profile-title" className="text-[1.625rem] font-bold leading-tight tracking-[-0.02em] text-[var(--text-primary)] [word-break:keep-all]">
-          먼저 아이에게 맞는 캠프 범위를 좁혀볼게요.
+          아이에게 맞는 시작을 찾기 위해
+          <br />
+          몇 가지만 먼저 살펴볼게요.
         </h2>
         <p className="max-w-2xl text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">
-          학년은 만 나이로 자동 반영합니다. 처음에는 정확한 답보다 현재 느낌에 가까운 선택이 더 도움이 됩니다.
+          정답은 없어요. 지금 아이와 가장 가까운 모습을 골라주세요.
         </p>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[0.85fr_1.15fr]">
-        <div className="apple-glass-soft grid content-start gap-4 rounded-[24px] p-5">
-          <SectionLabel eyebrow="기본 정보" title="나이와 현재 소통 수준" />
+        <div className="apple-glass-soft grid content-start gap-4 rounded-[24px] bg-[var(--surface-elevated)] p-5">
+          <SectionLabel eyebrow="우리 아이에 대해" title="아이 나이와 영어 익숙함" />
           <NumberField
             label="아이 나이 (만 나이)"
             hint={`추천에는 ${inferredGrade} 기준을 함께 사용합니다.`}
@@ -59,14 +61,14 @@ export function ParentInputForm({ input, onChange }: ParentInputFormProps) {
             onChange={(childAge) => onChange({ ...input, childAge, grade: gradeFromAge(childAge) })}
           />
           <SelectField
-            label="부모가 보기에 아이의 영어 소통은 어느 정도인가요?"
+            label="영어를 듣고 말하는 데 얼마나 익숙한가요?"
             value={input.englishSelfLevel}
             options={englishSelfLevels}
             getLabel={(value) => optionLabels.englishSelfLevel[value]}
             onChange={(value) => onChange({ ...input, englishSelfLevel: EnglishSelfLevelSchema.parse(value) })}
           />
           <SelectField
-            label="해외 경험"
+            label="해외나 장거리 여행 경험이 있나요?"
             value={input.overseasExperience}
             options={overseasExperienceOptions}
             getLabel={(value) => optionLabels.overseasExperience[value]}
@@ -74,60 +76,60 @@ export function ParentInputForm({ input, onChange }: ParentInputFormProps) {
           />
         </div>
 
-        <div className="apple-glass-soft grid gap-4 rounded-[24px] p-5">
-          <SectionLabel eyebrow="캠프 조건" title="지역, 거리, 관리 방식" />
+        <div className="apple-glass-soft grid gap-4 rounded-[24px] bg-[var(--surface-elevated)] p-5">
+          <SectionLabel eyebrow="가족이 원하는 조건" title="캠프를 고를 때 중요한 조건" />
           <div className="grid gap-4 sm:grid-cols-2">
             <SelectField
-              label="낯가림"
+              label="낯선 사람이나 환경을 어려워하나요?"
               value={input.shynessLevel}
               options={levelOptions}
               getLabel={(value) => optionLabels.level[value]}
               onChange={(value) => onChange({ ...input, shynessLevel: LevelSchema.parse(value) })}
             />
             <SelectField
-              label="분리 적응"
+              label="부모와 떨어져 수업 듣는 적응력은 어떤가요?"
               value={input.separationTolerance}
               options={levelOptions}
               getLabel={(value) => optionLabels.level[value]}
               onChange={(value) => onChange({ ...input, separationTolerance: LevelSchema.parse(value) })}
             />
             <SelectField
-              label="예산"
+              label="생각하는 예산 범위는 어느 정도인가요?"
               value={input.budgetRange}
               options={budgetRangeOptions}
               getLabel={(value) => optionLabels.budgetRange[value]}
               onChange={(value) => onChange({ ...input, budgetRange: BudgetRangeSchema.parse(value) })}
             />
             <SelectField
-              label="희망 지역"
+              label="가족이 마음에 두는 지역이 있나요?"
               value={input.destinationPreference}
               options={destinationPreferenceOptions}
               getLabel={(value) => optionLabels.destinationPreference[value]}
               onChange={(value) => onChange({ ...input, destinationPreference: DestinationPreferenceSchema.parse(value) })}
             />
             <SelectField
-              label="거리/독립도"
+              label="비행 거리와 독립 일정은 어느 정도까지 괜찮나요?"
               value={input.travelReadiness}
               options={travelReadinessOptions}
               getLabel={(value) => optionLabels.travelReadiness[value]}
               onChange={(value) => onChange({ ...input, travelReadiness: TravelReadinessSchema.parse(value) })}
             />
             <SelectField
-              label="기간"
+              label="어느 정도 기간을 생각하고 있나요?"
               value={input.durationWeeks}
               options={durationWeekOptions}
               getLabel={(value) => optionLabels.durationWeeks[value]}
               onChange={(value) => onChange({ ...input, durationWeeks: DurationWeeksSchema.parse(value) })}
             />
             <SelectField
-              label="부모 동반"
+              label="부모 동행이 필요한 일정인가요?"
               value={input.parentAccompanied}
               options={parentAccompaniedOptions}
               getLabel={(value) => optionLabels.parentAccompanied[value]}
               onChange={(value) => onChange({ ...input, parentAccompanied: ParentAccompaniedSchema.parse(value) })}
             />
             <SelectField
-              label="한국인 관리자"
+              label="한국어로 챙겨주는 관리자가 필요할까요?"
               value={input.koreanManagerRequired}
               options={koreanManagerRequiredOptions}
               getLabel={(value) => optionLabels.koreanManagerRequired[value]}
@@ -139,7 +141,7 @@ export function ParentInputForm({ input, onChange }: ParentInputFormProps) {
 
       <div>
         <SelectField
-          label="원하는 캠프 방향"
+          label="이번 캠프에서 가장 기대하는 것은 무엇인가요?"
           value={input.preferredProgramType}
           options={programTypeOptions}
           getLabel={(value) => optionLabels.preferredProgramType[value]}

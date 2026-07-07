@@ -60,7 +60,7 @@ export function CampfitFlow() {
 
   async function analyze(): Promise<void> {
     setIsLoading(true)
-    setStatus("AI가 학부모 고민을 구조화하고 있습니다.")
+    setStatus("부모님이 적어주신 걱정과 기대를 정리하고 있습니다.")
     try {
       const response = await fetch("/api/campfit/analyze", {
         method: "POST",
@@ -75,7 +75,7 @@ export function CampfitFlow() {
 
       const parsed = AnalyzeResponseSchema.safeParse(json)
       if (!parsed.success) {
-        setStatus("분석 결과를 읽는 중 문제가 생겨 기본 분석으로 진행해 주세요.")
+        setStatus("정리 결과를 읽는 중 문제가 생겨 기본 체크 기준으로 진행해 주세요.")
         return
       }
 
@@ -95,7 +95,7 @@ export function CampfitFlow() {
     }
 
     setIsLoading(true)
-    setStatus("아이 성향에 맞는 도시와 프로그램 후보를 비교하고 있습니다.")
+    setStatus("아이에게 맞는 캠프 방식과 프로그램 후보를 비교하고 있습니다.")
     try {
       const response = await fetch("/api/campfit/recommend", {
         method: "POST",

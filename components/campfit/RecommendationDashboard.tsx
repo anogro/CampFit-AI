@@ -22,7 +22,7 @@ export function RecommendationDashboard({ result, onFeedback, feedbackStatus }: 
       <ResultVisualSummary result={result} />
 
       {result.noCandidateMessage ? (
-        <section className="rounded-[24px] border border-[rgb(255_204_0_/_0.32)] bg-[rgb(255_204_0_/_0.12)] p-5 shadow-[var(--shadow-soft)] backdrop-blur-xl">
+        <section className="rounded-[24px] border border-[var(--border-subtle)] bg-[var(--surface-tint-yellow)] p-5 shadow-[var(--shadow-soft)] backdrop-blur-xl">
           <p className="font-semibold leading-7 text-[var(--status-warning)] [word-break:keep-all]">{result.noCandidateMessage}</p>
         </section>
       ) : null}
@@ -31,7 +31,7 @@ export function RecommendationDashboard({ result, onFeedback, feedbackStatus }: 
         <section className="apple-glass rounded-[28px] p-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold text-[var(--accent-primary)]">도시 추천</p>
+              <p className="text-xs font-semibold text-[var(--accent-primary)]">예산과 기간 안에서 가능한 범위</p>
               <h3 className="mt-2 text-xl font-bold tracking-[-0.02em] text-[var(--text-primary)] [word-break:keep-all]">
                 먼저 체류 도시와 생활 방식을 비교해 보세요.
               </h3>
@@ -51,9 +51,9 @@ export function RecommendationDashboard({ result, onFeedback, feedbackStatus }: 
       <div className="grid gap-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold text-[var(--accent-primary)]">프로그램 후보</p>
+            <p className="text-xs font-semibold text-[var(--accent-primary)]">우리 아이에게 맞는 캠프 후보</p>
             <h3 className="mt-2 text-xl font-bold tracking-[-0.02em] text-[var(--text-primary)] [word-break:keep-all]">
-              도시 방향에 맞는 실제 프로그램입니다.
+              왜 이 방향이 맞는지와 피하면 좋은 선택지를 함께 확인하세요.
             </h3>
           </div>
         </div>
@@ -70,7 +70,7 @@ export function RecommendationDashboard({ result, onFeedback, feedbackStatus }: 
       <section className="apple-glass-soft rounded-[24px] p-5">
         <div className="flex items-center gap-2">
           <MessageCircle size={19} aria-hidden="true" />
-          <h3 className="text-lg font-semibold text-[var(--text-primary)]">추천 피드백</h3>
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">이 방향이 우리 가족과 맞나요?</h3>
         </div>
         <div className="mt-4 flex flex-wrap gap-3">
           <FeedbackButton label="잘 맞아요" onClick={() => onFeedback("good_fit")} />
@@ -150,7 +150,7 @@ function CityCard({ city, rank }: { readonly city: CitySummary; readonly rank: n
 function FeedbackButton({ label, onClick }: { readonly label: string; readonly onClick: () => void }) {
   return (
     <button
-      className="apple-pill min-h-11 border border-[var(--border-default)] bg-[var(--surface-glass)] px-5 font-semibold text-[var(--text-primary)] shadow-[var(--shadow-soft)] transition hover:bg-[var(--surface-tint-blue)] active:scale-[0.98]"
+      className="apple-pill glass-button-muted min-h-11 px-5 font-semibold transition active:scale-[0.98]"
       type="button"
       onClick={onClick}
     >

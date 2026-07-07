@@ -33,9 +33,9 @@ export function ResultVisualSummary({ result }: { readonly result: Recommendatio
   const topRecommendation = result.recommendations[0]
   const metricCards: readonly MetricCard[] = [
     {
-      label: "진단 유형",
+      label: "우리 아이에게 맞는 방식",
       value: result.analysis.parentType,
-      helper: result.aiUsage.parentAnalysis ? "Gemini가 부모 입력을 분석" : "기본 규칙으로 분석",
+      helper: result.aiUsage.parentAnalysis ? "부모 입력을 바탕으로 정리" : "기본 체크 기준으로 정리",
     },
     {
       label: "소통·적응 준비도",
@@ -53,20 +53,20 @@ export function ResultVisualSummary({ result }: { readonly result: Recommendatio
     <section className="apple-glass rounded-[28px] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold text-[var(--accent-primary)]">결과 리포트</p>
+          <p className="text-xs font-semibold text-[var(--accent-primary)]">캠프핏 가이드</p>
           <h2 className="mt-2 text-2xl font-bold tracking-[-0.02em] text-[var(--text-primary)] [word-break:keep-all]">
-            한눈에 보는 도시와 체류 적합도
+            우리 아이에게 맞는 방향과 다음 체크포인트
           </h2>
         </div>
         <div className="flex flex-wrap gap-2">
           <AiUsageBadge
             used={result.aiUsage.parentAnalysis}
-            usedLabel="Gemini 분석 사용"
-            fallbackLabel="기본 분석 사용"
+            usedLabel="입력 정리 반영"
+            fallbackLabel="기본 기준 반영"
           />
           <AiUsageBadge
             used={result.aiUsage.recommendationExplanation}
-            usedLabel="Gemini 문장 보강"
+            usedLabel="추천 문장 보강"
             fallbackLabel="기본 추천 문장"
           />
         </div>
@@ -95,12 +95,12 @@ export function ResultVisualSummary({ result }: { readonly result: Recommendatio
           ))}
         </div>
         <button
-          className="apple-pill inline-flex min-h-11 items-center justify-center gap-2 border border-[var(--border-default)] bg-[var(--surface-glass)] px-5 text-sm font-semibold text-[var(--text-primary)] shadow-[var(--shadow-soft)] transition hover:bg-[var(--surface-tint-blue)] active:scale-[0.98]"
+          className="apple-pill glass-button-muted inline-flex min-h-11 items-center justify-center gap-2 px-5 text-sm font-semibold transition active:scale-[0.98]"
           type="button"
           onClick={() => downloadReport(result)}
         >
           <Download size={17} aria-hidden="true" />
-          상세 리포트 다운로드
+          체크 노트 다운로드
         </button>
       </div>
     </section>
@@ -150,10 +150,10 @@ function SupportPanel({ result }: { readonly result: RecommendationResultView })
   const supportItems = [...new Set([...result.analysis.supportNeeded, ...result.readiness.recommendedSupport])].slice(0, 6)
 
   return (
-    <div className="rounded-[22px] border border-[rgb(255_204_0_/_0.32)] bg-[rgb(255_204_0_/_0.12)] p-4 shadow-[var(--shadow-soft)] backdrop-blur-xl">
+    <div className="rounded-[22px] border border-[var(--border-subtle)] bg-[var(--surface-tint-yellow)] p-4 shadow-[var(--shadow-soft)] backdrop-blur-xl">
       <div className="flex items-center gap-2">
         <FileText size={17} className="text-[var(--status-warning)]" aria-hidden="true" />
-        <p className="text-sm font-semibold text-[var(--text-primary)]">상담 전 확인할 보호 장치</p>
+      <p className="text-sm font-semibold text-[var(--text-primary)]">다음에 확인할 체크포인트</p>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {supportItems.map((item) => (
@@ -213,7 +213,7 @@ function formatReport(result: RecommendationResultView): string {
     .join("\n\n")
 
   return [
-    "CampFit AI 상세 리포트",
+    "CampFit 체크 노트",
     "",
     `진단 유형: ${result.analysis.parentType}`,
     `아이 준비도: ${readinessLabel(result.readiness.overallReadiness)}`,

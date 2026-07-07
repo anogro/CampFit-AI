@@ -1,10 +1,10 @@
-# CampFit AI Design System
+# CampFit Design System
 
 ## 1. Atmosphere & Identity
 
-CampFit AI should feel like a calm Apple-style decision surface for parents: spacious, cinematic, glassy, and precise. The UI borrows from Apple product pages and iOS glass surfaces: pale neutral canvas, translucent cards, thin hairline borders, capsule actions, restrained blue links, and practical copy.
+CampFit should feel like a deeper ANOGRO decision panel for parents choosing a child's first overseas camp: calm, trustworthy, premium, and easy to scan. The UI follows ANOGRO's soft layered clarity: white glass surfaces, subtle blur, restrained blue action states, green growth cues, and practical guidance copy.
 
-The product should not feel like a generic SaaS dashboard or an admin form. Parents should feel they are calmly narrowing a decision in a polished consulting product, not completing a test.
+The product should not feel like a generic AI tool, SaaS dashboard, admin form, or separate child-service brand. Parents should feel they are opening an ANOGRO diagnostic note that organizes the family's first-camp criteria.
 
 ## 2. Color
 
@@ -12,31 +12,44 @@ The product should not feel like a generic SaaS dashboard or an admin form. Pare
 
 | Role | Token | Light | Usage |
 |------|-------|-------|-------|
-| Surface/primary | --surface-primary | #F5F5F7 | Page background |
-| Surface/secondary | --surface-secondary | rgb(255 255 255 / 0.74) | Main glass cards and form blocks |
-| Surface/elevated | --surface-elevated | rgb(255 255 255 / 0.56) | Quiet glass callouts and nested work areas |
-| Surface/glass | --surface-glass | rgb(255 255 255 / 0.68) | Frosted panels |
-| Surface/tint blue | --surface-tint-blue | rgb(0 113 227 / 0.08) | Selected states and info badges |
-| Surface/tint green | --surface-tint-green | #EDF3EC | Positive fit badges |
-| Surface/tint yellow | --surface-tint-yellow | #FBF3DB | Cautions and tension notes |
-| Text/primary | --text-primary | #1D1D1F | Headlines and main text |
-| Text/secondary | --text-secondary | #6E6E73 | Supporting text |
-| Text/tertiary | --text-tertiary | #86868B | Captions and hints |
-| Border/default | --border-default | rgb(0 0 0 / 0.10) | Cards, inputs, controls |
-| Border/subtle | --border-subtle | rgb(0 0 0 / 0.06) | Internal dividers |
-| Accent/primary | --accent-primary | #0071E3 | Primary CTA, links, progress |
-| Accent/hover | --accent-hover | #0066CC | Primary hover |
+| Surface/primary | --surface-primary | #FFFFFF | Panel and card base |
+| Surface/secondary | --surface-secondary | #F9FAFB | Page background and soft sections |
+| Surface/elevated | --surface-elevated | #FBFAF8 | Warm guidance surfaces |
+| Surface/glass | --surface-glass | rgb(255 255 255 / 0.72) | ANOGRO glass shell |
+| Surface/tint blue | --surface-tint-blue | #F2F9FF | Category chips, selected/info states |
+| Surface/tint green | --surface-tint-green | #EEF8F1 | Positive/growth cues |
+| Surface/tint yellow | --surface-tint-yellow | #FFF2D8 | Cautions and tension notes |
+| Surface/tint lavender | --surface-tint-lavender | #F1ECFA | Gentle secondary highlight |
+| Surface/tint peach | --surface-tint-peach | #FFF4EB | Very low warmth for image halo only |
+| Text/primary | --text-primary | #111827 | Headlines and main text |
+| Text/ink | --text-ink | #1F2933 | Hero copy |
+| Text/secondary | --text-secondary | #4B5563 | Supporting text |
+| Text/tertiary | --text-tertiary | #615D59 | Captions and hints |
+| Border/default | --border-default | #E5E7EB | Cards, inputs, controls |
+| Border/subtle | --border-subtle | rgb(0 0 0 / 0.08) | Internal dividers and panel cards |
+| Accent/primary | --accent-primary | #0075DE | Primary diagnostic CTA and focus states |
+| Accent/hover | --accent-hover | #005BAB | Primary hover |
 | Accent/soft | --accent-soft | #F2F9FF | Soft selected surface |
-| Status/success | --status-success | #346538 | Positive fit |
-| Status/warning | --status-warning | #956400 | Cautions |
+| Accent/blue | --accent-blue | #097FE8 | Chips, focus ring, secondary link |
+| Accent/brand green | --accent-brand-green | #15803D | Growth/positive criterion cue |
+| Accent/lavender | --accent-lavender | #9A86BD | Small supporting accent |
+| Accent/peach | --accent-peach | #F97316 | Small warmth accent |
+| CTA/glass bg | --cta-glass-bg | rgb(255 255 255 / 0.66) | Primary hero CTA surface |
+| CTA/glass bg hover | --cta-glass-bg-hover | rgb(255 255 255 / 0.84) | Primary hero CTA hover |
+| CTA/glass border | --cta-glass-border | rgb(255 255 255 / 0.86) | Primary hero CTA edge |
+| CTA/glass text | --cta-glass-text | #1F2933 | Primary hero CTA text |
+| CTA/glass shadow | --cta-glass-shadow | inset 0 1px 0 rgb(255 255 255 / 0.92), 0 16px 34px rgb(17 24 39 / 0.08), 0 3px 12px rgb(9 127 232 / 0.08) | Primary hero CTA depth |
+| Status/success | --status-success | #15803D | Positive fit |
+| Status/warning | --status-warning | #946A2D | Cautions |
 | Status/error | --status-error | #9F2F2D | Validation and failures |
 | Status/info | --status-info | #097FE8 | Informational state |
-| Focus/ring | --focus-ring | rgb(9 127 232 / 0.38) | Keyboard focus outline |
+| Focus/ring | --focus-ring | rgb(9 127 232 / 0.32) | Keyboard focus outline |
 
 ### Rules
 
-- Blue is used sparingly: progress, primary actions, and selected states only.
-- Surfaces stay frosted white, pale gray, or white; avoid large saturated sections.
+- Primary hero CTA uses a glass surface with navy text; action blue is reserved for focus, progress, selected, and secondary action states.
+- Brand green is reserved for growth/positive criterion cues and small directional accents.
+- Surfaces stay white, warm white, or soft gray; CampFit should read as an ANOGRO panel, not as a separate cream-colored app.
 - Warnings use pale yellow backgrounds, not red blocks.
 
 ## 3. Typography
@@ -56,7 +69,7 @@ The product should not feel like a generic SaaS dashboard or an admin form. Pare
 
 ### Font Stack
 
-- Primary: "Helvetica Neue", Arial, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif
+- Primary: Pretendard, -apple-system, BlinkMacSystemFont, system-ui, Roboto, "Helvetica Neue", Arial, sans-serif
 - Mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace
 
 ### Rules
@@ -90,7 +103,7 @@ All spacing derives from a base of 4px.
 
 ### Rules
 
-- The app opens directly on the useful workflow, not a marketing hero.
+- The app opens directly on the useful workflow, with a warm guide-like first screen rather than a technical AI landing page.
 - Avoid nested decorative cards. Nested areas must be functional callouts, field groups, or result blocks.
 - Main surfaces use 8px radius or less.
 
@@ -102,9 +115,9 @@ All spacing derives from a base of 4px.
 - **States**: current progress only; no visible six-step navigation.
 - **Motion**: width transition only.
 
-### Glass Workspace Card
+### Guide Workspace Card
 
-- **Structure**: translucent white surface, 1px hairline border, 24-32px radius, backdrop blur, restrained Apple-style shadow.
+- **Structure**: warm white or translucent surface, 1px hairline border, 24-32px radius, restrained sage-tinted shadow.
 - **Usage**: main form and result cards.
 - **Motion**: hover may lift 2-4px with opacity/transform only.
 
@@ -113,8 +126,20 @@ All spacing derives from a base of 4px.
 - **Structure**: label, optional hint, input/select/textarea.
 - **Variants**: text, number, select, textarea, radio tile.
 - **Radius**: 14-18px for inputs and utility controls; CTAs use capsules.
-- **States**: hover border, focus outline, selected blue tint.
+- **States**: hover border, focus outline, selected sage or muted blue tint.
 - **Accessibility**: labels are always connected to controls.
+
+### Glass CTA
+
+- **Structure**: capsule button, translucent white surface, hairline white edge, navy label, small green direction icon.
+- **States**: hover increases opacity and lifts 2px; focus uses the standard blue focus ring.
+- **Usage**: first-screen primary action where a solid blue button would feel too AI/SaaS-like.
+
+### Muted Glass Button
+
+- **Structure**: capsule button, softer translucent white surface, navy or secondary label, subtle inset highlight.
+- **States**: hover increases opacity without filling the control with blue.
+- **Usage**: previous, example, feedback, download, and secondary actions across the form and result pages.
 
 ### Result Card
 
@@ -159,4 +184,4 @@ Borders provide most separation. Shadows are quiet and only used on the primary 
 
 | Token | Value |
 |-------|-------|
-| --shadow-card | 0 24px 70px rgb(0 0 0 / 0.10), 0 8px 24px rgb(0 0 0 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.70) |
+| --shadow-card | 0 32px 90px rgb(0 0 0 / 0.1), 0 4px 18px rgb(0 0 0 / 0.04), inset 0 1px 0 rgb(255 255 255 / 0.75) |

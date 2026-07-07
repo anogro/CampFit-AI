@@ -42,11 +42,11 @@ export function ParentInsightSummary({ analysis, aiUsed }: ParentInsightSummaryP
         <div className="grid gap-5 lg:grid-cols-[1fr_220px] lg:items-center">
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-[var(--accent-primary)]">AI 아이 성향 진단</p>
+              <p className="text-xs font-semibold text-[var(--accent-primary)]">아이에게 맞는 캠프 방식</p>
               <AiUsageBadge
                 used={aiUsed}
-                usedLabel="Gemini가 부모 입력을 분석했어요"
-                fallbackLabel="기본 규칙으로 분석했어요"
+                usedLabel="입력 내용을 함께 정리했어요"
+                fallbackLabel="기본 체크 기준으로 정리했어요"
               />
             </div>
             <h3 className="mt-2 text-2xl font-bold tracking-[-0.02em] text-[var(--text-primary)] [word-break:keep-all]">
@@ -61,7 +61,7 @@ export function ParentInsightSummary({ analysis, aiUsed }: ParentInsightSummaryP
             <div className="mt-3 grid gap-2 rounded-md bg-[var(--surface-tint-yellow)] px-3 py-2 text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">
               <p>{childInsight.coachingPoint}</p>
               <p>
-                참고 프레임: <span className="font-semibold text-[var(--text-primary)]">{childInsight.familyPersona.name}</span> ·{" "}
+                참고 기준: <span className="font-semibold text-[var(--text-primary)]">{childInsight.familyPersona.name}</span> ·{" "}
                 {childInsight.familyPersona.headline}
               </p>
             </div>
@@ -77,8 +77,8 @@ export function ParentInsightSummary({ analysis, aiUsed }: ParentInsightSummaryP
       </div>
       <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs font-semibold text-[var(--accent-primary)]">부모 선택 성향</p>
-          <p className="text-xs font-semibold text-[var(--text-tertiary)]">추천 기준에 함께 반영</p>
+          <p className="text-xs font-semibold text-[var(--accent-primary)]">가족이 중요하게 보는 조건</p>
+          <p className="text-xs font-semibold text-[var(--text-tertiary)]">캠프 방향에 함께 반영</p>
         </div>
         <p className="mt-2 text-xl font-bold tracking-[-0.02em] text-[var(--text-primary)] [word-break:keep-all]">
           {analysis.parentType}
@@ -118,9 +118,9 @@ function getChildInsight(analysis: ParentAnalysis): ChildInsight {
       typeName: "초기 적응형 세이프 스타터",
       headline: "영어보다 먼저 안정감과 첫 성공 경험이 필요한 아이",
       description:
-        "Gemini 분석상 영어 준비도와 또래 자신감이 아직 낮은 편이고, 보호 장치에 대한 부모 우선순위가 높게 잡혀 있습니다. 캠프를 고를 때는 수업 강도보다 초반 적응 루틴, 한국어 케어, 소그룹 관리가 먼저입니다.",
+        "영어 준비도와 또래 자신감이 아직 낮은 편이고, 보호 장치에 대한 부모 우선순위가 높게 보입니다. 캠프를 고를 때는 수업 강도보다 초반 적응 루틴, 한국어 케어, 소그룹 관리가 먼저입니다.",
       coachingPoint:
-        "8유형으로는 보호적 성향에 가깝지만, 실제 추천에서는 아이의 영어 준비도와 낯가림 신호까지 함께 반영해 부담이 낮은 캠프부터 비교합니다.",
+        "보호적 성향에 가깝지만, 실제 추천에서는 아이의 영어 준비도와 낯가림 신호까지 함께 반영해 부담이 낮은 캠프부터 비교합니다.",
       familyPersona,
     }
   }
@@ -132,7 +132,7 @@ function getChildInsight(analysis: ParentAnalysis): ChildInsight {
       description:
         "분리 적응, 새로운 환경 적응, 도전 수용도가 함께 높게 나타납니다. 보호 장치가 전혀 필요 없다는 뜻은 아니지만, 지나치게 안전한 선택지만 고르면 성장 자극이 부족할 수 있습니다.",
       coachingPoint:
-        "8유형의 개방형/성장형 요소를 참고하되, 추천에서는 실제 영어 소통 수준과 캠프 난이도의 간격을 함께 계산합니다.",
+        "개방형/성장형 요소를 참고하되, 추천에서는 실제 영어 소통 수준과 캠프 난이도의 간격을 함께 계산합니다.",
       familyPersona,
     }
   }
@@ -144,7 +144,7 @@ function getChildInsight(analysis: ParentAnalysis): ChildInsight {
       description:
         "도전 수용도와 영어 준비도가 일정 수준 이상으로 보여, 단순 회화 수업보다 만들기, 실험, 프로젝트, 액티비티가 섞인 캠프에서 반응이 좋을 가능성이 있습니다.",
       coachingPoint:
-        "8유형의 창의/탐구 성향을 참고하지만, 추천에서는 학습 강도와 피로도를 함께 봐 과부하를 줄이는 방향으로 조정합니다.",
+        "창의/탐구 성향을 참고하지만, 추천에서는 학습 강도와 피로도를 함께 봐 과부하를 줄이는 방향으로 조정합니다.",
       familyPersona,
     }
   }
@@ -156,7 +156,7 @@ function getChildInsight(analysis: ParentAnalysis): ChildInsight {
       description:
         "사회적 자신감은 비교적 괜찮지만 도전 강도에는 조심스러운 신호가 있습니다. 경쟁적인 몰입 캠프보다 친구를 만들고 자연스럽게 말할 기회가 있는 환경이 좋습니다.",
       coachingPoint:
-        "8유형의 경험/보호 성향을 가볍게 입히되, 실제 추천에서는 버디 시스템과 저압박 말하기 환경을 더 크게 반영합니다.",
+        "경험/보호 성향을 가볍게 입히되, 실제 추천에서는 버디 시스템과 저압박 말하기 환경을 더 크게 반영합니다.",
       familyPersona,
     }
   }
@@ -168,7 +168,7 @@ function getChildInsight(analysis: ParentAnalysis): ChildInsight {
       description:
         "적응과 성장 가능성이 모두 보이지만, 아직 무리한 도전으로 밀어붙이기보다는 관리와 자유 경험의 균형이 중요합니다. 캠프의 루틴과 완충 장치를 함께 봐야 합니다.",
       coachingPoint:
-        "8유형은 결과를 설명하는 언어로만 사용하고, 실제 추천은 Gemini가 분석한 아이 준비도와 부모 목표의 균형값을 기준으로 조정합니다.",
+        "성향 유형은 결과를 설명하는 언어로만 사용하고, 실제 추천은 아이 준비도와 부모 목표의 균형값을 기준으로 조정합니다.",
       familyPersona,
     }
   }
@@ -179,7 +179,7 @@ function getChildInsight(analysis: ParentAnalysis): ChildInsight {
     description:
       "현재 입력만 놓고 보면 새로운 환경과 영어 노출에 대한 부담을 먼저 낮춰주는 접근이 필요합니다. 첫 캠프에서는 결과보다 적응 경험을 안전하게 만드는 것이 우선입니다.",
     coachingPoint:
-      "8유형으로는 보호적 성향이 강하지만, 추천에서는 아이의 실제 부담 신호를 더 세밀하게 반영해 초반 적응 지원이 있는 캠프를 우선합니다.",
+      "보호적 성향이 강하지만, 추천에서는 아이의 실제 부담 신호를 더 세밀하게 반영해 초반 적응 지원이 있는 캠프를 우선합니다.",
     familyPersona,
   }
 }
