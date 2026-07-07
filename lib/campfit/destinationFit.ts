@@ -21,7 +21,7 @@ export function calculateTravelFit(camp: Camp, readiness: CampfitInput["travelRe
   }
 }
 
-function countryRegion(country: string): Exclude<DestinationPreference, "no_preference"> {
+export function countryRegion(country: string): Exclude<DestinationPreference, "no_preference"> {
   switch (country) {
     case "Philippines":
     case "Singapore":

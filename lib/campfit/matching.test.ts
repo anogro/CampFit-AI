@@ -145,4 +145,61 @@ describe("recommendCamps", () => {
     expect(recommendations.length).toBeGreaterThan(0)
     expect(["Philippines", "Singapore", "Malaysia"]).toContain(recommendations[0]?.camp.country)
   })
+
+  it("Given Oceania and schooling preference with feasible constraints When recommending Then matching regional school programs rank first", () => {
+    const readiness = scoreCampReadiness({ ...basicAnswers, q5: "I can ask teachers for help.", q6: "A" })
+
+    const recommendations = recommendCamps({
+      input: {
+        ...baseInput,
+        childAge: 10,
+        grade: "초4",
+        budgetRange: "over_8m",
+        destinationPreference: "oceania",
+        travelReadiness: "long_flight_independent",
+        durationWeeks: "3_4w",
+        koreanManagerRequired: "not_needed",
+        preferredProgramType: "schooling",
+      },
+      analysis: {
+        ...baseAnalysis,
+        parentGoal: { ...baseAnalysis.parentGoal, academicResultPriority: 0.78, experiencePriority: 0.72 },
+        childProfile: {
+          englishReadiness: 0.62,
+          socialConfidence: 0.58,
+          separationTolerance: 0.66,
+          newEnvironmentAdaptability: 0.64,
+          challengeTolerance: 0.66,
+        },
+        supportNeeded: ["buddy_system", "early_adaptation_support"],
+      },
+      readiness,
+      camps,
+    })
+
+    expect(recommendations.length).toBeGreaterThan(0)
+    expect(recommendations.every((item) => item.camp.programType === "schooling")).toBe(true)
+    expect(recommendations.every((item) => item.camp.country === "Australia" || item.camp.country === "New Zealand")).toBe(true)
+  })
+
+  it("Given unavailable Oceania constraints but schooling preference When recommending Then program preference is kept before Cebu fallback", () => {
+    const readiness = scoreCampReadiness(basicAnswers)
+
+    const recommendations = recommendCamps({
+      input: {
+        ...baseInput,
+        destinationPreference: "oceania",
+        durationWeeks: "2w",
+        koreanManagerRequired: "required",
+        preferredProgramType: "schooling",
+      },
+      analysis: baseAnalysis,
+      readiness,
+      camps,
+    })
+
+    expect(recommendations.length).toBeGreaterThan(0)
+    expect(recommendations[0]?.camp.programType).toBe("schooling")
+    expect(recommendations[0]?.camp.country).not.toBe("Philippines")
+  })
 })

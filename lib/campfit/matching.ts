@@ -10,6 +10,7 @@ import type {
   SupportKey,
 } from "@/types/campfit"
 import { calculateDestinationFit, calculateTravelFit } from "@/lib/campfit/destinationFit"
+import { narrowCandidatesByExplicitPreferences } from "@/lib/campfit/preferenceCandidates"
 import { average, clamp01, toPercentScore, weightedAverage } from "@/lib/campfit/utils"
 
 const budgetMaxByRange = {
@@ -28,8 +29,9 @@ export type MatchInput = {
 
 export function recommendCamps(matchInput: MatchInput): readonly CampRecommendation[] {
   const candidates = matchInput.camps.filter((camp) => passesHardFilters(camp, matchInput.input))
+  const preferenceCandidates = narrowCandidatesByExplicitPreferences(candidates, matchInput.input)
 
-  return candidates
+  return preferenceCandidates
     .map((camp) => scoreCamp(camp, matchInput))
     .sort((left, right) => right.score - left.score)
     .slice(0, 3)
