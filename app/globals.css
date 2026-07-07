@@ -5,7 +5,7 @@
   --surface-secondary: #f9fafb;
   --surface-elevated: #fbfaf8;
   --surface-glass: rgb(255 255 255 / 0.72);
-  --surface-tint-blue: #f2f9ff;
+  --surface-tint-blue: #eef7f2;
   --surface-tint-green: #eef8f1;
   --surface-tint-yellow: #fff2d8;
   --surface-tint-lavender: #f1ecfa;
@@ -16,23 +16,23 @@
   --text-tertiary: #615d59;
   --border-default: #e5e7eb;
   --border-subtle: rgb(0 0 0 / 0.08);
-  --accent-primary: #0075de;
-  --accent-hover: #005bab;
-  --accent-soft: #f2f9ff;
-  --accent-blue: #097fe8;
+  --accent-primary: #2f6f52;
+  --accent-hover: #275f47;
+  --accent-soft: #eef7f2;
+  --accent-blue: #2f6f52;
   --accent-brand-green: #15803d;
   --accent-lavender: #9a86bd;
   --accent-peach: #f97316;
-  --cta-glass-bg: rgb(255 255 255 / 0.66);
-  --cta-glass-bg-hover: rgb(255 255 255 / 0.84);
-  --cta-glass-border: rgb(255 255 255 / 0.86);
+  --cta-glass-bg: linear-gradient(180deg, rgb(238 248 241 / 0.94) 0%, rgb(255 255 255 / 0.72) 100%);
+  --cta-glass-bg-hover: linear-gradient(180deg, rgb(224 243 231 / 0.98) 0%, rgb(255 255 255 / 0.82) 100%);
+  --cta-glass-border: rgb(21 128 61 / 0.28);
   --cta-glass-text: #1f2933;
-  --cta-glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.92), 0 16px 34px rgb(17 24 39 / 0.08), 0 3px 12px rgb(9 127 232 / 0.08);
+  --cta-glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 10px 24px rgb(21 128 61 / 0.1), 0 5px 14px rgb(17 24 39 / 0.065);
   --status-success: #15803d;
   --status-warning: #946a2d;
   --status-error: #9f2f2d;
-  --status-info: #097fe8;
-  --focus-ring: rgb(9 127 232 / 0.32);
+  --status-info: #2f6f52;
+  --focus-ring: rgb(47 111 82 / 0.3);
   --shadow-card: 0 32px 90px rgb(0 0 0 / 0.1), 0 4px 18px rgb(0 0 0 / 0.04), inset 0 1px 0 rgb(255 255 255 / 0.75);
   --shadow-soft: 0 4px 18px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.027);
 }
@@ -48,7 +48,7 @@ html {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at 72% 16%, rgb(9 127 232 / 0.08), transparent 34rem),
+    radial-gradient(circle at 72% 16%, rgb(47 111 82 / 0.055), transparent 34rem),
     radial-gradient(circle at 18% 86%, rgb(21 128 61 / 0.07), transparent 28rem),
     radial-gradient(circle at 58% 0%, rgb(249 115 22 / 0.045), transparent 30rem),
     linear-gradient(180deg, #ffffff 0%, var(--surface-secondary) 54%, var(--surface-elevated) 100%);
@@ -61,7 +61,8 @@ button,
 input,
 select,
 textarea {
-  font: inherit;
+  font-family: inherit;
+  font-size: inherit;
 }
 
 .apple-glass {
@@ -94,9 +95,9 @@ textarea {
 }
 
 .glass-cta:hover {
-  border-color: rgb(9 127 232 / 0.18);
+  border-color: rgb(21 128 61 / 0.38);
   background: var(--cta-glass-bg-hover);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), 0 18px 38px rgb(17 24 39 / 0.1), 0 4px 16px rgb(21 128 61 / 0.1);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.95), 0 12px 28px rgb(21 128 61 / 0.13), 0 6px 16px rgb(17 24 39 / 0.075);
 }
 
 .glass-button-muted {
@@ -109,7 +110,7 @@ textarea {
 }
 
 .glass-button-muted:hover {
-  border-color: rgb(9 127 232 / 0.16);
+  border-color: rgb(47 111 82 / 0.16);
   background: rgb(255 255 255 / 0.76);
 }
 

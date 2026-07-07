@@ -27,16 +27,24 @@ const followUpExampleSets = [
 export function Header() {
   return (
     <header className="apple-glass grid gap-6 rounded-[28px] p-5 md:p-8">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2.5">
+          <img src="/images/Small Logo.png" alt="" className="h-6 w-6 object-contain" draggable={false} />
+          <p className="text-sm font-extrabold tracking-[0.04em] text-[var(--text-primary)]">ANOGRO</p>
+        </div>
+        <p className="hidden text-sm font-medium text-[var(--text-tertiary)] [word-break:keep-all] sm:block">
+          첫 해외캠프 선택 노트
+        </p>
+      </div>
       <div className="grid gap-5 lg:grid-cols-[1fr_340px] lg:items-end">
         <div className="grid gap-3">
-          <p className="text-xs font-semibold tracking-[0.01em] text-[var(--accent-primary)]">우리 아이 캠프핏</p>
-          <h1 className="max-w-3xl text-[2rem] font-bold leading-[1.05] tracking-[-0.03em] text-[var(--text-primary)] [word-break:keep-all] sm:text-[2.75rem] md:text-[3.5rem]">
-            <span className="block">처음 떠나는 해외캠프,</span>
-            <span className="block">맞는 시작부터 찾아볼게요.</span>
+          <h1 className="max-w-3xl text-[1.85rem] font-bold leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)] [word-break:keep-all] sm:text-[2.3rem] md:text-[2.85rem]">
+            <span className="block">아이 성향과 우리 가족의 방향,</span>
+            <span className="block">근거 있는 캠프 추천을 받아보세요</span>
           </h1>
         </div>
         <p className="text-base font-medium leading-7 text-[var(--text-secondary)] [word-break:keep-all]">
-          영어 익숙함, 낯선 환경 적응, 부모 동행 필요 여부를 차분히 살펴보고 실제 프로그램 후보를 좁혀갑니다.
+          후기와 광고만으로는 알 수 없는 우리 아이의 성향, 그리고 우리 가족만의 조건을 함께 진단해 추천 이유와 주의할 점을 정리합니다.
         </p>
       </div>
       <ul className="grid gap-2 border-t border-[var(--border-subtle)] pt-4 text-sm text-[var(--text-secondary)] sm:grid-cols-3">

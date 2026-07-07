@@ -53,7 +53,7 @@ function RadarChart({ scores }: { readonly scores: readonly AxisScore[] }) {
           </g>
         )
       })}
-      <polygon points={polygon} fill="rgb(9 127 232 / 0.18)" stroke="var(--accent-primary)" strokeWidth="2" />
+      <polygon points={polygon} fill="rgb(47 111 82 / 0.16)" stroke="var(--accent-primary)" strokeWidth="2" />
     </svg>
   )
 }

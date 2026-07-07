@@ -2,7 +2,7 @@
 
 ## 1. Atmosphere & Identity
 
-CampFit should feel like a deeper ANOGRO decision panel for parents choosing a child's first overseas camp: calm, trustworthy, premium, and easy to scan. The UI follows ANOGRO's soft layered clarity: white glass surfaces, subtle blur, restrained blue action states, green growth cues, and practical guidance copy.
+CampFit should feel like a deeper ANOGRO decision panel for parents choosing a child's first overseas camp: calm, trustworthy, premium, and easy to scan. The UI follows ANOGRO's soft layered clarity: white glass surfaces, subtle blur, deep sage guidance states, green growth cues, and practical guidance copy.
 
 The product should not feel like a generic AI tool, SaaS dashboard, admin form, or separate child-service brand. Parents should feel they are opening an ANOGRO diagnostic note that organizes the family's first-camp criteria.
 
@@ -16,7 +16,7 @@ The product should not feel like a generic AI tool, SaaS dashboard, admin form, 
 | Surface/secondary | --surface-secondary | #F9FAFB | Page background and soft sections |
 | Surface/elevated | --surface-elevated | #FBFAF8 | Warm guidance surfaces |
 | Surface/glass | --surface-glass | rgb(255 255 255 / 0.72) | ANOGRO glass shell |
-| Surface/tint blue | --surface-tint-blue | #F2F9FF | Category chips, selected/info states |
+| Surface/tint info | --surface-tint-blue | #EEF7F2 | Category chips, selected/info states; legacy token name |
 | Surface/tint green | --surface-tint-green | #EEF8F1 | Positive/growth cues |
 | Surface/tint yellow | --surface-tint-yellow | #FFF2D8 | Cautions and tension notes |
 | Surface/tint lavender | --surface-tint-lavender | #F1ECFA | Gentle secondary highlight |
@@ -27,27 +27,28 @@ The product should not feel like a generic AI tool, SaaS dashboard, admin form, 
 | Text/tertiary | --text-tertiary | #615D59 | Captions and hints |
 | Border/default | --border-default | #E5E7EB | Cards, inputs, controls |
 | Border/subtle | --border-subtle | rgb(0 0 0 / 0.08) | Internal dividers and panel cards |
-| Accent/primary | --accent-primary | #0075DE | Primary diagnostic CTA and focus states |
-| Accent/hover | --accent-hover | #005BAB | Primary hover |
-| Accent/soft | --accent-soft | #F2F9FF | Soft selected surface |
-| Accent/blue | --accent-blue | #097FE8 | Chips, focus ring, secondary link |
+| Accent/primary | --accent-primary | #2F6F52 | Progress, selected, score, and key informational points |
+| Accent/hover | --accent-hover | #275F47 | Primary hover |
+| Accent/soft | --accent-soft | #EEF7F2 | Soft selected surface |
+| Accent/info | --accent-blue | #2F6F52 | Chips, focus ring, secondary link; legacy token name |
 | Accent/brand green | --accent-brand-green | #15803D | Growth/positive criterion cue |
 | Accent/lavender | --accent-lavender | #9A86BD | Small supporting accent |
 | Accent/peach | --accent-peach | #F97316 | Small warmth accent |
-| CTA/glass bg | --cta-glass-bg | rgb(255 255 255 / 0.66) | Primary hero CTA surface |
-| CTA/glass bg hover | --cta-glass-bg-hover | rgb(255 255 255 / 0.84) | Primary hero CTA hover |
-| CTA/glass border | --cta-glass-border | rgb(255 255 255 / 0.86) | Primary hero CTA edge |
+| CTA/glass bg | --cta-glass-bg | linear-gradient(180deg, rgb(238 248 241 / 0.94), rgb(255 255 255 / 0.72)) | Primary hero CTA surface with sage tint |
+| CTA/glass bg hover | --cta-glass-bg-hover | linear-gradient(180deg, rgb(224 243 231 / 0.98), rgb(255 255 255 / 0.82)) | Primary hero CTA hover |
+| CTA/glass border | --cta-glass-border | rgb(21 128 61 / 0.28) | Primary hero CTA edge |
 | CTA/glass text | --cta-glass-text | #1F2933 | Primary hero CTA text |
-| CTA/glass shadow | --cta-glass-shadow | inset 0 1px 0 rgb(255 255 255 / 0.92), 0 16px 34px rgb(17 24 39 / 0.08), 0 3px 12px rgb(9 127 232 / 0.08) | Primary hero CTA depth |
+| CTA/glass shadow | --cta-glass-shadow | inset 0 1px 0 rgb(255 255 255 / 0.9), 0 10px 24px rgb(21 128 61 / 0.10), 0 5px 14px rgb(17 24 39 / 0.065) | Primary hero CTA depth |
 | Status/success | --status-success | #15803D | Positive fit |
 | Status/warning | --status-warning | #946A2D | Cautions |
 | Status/error | --status-error | #9F2F2D | Validation and failures |
-| Status/info | --status-info | #097FE8 | Informational state |
-| Focus/ring | --focus-ring | rgb(9 127 232 / 0.32) | Keyboard focus outline |
+| Status/info | --status-info | #2F6F52 | Informational state |
+| Focus/ring | --focus-ring | rgb(47 111 82 / 0.30) | Keyboard focus outline |
 
 ### Rules
 
-- Primary hero CTA uses a glass surface with navy text; action blue is reserved for focus, progress, selected, and secondary action states.
+- Primary hero CTA uses a glass surface with navy text; deep sage is shared across focus, progress, selected, and small information states.
+- Saturated blue is avoided inside the CampFit panel so the feature does not read like a generic AI/SaaS tool.
 - Brand green is reserved for growth/positive criterion cues and small directional accents.
 - Surfaces stay white, warm white, or soft gray; CampFit should read as an ANOGRO panel, not as a separate cream-colored app.
 - Warnings use pale yellow backgrounds, not red blocks.
@@ -126,19 +127,19 @@ All spacing derives from a base of 4px.
 - **Structure**: label, optional hint, input/select/textarea.
 - **Variants**: text, number, select, textarea, radio tile.
 - **Radius**: 14-18px for inputs and utility controls; CTAs use capsules.
-- **States**: hover border, focus outline, selected sage or muted blue tint.
+- **States**: hover border, focus outline, selected sage or soft information tint.
 - **Accessibility**: labels are always connected to controls.
 
 ### Glass CTA
 
-- **Structure**: capsule button, translucent white surface, hairline white edge, navy label, small green direction icon.
-- **States**: hover increases opacity and lifts 2px; focus uses the standard blue focus ring.
-- **Usage**: first-screen primary action where a solid blue button would feel too AI/SaaS-like.
+- **Structure**: capsule button, sage-tinted translucent surface, hairline green edge, navy label, small green direction icon.
+- **States**: hover increases opacity and lifts 2px; focus uses the standard deep sage focus ring.
+- **Usage**: first-screen primary action where a solid saturated button would feel too AI/SaaS-like; keep it larger and more separated than trust cards.
 
 ### Muted Glass Button
 
 - **Structure**: capsule button, softer translucent white surface, navy or secondary label, subtle inset highlight.
-- **States**: hover increases opacity without filling the control with blue.
+- **States**: hover increases opacity without filling the control with a saturated color.
 - **Usage**: previous, example, feedback, download, and secondary actions across the form and result pages.
 
 ### Result Card

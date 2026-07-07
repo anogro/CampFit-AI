@@ -10,7 +10,7 @@ export function CampfitStartHero({ onStart }: { readonly onStart: () => void }) 
           <header className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
               <img src="/images/Small Logo.png" alt="" className="h-6 w-6 object-contain" draggable={false} />
-              <p className="text-sm font-extrabold tracking-[0.12em] text-[var(--text-primary)]">ANOGRO</p>
+              <p className="text-sm font-extrabold tracking-[0.04em] text-[var(--text-primary)]">ANOGRO</p>
             </div>
             <p className="hidden text-sm font-medium text-[var(--text-tertiary)] [word-break:keep-all] sm:block">
               첫 해외캠프 선택 노트

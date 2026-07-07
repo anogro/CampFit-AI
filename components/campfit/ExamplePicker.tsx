@@ -31,7 +31,7 @@ export function ExamplePicker({ examples, onSelect }: ExamplePickerProps) {
           {examples.map((example) => (
             <button
               key={example}
-              className="rounded-[16px] border border-[rgb(255_255_255_/_0.72)] bg-[rgb(255_255_255_/_0.56)] px-3 py-2 text-left text-sm leading-6 text-[var(--text-secondary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-lg transition hover:border-[rgb(9_127_232_/_0.16)] hover:bg-[rgb(255_255_255_/_0.78)] [word-break:keep-all]"
+              className="rounded-[16px] border border-[rgb(255_255_255_/_0.72)] bg-[rgb(255_255_255_/_0.56)] px-3 py-2 text-left text-sm leading-6 text-[var(--text-secondary)] shadow-[inset_0_1px_0_rgba(255,255,255,0.82)] backdrop-blur-lg transition hover:border-[rgb(47_111_82_/_0.16)] hover:bg-[rgb(255_255_255_/_0.78)] [word-break:keep-all]"
               type="button"
               onClick={() => {
                 onSelect(example)
