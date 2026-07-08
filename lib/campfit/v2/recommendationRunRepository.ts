@@ -42,10 +42,10 @@ type LegacyMatchingAuditPayload = {
   readonly warnings: readonly string[]
 }
 
-export async function saveCampfitV2RecommendationRun(input: SaveRecommendationRunInput): Promise<void> {
+export async function saveCampfitV2RecommendationRun(input: SaveRecommendationRunInput): Promise<string | null> {
   const client = createServerSupabaseClient()
   if (client === null) {
-    return
+    return null
   }
 
   const profileRow = buildConsultingProfileRow(input.sessionId, input.profile)
@@ -57,28 +57,35 @@ export async function saveCampfitV2RecommendationRun(input: SaveRecommendationRu
 
   if (profileError) {
     console.error("CampFit v2 consulting profile save failed", profileError.message)
-    return
+    return null
   }
 
   const profileId = readProfileId(profileData)
   if (profileId === null) {
     console.error("CampFit v2 consulting profile save did not return id")
-    return
+    return null
   }
 
-  const { error: runError } = await client.from("campfit_v2_recommendation_runs").insert(
-    buildRecommendationRunRow({
-      sessionId: input.sessionId,
-      consultingProfileId: profileId,
-      profile: input.profile,
-      matchingResult: input.matchingResult,
-      report: input.report,
-    }),
-  )
+  const { data: runData, error: runError } = await client
+    .from("campfit_v2_recommendation_runs")
+    .insert(
+      buildRecommendationRunRow({
+        sessionId: input.sessionId,
+        consultingProfileId: profileId,
+        profile: input.profile,
+        matchingResult: input.matchingResult,
+        report: input.report,
+      }),
+    )
+    .select("id")
+    .single()
 
   if (runError) {
     console.error("CampFit v2 recommendation run save failed", runError.message)
+    return null
   }
+
+  return readProfileId(runData)
 }
 
 function buildConsultingProfileRow(sessionId: string, profile: ConsultingProfile): ConsultingProfileRow {

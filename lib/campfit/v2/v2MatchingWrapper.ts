@@ -1,13 +1,12 @@
 import { recommendCamps } from "@/lib/campfit/matching"
 import { buildLegacyMatchingPayload } from "@/lib/campfit/v2/legacyAdapter"
-import {
-  preferredRegions,
-} from "@/lib/campfit/v2/profileAccess"
+import { preferredRegions } from "@/lib/campfit/v2/profileAccess"
 import {
   bucketRank,
   buildConditionRelaxationSuggestions,
   buildConsultingChecklist,
   buildExcludedReasons,
+  buildFitScoreSummary,
   buildMatchedConditions,
   buildMismatchReasons,
   buildMitigation,
@@ -59,7 +58,7 @@ export function recommendCampsV2(
   const relaxedCandidates = [
     ...cards.filter((card) => card.tier === "not_recommended"),
     ...filtered.relaxed.map((camp) => scoreCandidateV2(camp, profile, legacyByCampId.get(camp.id))),
-  ].slice(0, 5)
+  ].sort((left, right) => right.scoreBreakdown.v2Score - left.scoreBreakdown.v2Score).slice(0, 5)
 
   return {
     recommendations,
@@ -84,22 +83,21 @@ export function applyV2HardFilters(camps: readonly Camp[], profile: ConsultingPr
   const excluded: ExcludedCandidateV2[] = []
   for (const camp of camps) {
     const reasons = buildExcludedReasons(camp, profile)
-    const regionMismatch = reasons.includes("지역을 필수 조건으로 설정했기 때문에 제외했습니다.")
+    const regionMismatch = reasons.some((reason) => reason.includes("지역을 반드시"))
     if (regionMismatch) {
       relaxed.push(camp)
       continue
     }
 
     if (reasons.length > 0) {
-      const stillWorthConsideringReason = reasons.some((reason) => reason.includes("예산"))
-        ? "예산 조건을 조정하면 다시 비교할 수 있습니다."
-        : "제외 조건을 완화할 수 있다면 상담에서 재검토할 수 있습니다."
       excluded.push({
         programId: camp.id,
         programName: camp.name,
         excludedReasons: reasons,
         conditionRelaxation: buildConditionRelaxationSuggestions({ programId: camp.id, programName: camp.name, excludedReasons: reasons, conditionRelaxation: [] }, profile),
-        stillWorthConsideringReason,
+        stillWorthConsideringReason: reasons.some((reason) => reason.includes("예산"))
+          ? "예산 조건을 조정하면 다시 비교해볼 수 있습니다."
+          : "제외 조건을 완화할 수 있다면 상담에서 재검토할 수 있습니다.",
       })
       continue
     }
@@ -134,16 +132,26 @@ export function scoreCandidateV2(
       regionPriorityAdjustment(camp, profile),
   )
   const tier = classifyRecommendationTierV2({ v2Score, mismatchedConditions, riskReasons })
-
   const recommendDespiteMismatchReason = buildRecommendDespiteMismatchReason(camp, profile, mismatchedConditions)
+
   return {
     programId: camp.id,
     programName: camp.name,
     tier,
-    fitSummary: `${camp.name}은 ${matchedConditions.slice(0, 2).join(", ") || "기본 조건"} 측면에서 비교할 수 있는 후보입니다.`,
+    fitScoreSummary: buildFitScoreSummary({
+      camp,
+      profile,
+      tier,
+      legacyScore,
+      v2Score,
+      matchedConditions,
+      mismatchedConditions,
+      riskReasons,
+    }),
+    fitSummary: `${camp.name}은 ${matchedConditions.slice(0, 2).join(", ") || "기본 조건"} 측면에서 검토할 수 있는 후보입니다.`,
     matchedConditions,
     mismatchedConditions,
-    recommendDespiteMismatchReason: recommendDespiteMismatchReason ?? "주요 조건 불일치 없이 추천 가능한 후보입니다.",
+    recommendDespiteMismatchReason: recommendDespiteMismatchReason ?? "주요 조건 불일치가 적어 현재 조건에서 검토 가능한 후보입니다.",
     childFit: childFitText(camp, profile),
     familyFit: familyFitText(camp, profile),
     riskLevel: riskReasons.length >= 3 ? "high" : riskReasons.length >= 1 ? "medium" : "low",

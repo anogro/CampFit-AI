@@ -5,6 +5,7 @@ import {
   departureWindows,
   koreanSupportNeeds,
   parentAccompanimentModes,
+  fitAxisKeys,
   questionTypes,
   recommendationTiers,
   regionGroups,
@@ -162,6 +163,19 @@ const RecommendationCardSchema = z
     programId: z.string().min(1),
     programName: z.string().min(1),
     tier: z.enum(recommendationTiers),
+    fitScoreSummary: z
+      .object({
+        overallScore: z.number().int().min(0).max(100),
+        tier: z.enum(recommendationTiers),
+        label: z.string().min(1),
+        axes: z.array(z.object({
+          key: z.enum(fitAxisKeys),
+          label: z.string().min(1),
+          score: z.number().int().min(0).max(100),
+          comment: z.string().min(1),
+        }).strict()).min(1),
+      })
+      .strict(),
     fitSummary: z.string().min(1),
     matchedConditions: z.array(z.string().min(1)),
     mismatchedConditions: z.array(z.string().min(1)),
@@ -187,11 +201,27 @@ const ExcludedCandidateSchema = z
 
 export const RecommendationReportSchema = z
   .object({
+    conclusion: z.string().min(1),
+    fitScoreSummary: RecommendationCardSchema.shape.fitScoreSummary,
     familySummary: z.string().min(1),
     childReadinessSummary: z.string().min(1),
     recommendedProgramModes: z.array(z.string().min(1)),
+    optionGroups: z.array(z.object({
+      key: z.enum(["keep_preferred_region", "prioritize_child_fit", "prioritize_budget_and_support"]),
+      title: z.string().min(1),
+      fitLabel: z.string().min(1),
+      score: z.number().int().min(0).max(100),
+      matchedPoints: z.array(z.string().min(1)),
+      tradeoffs: z.array(z.string().min(1)),
+      suggestedAction: z.string().min(1),
+    }).strict()),
     recommendations: z.array(RecommendationCardSchema),
     excludedCandidates: z.array(ExcludedCandidateSchema),
+    excludedSummaryGroups: z.array(z.object({
+      key: z.string().min(1),
+      label: z.string().min(1),
+      count: z.number().int().min(0),
+    }).strict()),
     conditionRelaxationSuggestions: z.array(z.string().min(1)),
     consultingChecklist: z.array(z.string().min(1)),
   })

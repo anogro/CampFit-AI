@@ -21,6 +21,7 @@ export function buildFallbackExtraction(
   const detectedProgramTypes = detectProgramTypes(text)
   const riskSignals = detectRiskSignals(text)
   const parentGoals = detectParentGoals(text)
+  const avoidSignals = detectAvoidSignals(text)
   const conflicts = detectConflicts(requiredIntake, detectedProgramTypes, riskSignals, parentGoals)
   const recommendedQuestionKeys = dedupeStrings([
     ...conflicts.map((conflict) => conflict.recommendedQuestionKey).filter((key) => key !== undefined),
@@ -28,14 +29,14 @@ export function buildFallbackExtraction(
   ])
 
   return {
-    understandingSummaryForUser: "입력된 필수 정보와 자연어 상담 내용을 바탕으로 지역, 프로그램 방향, 걱정 신호를 임시 구조화했습니다.",
+    understandingSummaryForUser: "입력하신 필수 조건과 상담 내용을 바탕으로 추천 방향과 주의할 점을 먼저 정리했습니다.",
     extractedProfile: {
       detectedRegions,
       detectedProgramTypes,
       parentGoals,
-      childSignals: [],
+      childSignals: detectChildSignals(text),
       riskSignals,
-      avoidSignals: detectAvoidSignals(text),
+      avoidSignals,
       flexibilitySignals: detectFlexibilitySignals(text),
     },
     missingSlots: buildMissingSlots(requiredIntake),
@@ -54,7 +55,7 @@ function detectRegions(text: string, preferredRegionGroups: RequiredIntake["pref
     regions.push("oceania")
   }
 
-  if (/세부|필리핀|말레이시아|싱가포르|동남아/.test(text)) {
+  if (/싱가포르|말레이시아|동남아|태국|필리핀/.test(text)) {
     regions.push("southeast_asia")
   }
 
@@ -63,63 +64,100 @@ function detectRegions(text: string, preferredRegionGroups: RequiredIntake["pref
 
 function detectProgramTypes(text: string): readonly string[] {
   const programTypes: string[] = []
-  if (/스쿨링|국제학교|정규수업/.test(text)) {
+  if (/스쿨링|현지\s*학교|학교\s*수업|정규\s*수업/.test(text)) {
     programTypes.push("international_school_regular", "schooling")
+  }
+
+  if (/국제학교\s*분위기|국제학교\s*경험|국제학교/.test(text)) {
+    programTypes.push("international_school_experience")
   }
 
   if (/액티비티|스포츠|활동/.test(text)) {
     programTypes.push("activity_sports")
   }
 
-  if (/어학원|ESL|영어수업/i.test(text)) {
+  if (/어학원|ESL|영어\s*수업/i.test(text)) {
     programTypes.push("language_school_esl")
   }
 
   return dedupeStrings(programTypes)
 }
 
-function detectRiskSignals(text: string): readonly string[] {
-  const riskSignals: string[] = []
-  if (/영어\s*초급|영어를\s*못|도움\s*요청\s*어려|못 알아들|영어가\s*걱정/.test(text)) {
-    riskSignals.push("english_overload")
+function detectChildSignals(text: string): readonly string[] {
+  const childSignals: string[] = []
+  if (/낯선 환경|적응.*시간|긴장|느린 적응|낯을\s*가리|낯가림/.test(text)) {
+    childSignals.push("slow_to_adapt")
   }
 
-  if (/떨어진 경험 없음|분리|부모와 떨어|혼자.*걱정/.test(text)) {
+  if (/친구.*먼저|소극적|조심스러운|낯선 친구|낯을\s*가리|낯가림/.test(text)) {
+    childSignals.push("socially_reserved")
+  }
+
+  return dedupeStrings(childSignals)
+}
+
+function detectRiskSignals(text: string): readonly string[] {
+  const riskSignals: string[] = []
+  if (/영어\s*초급|영어.*걱정|수업.*부담|수업.*못\s*따라|영어.*위축|자유로운 영어.*위축/.test(text)) {
+    riskSignals.push("english_proficiency_concern", "english_overload")
+  }
+
+  if (/또래.*소외|소외|친구.*못\s*사귈|또래.*위축/.test(text)) {
+    riskSignals.push("social_exclusion_anxiety")
+  }
+
+  if (/떨어진 경험.*없|분리|부모.*떨어|혼자.*걱정/.test(text)) {
     riskSignals.push("separation_risk")
   }
 
-  return riskSignals
+  return dedupeStrings(riskSignals)
 }
 
 function detectParentGoals(text: string): readonly string[] {
   const goals: string[] = []
-  if (/영어.*실력|영어.*향상|영어.*성과/.test(text)) {
+  if (/영어.*(실력\s*향상|늘었으면|레벨업|수업\s*효과|학업\s*성과|말하기\s*실력|점수|레벨|성과)/.test(text)) {
     goals.push("english_improvement")
+  }
+
+  if (/영어.*(언어로|거부감|자연스럽|부담을?\s*줄|싫어하지)/.test(text)) {
+    goals.push("reduce_english_resistance", "natural_english_exposure")
+  }
+
+  if (/문화|분위기|국제학교\s*분위기|다양한\s*문화/.test(text)) {
+    goals.push("cultural_exposure")
+  }
+
+  if (/국제학교\s*분위기|국제학교\s*경험/.test(text)) {
+    goals.push("international_school_experience")
   }
 
   if (/자신감/.test(text)) {
     goals.push("confidence")
   }
 
-  if (/독립심|독립/.test(text)) {
+  if (/독립|자립/.test(text)) {
     goals.push("independence")
   }
 
-  return goals
+  return dedupeStrings(goals)
 }
 
 function detectAvoidSignals(text: string): readonly string[] {
   const avoidSignals: string[] = []
-  if (/피하고|싫|원하지/.test(text)) {
+  if (/공부\s*위주|학업\s*위주|너무\s*공부|공부처럼만/.test(text)) {
+    avoidSignals.push("too_study_focused")
+  }
+
+  if (/피하고|원하지|싫어/.test(text)) {
     avoidSignals.push("avoidance_mentioned")
   }
 
-  return avoidSignals
+  return dedupeStrings(avoidSignals)
 }
 
 function detectFlexibilitySignals(text: string): readonly string[] {
   const flexibilitySignals: string[] = []
-  if (/조정|상관없|넓힐|바꿀/.test(text)) {
+  if (/조정|상관없|넓히|바꿀 수/.test(text)) {
     flexibilitySignals.push("flexibility_mentioned")
   }
 
@@ -139,7 +177,7 @@ function detectConflicts(
   if (wantsOceania && lowBudget && hasParentStay) {
     conflicts.push({
       conflictKey: "conflict_oceania_budget_parent",
-      description: "오세아니아 선호, 제한적인 항공권 포함 총예산, 부모 동행 조건이 함께 있어 후보가 제한될 수 있습니다.",
+      description: "오세아니아 지역과 부모 동반 체류를 함께 고려하면 현재 예산 안에서 선택지가 좁아질 수 있습니다.",
       severity: "high",
       recommendedQuestionKey: "conflict_oceania_budget_parent",
     })
@@ -147,11 +185,11 @@ function detectConflicts(
 
   if (
     detectedProgramTypes.some((programType) => programType === "international_school_regular" || programType === "schooling") &&
-    riskSignals.includes("english_overload")
+    riskSignals.some((risk) => risk === "english_overload" || risk === "english_proficiency_concern")
   ) {
     conflicts.push({
       conflictKey: "conflict_schooling_low_english",
-      description: "국제학교/스쿨링 방향은 맞지만 현재 영어 준비도 기준에서는 부담이 클 수 있습니다.",
+      description: "오세아니아 스쿨링은 방향성은 맞지만, 영어 초급 아이에게는 수업 참여 부담이 있을 수 있습니다.",
       severity: "medium",
       recommendedQuestionKey: "conflict_schooling_low_english",
     })
@@ -160,7 +198,7 @@ function detectConflicts(
   if (parentGoals.includes("independence") && riskSignals.includes("separation_risk")) {
     conflicts.push({
       conflictKey: "conflict_independence_parent_anxiety",
-      description: "독립심 성장을 기대하지만 부모 분리 부담 신호가 함께 있습니다.",
+      description: "독립성을 키우고 싶은 목표와 부모 분리 불안이 함께 있습니다.",
       severity: "medium",
       recommendedQuestionKey: "conflict_independence_parent_anxiety",
     })
@@ -179,7 +217,7 @@ function buildFallbackQuestionKeys(requiredIntake: RequiredIntake, riskSignals: 
     keys.push("korean_support_need")
   }
 
-  if (riskSignals.includes("english_overload")) {
+  if (riskSignals.some((risk) => risk === "english_overload" || risk === "english_proficiency_concern")) {
     keys.push("english_help_seeking", "english_comprehension")
   }
 

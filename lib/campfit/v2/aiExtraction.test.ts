@@ -32,6 +32,21 @@ describe("buildFallbackExtraction", () => {
     expect(extraction.conflicts.some((conflict) => conflict.conflictKey === "conflict_schooling_low_english")).toBe(true)
     expect(JSON.stringify(extraction)).not.toMatch(/\bgrade\b/i)
   })
+
+  it("Given natural English and culture goal When falling back Then does not infer English improvement", () => {
+    const naturalInput: NaturalConsultationInput = {
+      situationText: "영어를 언어로 받아들이면 좋을 것 같아요. 너무 공부위주보다는 다양한 문화와 분위기를 느끼게 해주고 싶어요.",
+    }
+
+    const extraction = buildFallbackExtraction(requiredIntake, naturalInput)
+    const parentGoals = extraction.extractedProfile["parentGoals"]
+    const avoidSignals = extraction.extractedProfile["avoidSignals"]
+
+    expect(parentGoals).not.toContain("english_improvement")
+    expect(parentGoals).toEqual(expect.arrayContaining(["reduce_english_resistance"]))
+    expect(parentGoals).toEqual(expect.arrayContaining(["cultural_exposure"]))
+    expect(avoidSignals).toEqual(expect.arrayContaining(["too_study_focused"]))
+  })
 })
 
 describe("sanitizeAIExtractionResult", () => {

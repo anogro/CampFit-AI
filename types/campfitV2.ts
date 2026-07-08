@@ -159,6 +159,7 @@ export type RecommendationCardV2 = {
   readonly programId: string
   readonly programName: string
   readonly tier: RecommendationTier
+  readonly fitScoreSummary: FitScoreSummary
   readonly fitSummary: string
   readonly matchedConditions: readonly string[]
   readonly mismatchedConditions: readonly string[]
@@ -171,6 +172,31 @@ export type RecommendationCardV2 = {
   readonly consultingChecklist: readonly string[]
 }
 
+export const fitAxisKeys = [
+  "child_fit",
+  "english_readiness",
+  "family_constraints",
+  "support_fit",
+  "growth_balance",
+  "budget_reality",
+  "risk_management",
+] as const
+export type FitAxisKey = (typeof fitAxisKeys)[number]
+
+export type FitScoreAxis = {
+  readonly key: FitAxisKey
+  readonly label: string
+  readonly score: number
+  readonly comment: string
+}
+
+export type FitScoreSummary = {
+  readonly overallScore: number
+  readonly tier: RecommendationTier
+  readonly label: string
+  readonly axes: readonly FitScoreAxis[]
+}
+
 export type ExcludedCandidateV2 = {
   readonly programId: string
   readonly programName: string
@@ -180,11 +206,31 @@ export type ExcludedCandidateV2 = {
 }
 
 export type RecommendationReportV2 = {
+  readonly conclusion: string
+  readonly fitScoreSummary: FitScoreSummary
   readonly familySummary: string
   readonly childReadinessSummary: string
   readonly recommendedProgramModes: readonly string[]
+  readonly optionGroups: readonly ReportOptionGroup[]
   readonly recommendations: readonly RecommendationCardV2[]
   readonly excludedCandidates: readonly ExcludedCandidateV2[]
+  readonly excludedSummaryGroups: readonly ExcludedSummaryGroup[]
   readonly conditionRelaxationSuggestions: readonly string[]
   readonly consultingChecklist: readonly string[]
+}
+
+export type ReportOptionGroup = {
+  readonly key: "keep_preferred_region" | "prioritize_child_fit" | "prioritize_budget_and_support"
+  readonly title: string
+  readonly fitLabel: string
+  readonly score: number
+  readonly matchedPoints: readonly string[]
+  readonly tradeoffs: readonly string[]
+  readonly suggestedAction: string
+}
+
+export type ExcludedSummaryGroup = {
+  readonly key: string
+  readonly label: string
+  readonly count: number
 }
