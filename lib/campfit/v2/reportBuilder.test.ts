@@ -87,7 +87,7 @@ const sampleCard: RecommendationCardV2WithScore = {
   fitScoreSummary: {
     overallScore: 64,
     tier: "possible_if_adjusted",
-    label: "조건 조정 시 검토",
+    label: "조건을 조정하면 검토 가능",
     axes: [
       { key: "child_fit", label: "아이 적응 적합도", score: 65, comment: "초반 적응 확인이 필요합니다." },
       { key: "english_readiness", label: "영어 준비도 적합도", score: 60, comment: "영어 부담 확인이 필요합니다." },

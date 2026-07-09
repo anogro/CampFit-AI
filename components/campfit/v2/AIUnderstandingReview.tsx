@@ -18,8 +18,8 @@ export function AIUnderstandingReview({ summary, loading, onBack, onContinue }: 
     <section className="grid gap-6" aria-labelledby="campfit-v2-ai-review-title">
       <SectionIntro
         eyebrow="상담 내용 확인"
-        title="말씀해주신 내용을 바탕으로, 추천에 중요한 부분만 먼저 정리했어요."
-        description="틀린 부분이 있다면 이전으로 돌아가 수정할 수 있어요. 정확한 추천을 위해 다음 단계에서 몇 가지만 더 확인할게요."
+        title="말씀해주신 내용을 바탕으로, 중요한 부분만 먼저 정리했어요."
+        description="틀린 부분이 있다면 이전으로 돌아가 수정할 수 있어요. 다음 단계에서 몇 가지만 더 확인할게요."
       />
       <div className="apple-glass-soft grid gap-4 rounded-[24px] p-5">
         <ReviewBlock title="부모님이 원하는 방향" items={sections.parentDirection} />
@@ -29,7 +29,7 @@ export function AIUnderstandingReview({ summary, loading, onBack, onContinue }: 
       <div className="flex flex-col-reverse gap-3 border-t border-[var(--border-subtle)] pt-5 sm:flex-row sm:justify-between">
         <SecondaryButton disabled={loading} onClick={onBack}>이전으로 돌아가 수정하기</SecondaryButton>
         <PrimaryButton disabled={loading} onClick={onContinue}>
-          {loading ? "질문 준비 중..." : "맞아요, 몇 가지만 더 확인할게요"}
+          {loading ? "질문 준비 중..." : "네, 몇 가지만 더 확인해주세요"}
         </PrimaryButton>
       </div>
     </section>
@@ -46,7 +46,7 @@ function ReviewBlock({ title, items }: { readonly title: string; readonly items:
           {visible.map((item, index) => <li key={`${index}-${item}`} className="[word-break:keep-all]">{item}</li>)}
         </ul>
       ) : (
-        <p className="text-sm leading-6 text-[var(--text-tertiary)]">아직 선명하게 정리된 내용이 없습니다.</p>
+        <p className="text-sm leading-6 text-[var(--text-tertiary)]">아직 정리할 만한 내용을 찾지 못했어요. 다음 질문에서 더 확인할게요.</p>
       )}
     </div>
   )

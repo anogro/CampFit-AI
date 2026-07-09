@@ -16,7 +16,7 @@ export function RequiredIntakeForm({ value, onChange, onNext }: RequiredIntakeFo
       <SectionIntro
         eyebrow="CampFit v2 상담 시작"
         title="먼저 바꿀 수 없는 조건과 가족 기준을 정리할게요."
-        description="추천은 국가별 통제가 아니라 캠프 시작 시점의 아이 나이, 항공권 포함 전체 예산, 부모 동행 가능 형태를 기준으로 좁혀갑니다."
+        description="캠프 시작 시점의 아이 나이, 항공권을 포함한 전체 예산, 부모 동행 가능 형태를 기준으로 먼저 방향을 좁혀갑니다."
       />
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <div className="apple-glass-soft grid gap-4 rounded-[24px] p-5">
@@ -46,7 +46,7 @@ export function RequiredIntakeForm({ value, onChange, onNext }: RequiredIntakeFo
         <div className="apple-glass-soft grid gap-4 rounded-[24px] p-5">
           <SelectField
             id="total-budget-all-in"
-            label="항공권, 숙소, 식비, 보험, 현지 이동비까지 포함한 이번 캠프의 전체 예산은 어느 정도인가요?"
+            label="항공권부터 현지 이동비까지, 이번 캠프에 쓸 수 있는 전체 예산은 어느 정도인가요?"
             value={budgetValue(value)}
             options={budgetOptions}
             onChange={(budget) => onChange({ ...value, ...budgetPatch(budget) })}

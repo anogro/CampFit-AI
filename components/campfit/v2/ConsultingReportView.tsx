@@ -19,7 +19,7 @@ export function ConsultingReportView({ report, recommendationRunId }: Consulting
         title="추천보다 중요한 건, 지금 무엇을 선택하고 무엇을 조정할지입니다."
         description="점수는 절대 평가가 아니라 현재 입력 조건 기준의 비교용 적합도입니다. 비용은 실제 견적 전까지 상담 전 확인 항목으로 표시합니다."
       />
-      {recommendationRunId ? <p className="text-xs font-semibold text-[var(--text-tertiary)]">추천 실행 ID: {recommendationRunId}</p> : null}
+      {recommendationRunId ? <p className="text-xs font-semibold text-[var(--text-tertiary)]">리포트 번호: {recommendationRunId}</p> : null}
 
       <ReportSection title="오늘의 결론">
         <p className="text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{report.conclusion}</p>
@@ -54,7 +54,7 @@ export function ConsultingReportView({ report, recommendationRunId }: Consulting
               </div>
               <p className="text-sm font-semibold leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{group.fitLabel}</p>
               <CompactList sectionId={`option-match-${group.key}`} title="맞는 점" items={group.matchedPoints.slice(0, 2)} />
-              <CompactList sectionId={`option-tradeoff-${group.key}`} title="감수할 점" items={group.tradeoffs.slice(0, 2)} emphasized />
+              <CompactList sectionId={`option-tradeoff-${group.key}`} title="확인할 점" items={group.tradeoffs.slice(0, 2)} emphasized />
               <p className="rounded-lg bg-[var(--surface-primary)] p-3 text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{group.suggestedAction}</p>
             </article>
           ))}
@@ -62,19 +62,19 @@ export function ConsultingReportView({ report, recommendationRunId }: Consulting
       </section>
 
       <section className="grid gap-3">
-        <h3 className="text-lg font-bold text-[var(--text-primary)]">현재 조건에서 검토할 후보 TOP 3</h3>
+        <h3 className="text-lg font-bold text-[var(--text-primary)]">지금 조건에서 먼저 검토해볼 후보</h3>
         {candidates.length > 0 ? (
           <div className="grid gap-4">
             {candidates.map((card, index) => <CandidateCard key={`candidate-${index}-${card.programId}`} card={card} index={index} />)}
           </div>
         ) : (
           <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4 text-sm leading-6 text-[var(--text-secondary)]">
-            정확히 맞는 후보는 부족하지만, 위 선택 방향을 기준으로 조건을 조정하면 가까운 후보를 만들 수 있습니다.
+            정확히 맞는 후보는 아직 없지만, 위 선택 방향을 기준으로 조건을 조정하면 가까운 후보를 비교해볼 수 있습니다.
           </p>
         )}
       </section>
 
-      <ReportSection title="원래 원했던 방향이 왜 어려운지">
+      <ReportSection title="처음 원했던 방향에서 확인이 필요한 부분">
         <SimpleList sectionId="mismatch-summary" items={uniqueStrings(candidates.flatMap((card) => card.mismatchedConditions)).slice(0, 5)} emptyText="큰 조건 불일치는 아직 선명하게 잡히지 않았습니다." />
       </ReportSection>
 
@@ -210,9 +210,9 @@ function tierLabel(tier: RecommendationTier): string {
     case "good_with_support":
       return "지원 조건 확인 후 적합"
     case "possible_if_adjusted":
-      return "조건 조정 시 검토"
+      return "조건을 조정하면 검토 가능"
     case "not_recommended":
-      return "조건 조정 후 검토"
+      return "지금은 우선순위가 낮음"
   }
 }
 

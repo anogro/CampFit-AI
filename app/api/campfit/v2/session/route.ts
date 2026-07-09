@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
   const client = getV2ApiClient()
   if (client === null) {
-    return NextResponse.json({ message: "상담 세션 저장 환경변수가 설정되어 있지 않습니다." }, { status: 500 })
+    return NextResponse.json({ message: "지금은 상담 내용을 저장할 수 없습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 })
   }
 
   const sessionId = await createV2Session({

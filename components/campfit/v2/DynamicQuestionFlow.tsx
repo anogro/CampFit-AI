@@ -25,8 +25,8 @@ export function DynamicQuestionFlow({ questions, answers, loading, onChange, onS
     <section className="grid gap-6" aria-labelledby="campfit-v2-dynamic-title">
       <SectionIntro
         eyebrow="추가 확인"
-        title="정확한 추천을 위해 몇 가지만 더 확인할게요."
-        description="아래 질문에 답하면 현재 조건에서 맞는 후보와 조정이 필요한 조건을 함께 정리해드릴게요."
+        title="몇 가지만 더 확인할게요."
+        description="아래 질문에 답해주시면, 지금 조건에서 맞는 점과 조정이 필요한 부분을 함께 정리해드릴게요."
       />
       <div className="grid gap-4">
         {questions.map((question) => (
@@ -40,7 +40,7 @@ export function DynamicQuestionFlow({ questions, answers, loading, onChange, onS
       </div>
       <div className="flex justify-end border-t border-[var(--border-subtle)] pt-5">
         <PrimaryButton disabled={loading || !canSubmit} onClick={onSubmit}>
-          {loading ? "추천 생성 중..." : "컨설팅 리포트 보기"}
+          {loading ? "리포트 준비 중..." : "컨설팅 리포트 보기"}
         </PrimaryButton>
       </div>
     </section>

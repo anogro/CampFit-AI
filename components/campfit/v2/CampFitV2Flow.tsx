@@ -44,7 +44,7 @@ export function CampFitV2Flow() {
       })
       const nextSessionId = session.sessionId
       if (nextSessionId.length === 0) {
-        throw new Error("상담 세션을 먼저 생성하지 못했습니다. 다시 시도해주세요.")
+        throw new Error("상담 정보를 먼저 저장하지 못했습니다. 다시 시도해주세요.")
       }
 
       setSessionId(nextSessionId)
@@ -115,10 +115,10 @@ export function CampFitV2Flow() {
         </div>
         <div className="grid gap-3">
           <h1 className="max-w-3xl text-[1.85rem] font-bold leading-[1.08] text-[var(--text-primary)] [word-break:keep-all] sm:text-[2.35rem] md:text-[2.85rem]">
-            상담형 추천 리포트로 아이에게 맞는 캠프 조건을 좁혀보세요
+            완벽한 캠프는 없어도, 우리 가족의 기준은 있습니다
           </h1>
           <p className="max-w-3xl text-base font-medium leading-7 text-[var(--text-secondary)] [word-break:keep-all]">
-            필수 조건과 자연어 상담을 바탕으로 추천 이유, 맞지 않는 조건, 조정 가능한 방향을 함께 정리합니다.
+            입력해주신 조건과 상황을 바탕으로, 맞는 점과 확인이 필요한 조건, 조정 가능한 방향을 함께 정리합니다.
           </p>
         </div>
         <Progress step={step} />
@@ -137,7 +137,7 @@ export function CampFitV2Flow() {
 
 async function analyzeSession(sessionId: string): Promise<AnalyzeV2Response> {
   if (sessionId.length === 0) {
-    throw new Error("상담 세션을 먼저 생성하지 못했습니다. 다시 시도해주세요.")
+    throw new Error("상담 정보를 먼저 저장하지 못했습니다. 다시 시도해주세요.")
   }
 
   return postJson<AnalyzeV2Response>("/api/campfit/v2/analyze", { sessionId })

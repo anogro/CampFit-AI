@@ -15,9 +15,9 @@ export function NaturalConsultationForm({ value, loading, onBack, onChange, onSu
   return (
     <section className="grid gap-6" aria-labelledby="campfit-v2-natural-title">
       <SectionIntro
-        eyebrow="자연어 상담"
+        eyebrow="자유롭게 적어주세요"
         title="조건표에 담기 어려운 아이의 상황을 편하게 적어주세요."
-        description="이 내용은 AI가 구조화하되, 추천 판단과 후보 분류는 코드 기반 규칙으로 다시 검토합니다."
+        description="적어주신 내용을 바탕으로 아이에게 중요한 조건과 확인할 점을 먼저 정리합니다."
       />
       <TextAreaField
         id="situation-text"
@@ -43,7 +43,7 @@ export function NaturalConsultationForm({ value, loading, onBack, onChange, onSu
       <div className="flex flex-col-reverse gap-3 border-t border-[var(--border-subtle)] pt-5 sm:flex-row sm:justify-between">
         <SecondaryButton disabled={loading} onClick={onBack}>이전으로</SecondaryButton>
         <PrimaryButton disabled={loading || value.situationText.trim().length < 10} onClick={onSubmit}>
-          {loading ? "분석 중..." : "AI 이해 내용 확인"}
+          {loading ? "내용 정리하는 중..." : "상담 내용 확인하기"}
         </PrimaryButton>
       </div>
     </section>

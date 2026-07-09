@@ -126,7 +126,7 @@ export function buildRecommendDespiteMismatchReason(
 ): string | undefined {
   if (mismatchReasons.length === 0) return undefined
   if (camp.koreanManager || camp.beginnerClass || camp.parentAccompanied) {
-    return "일부 조건은 다르지만, 아이의 현재 준비도와 부모님의 안전 관리 기준에는 더 잘 맞아 검토 후보로 제시했습니다."
+    return "일부 조건은 다르지만, 아이의 준비도와 안전 관리 기준에는 잘 맞아 함께 검토해보시길 권합니다."
   }
 
   return "선호와 다른 지점은 있지만, 조건을 조금 조정하면 비교해볼 가치가 있는 대안입니다."
@@ -285,9 +285,9 @@ function tierLabel(tier: RecommendationTier): string {
     case "good_with_support":
       return "지원 조건 확인 후 적합"
     case "possible_if_adjusted":
-      return "조건 조정 시 검토"
+      return "조건을 조정하면 검토 가능"
     case "not_recommended":
-      return "조건 조정 후 검토"
+      return "지금은 우선순위가 낮음"
   }
 }
 

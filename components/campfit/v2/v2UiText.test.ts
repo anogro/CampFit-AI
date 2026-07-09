@@ -24,7 +24,7 @@ describe("CampFit v2 UI copy", () => {
   })
 
   it("Given required intake form When checking copy Then all-in budget wording is present", () => {
-    expect(requiredIntakeFormSource).toContain("항공권, 숙소, 식비, 보험, 현지 이동비까지 포함")
+    expect(requiredIntakeFormSource).toContain("항공권부터 현지 이동비까지")
   })
 
   it("Given AI understanding review When checking copy Then internal process labels are absent", () => {
@@ -41,7 +41,7 @@ describe("CampFit v2 UI copy", () => {
   })
 
   it("Given AI understanding review When checking copy Then counselor-style button is present", () => {
-    expect(aiUnderstandingReviewSource).toContain("맞아요, 몇 가지만 더 확인할게요")
+    expect(aiUnderstandingReviewSource).toContain("네, 몇 가지만 더 확인해주세요")
   })
 
   it("Given dynamic questions When checking copy Then internal reasoning terms are absent", () => {
@@ -66,7 +66,7 @@ describe("CampFit v2 UI copy", () => {
     expect(consultingReportViewSource).toContain("오늘의 결론")
     expect(consultingReportViewSource).toContain("종합 적합도")
     expect(consultingReportViewSource).toContain("우리 가족에게 맞는 선택 방향")
-    expect(consultingReportViewSource).toContain("현재 조건에서 검토할 후보 TOP 3")
+    expect(consultingReportViewSource).toContain("지금 조건에서 먼저 검토해볼 후보")
     expect(consultingReportViewSource).toContain("제외 후보 요약")
   })
 

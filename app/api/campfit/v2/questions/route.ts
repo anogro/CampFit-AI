@@ -6,12 +6,12 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const sessionId = url.searchParams.get("sessionId")
   if (sessionId === null) {
-    return NextResponse.json({ message: "sessionId가 필요합니다." }, { status: 400 })
+    return NextResponse.json({ message: "상담 정보를 불러오지 못했습니다. 처음부터 다시 시도해 주세요." }, { status: 400 })
   }
 
   const client = getV2ApiClient()
   if (client === null) {
-    return NextResponse.json({ message: "동적 질문 저장 환경변수가 설정되어 있지 않습니다." }, { status: 500 })
+    return NextResponse.json({ message: "지금은 질문을 불러올 수 없습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 })
   }
 
   const [bundle, extraction, answeredQuestions, validQuestionKeys] = await Promise.all([
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     loadActiveQuestionKeys(client),
   ])
   if (bundle === null || extraction === null) {
-    return NextResponse.json({ message: "분석된 상담 세션을 찾을 수 없습니다." }, { status: 404 })
+    return NextResponse.json({ message: "상담 정보를 찾을 수 없습니다. 처음부터 다시 시도해 주세요." }, { status: 404 })
   }
 
   const planned = planCampfitV2Questions({

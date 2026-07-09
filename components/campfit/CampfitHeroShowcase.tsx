@@ -5,7 +5,7 @@ import { ArrowRight, ListChecks, UserRound, UsersRound } from "lucide-react"
 const guidePoints = [
   {
     label: "아이 성향",
-    text: "영어 익숙함 · 낯가림 · 분리불안 적응력",
+    text: "영어 노출 정도 · 낯가림 · 분리 적응력",
     Icon: UserRound,
   },
   {
@@ -14,8 +14,8 @@ const guidePoints = [
     Icon: UsersRound,
   },
   {
-    label: "맞춤 추천 & 이유",
-    text: "추천 캠프 · 추천 이유 · 주의할 점",
+    label: "핵심 기준 & 우선순위",
+    text: "맞는 점 · 확인할 점 · 우선순위",
     Icon: ListChecks,
   },
 ] as const
@@ -38,11 +38,9 @@ export function CampfitHeroShowcase({ onStart }: { readonly onStart: () => void 
             ))}
           </div>
           <h1 className="max-w-[36rem] text-[1.34rem] font-bold leading-[1.1] tracking-[-0.03em] text-[var(--text-ink)] [word-break:keep-all] sm:text-[2.18rem] lg:text-[2.78rem]">
-            아이 성향과 우리 가족의 방향,
+            완벽한 캠프는 없어도,
             <br />
-            근거 있는 캠프 추천을
-            <br />
-            받아보세요
+            우리 가족의 기준은 있습니다
           </h1>
         </div>
 
@@ -68,10 +66,10 @@ export function CampfitHeroShowcase({ onStart }: { readonly onStart: () => void 
 
         <div className="order-3 grid justify-items-center gap-3 text-center lg:mt-5 lg:max-w-[35rem] lg:justify-items-start lg:text-left">
           <p className="max-w-2xl text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all] sm:text-base sm:leading-7 lg:text-[1.02rem]">
-            <span className="block">후기와 광고만으로는 알 수 없는 우리 아이의 성향,</span>
-            <span className="block">그리고 우리 가족만의 조건.</span>
-            <span className="mt-1 block">두 가지를 함께 진단해, 왜 이 캠프가 맞는지</span>
-            <span className="block">이유와 함께 추천해 드립니다.</span>
+            <span className="block">후기와 광고만으로는 알 수 없습니다.</span>
+            <span className="block">막연하게 흩어져있던 생각들을 편하게 말해주시면,</span>
+            <span className="mt-1 block">우리 가족에게 중요한 기준과 우선순위를</span>
+            <span className="block">정리해드립니다.</span>
           </p>
         </div>
 

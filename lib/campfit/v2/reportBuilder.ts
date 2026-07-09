@@ -14,7 +14,7 @@ import type { RecommendationReportV2 } from "@/types/campfitV2"
 const fallbackFitScoreSummary: FitScoreSummary = {
   overallScore: 58,
   tier: "possible_if_adjusted",
-  label: "조건 조정 시 검토",
+  label: "조건을 조정하면 검토 가능",
   axes: [
     { key: "child_fit", label: "아이 적응 적합도", score: 62, comment: "아이 성향을 기준으로 지원 장치 확인이 필요합니다." },
     { key: "english_readiness", label: "영어 준비도 적합도", score: 58, comment: "영어 초급 부담은 상담 전 확인해야 합니다." },
@@ -51,7 +51,7 @@ export function buildCampfitV2Report(
 export function buildFamilySummary(profile: ConsultingProfile): string {
   const regions = preferredRegions(profile)
   const regionText = regions.length > 0 ? regions.map(regionLabel).join(", ") : "지역은 유연하게 검토"
-  return `현재 가족 조건은 ${regionText} 중심으로 보되, 아이 만 ${childAge(profile)}세 기준의 적응 난이도, ${parentModeLabel(parentAccompanimentMode(profile))}, ${supportNeedLabel(koreanSupportNeed(profile))}를 함께 비교해야 합니다.`
+  return `지금 가족 조건은 ${regionText}를 중심으로, 아이 만 ${childAge(profile)}세 기준 적응 난이도와 ${parentModeLabel(parentAccompanimentMode(profile))}, ${supportNeedLabel(koreanSupportNeed(profile))}를 함께 살펴봐야 합니다.`
 }
 
 export function buildChildReadinessSummary(profile: ConsultingProfile): string {
@@ -146,11 +146,11 @@ function buildConclusion(profile: ConsultingProfile, candidates: readonly Recomm
   const wantsOceania = regions.includes("oceania")
   const hasCandidate = candidates.length > 0
   if (wantsOceania && riskSignals(profile).some((signal) => signal.includes("english"))) {
-    return "현재 조건에서는 오세아니아 정규 스쿨링을 바로 선택하기보다, 국제학교 분위기를 경험할 수 있는 방학캠프형 또는 부모동반 ESL형이 더 안전한 출발점입니다."
+    return "지금 조건에서는 오세아니아 정규 스쿨링보다, 국제학교 분위기를 경험할 수 있는 방학캠프형이나 부모동반 ESL형부터 검토해보시길 권합니다."
   }
 
   if (!hasCandidate) {
-    return "정확히 맞는 후보는 부족하지만, 아래 선택 방향을 기준으로 조건을 조정하면 가까운 후보를 만들 수 있습니다."
+    return "정확히 맞는 후보는 아직 없지만, 아래 방향을 기준으로 조건을 조정하면 가까운 후보를 비교해볼 수 있습니다."
   }
 
   return "현재 입력 기준으로는 아이 적응과 가족 관리 조건을 함께 만족시키는 후보부터 비교하는 것이 좋습니다."

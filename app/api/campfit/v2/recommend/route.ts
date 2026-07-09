@@ -11,12 +11,12 @@ import { recommendCampsV2 } from "@/lib/campfit/v2/v2MatchingWrapper"
 export async function POST(request: Request) {
   const parsed = RecommendV2RequestSchema.safeParse(await request.json())
   if (!parsed.success) {
-    return NextResponse.json({ message: "추천 세션 정보를 다시 확인해 주세요.", issues: parsed.error.flatten() }, { status: 400 })
+    return NextResponse.json({ message: "상담 정보를 다시 확인해 주세요.", issues: parsed.error.flatten() }, { status: 400 })
   }
 
   const client = getV2ApiClient()
   if (client === null) {
-    return NextResponse.json({ message: "추천 저장 환경변수가 설정되어 있지 않습니다." }, { status: 500 })
+    return NextResponse.json({ message: "지금은 리포트를 만들 수 없습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 })
   }
 
   const [bundle, extraction, dynamicAnswers, assumptions, camps] = await Promise.all([
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     loadCampfitProgramCatalog(),
   ])
   if (bundle === null || extraction === null) {
-    return NextResponse.json({ message: "추천 가능한 상담 세션을 찾을 수 없습니다." }, { status: 404 })
+    return NextResponse.json({ message: "리포트를 만들 상담 정보를 찾을 수 없습니다. 처음부터 다시 시도해 주세요." }, { status: 404 })
   }
 
   const budgetEstimates = estimateAvailableProgramBudget({ requiredIntake: bundle.requiredIntake, assumptions })
