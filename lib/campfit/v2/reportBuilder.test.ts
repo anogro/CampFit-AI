@@ -3,7 +3,7 @@ import { camps } from "@/data/campfit/camps"
 import { buildCampfitV2ConsultingProfile } from "@/lib/campfit/v2/profileBuilder"
 import { buildCampfitV2Report } from "@/lib/campfit/v2/reportBuilder"
 import { recommendCampsV2, type CampfitV2MatchingResult, type RecommendationCardV2WithScore } from "@/lib/campfit/v2/v2MatchingWrapper"
-import type { AIExtractionResult, ExcludedCandidateV2, RequiredIntake } from "@/types/campfitV2"
+import type { AIExtractionResult, CityFitProfile, ExcludedCandidateV2, RequiredIntake } from "@/types/campfitV2"
 
 const requiredIntake: RequiredIntake = {
   childAgeAtStart: 10,
@@ -78,6 +78,19 @@ describe("buildCampfitV2Report", () => {
     expect(JSON.stringify(report)).not.toMatch(/\bgrade\b/i)
     expect(JSON.stringify(report)).not.toMatch(/\bbudgetIncludesFlight\b/)
   })
+
+  it("Given city fit profiles When building report Then destination recommendations are generated", () => {
+    const profile = buildProfile()
+    const report = buildCampfitV2Report(profile, {
+      recommendations: [],
+      relaxedCandidates: [sampleCard],
+      excludedCandidates: [],
+      strategySummary: {},
+    }, { cityFitProfiles: [sampleCityProfile] })
+
+    expect(report.destinationRecommendations.length).toBeGreaterThanOrEqual(3)
+    expect(report.destinationRecommendations[0]?.title).toContain("Auckland")
+  })
 })
 
 const sampleCard: RecommendationCardV2WithScore = {
@@ -117,6 +130,26 @@ const sampleExcludedCandidate: ExcludedCandidateV2 = {
   excludedReasons: ["항공권 포함 총예산에서 예상 부대비를 제외하면 프로그램비가 부족할 가능성이 높습니다.", "희망 기간보다 최소 운영 기간이 깁니다."],
   conditionRelaxation: ["예산 범위를 올리면 재검토 가능합니다.", "기간을 3주 이상으로 늘리면 검토 가능합니다."],
   stillWorthConsideringReason: "조건 조정 시 재검토할 수 있습니다.",
+}
+
+const sampleCityProfile: CityFitProfile = {
+  cityId: "auckland",
+  cityName: "Auckland",
+  countryName: "New Zealand",
+  regionGroup: "oceania",
+  schoolingFit: 86,
+  familyEslFit: 72,
+  managedCampFit: 54,
+  parentStayFit: 74,
+  beginnerEnglishFit: 78,
+  koreanSupportLikelihood: 58,
+  budgetPressure: 72,
+  safetyComfort: 92,
+  travelBurden: 78,
+  culturalExposure: 86,
+  dataQuality: "city_data",
+  notes: ["오세아니아 선호를 유지하기 좋은 도시입니다."],
+  verifyBeforeConsulting: ["항공권과 숙소 비용은 상담 전 확인이 필요합니다."],
 }
 
 function buildProfile() {

@@ -1,6 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
+import { DestinationRecommendationsSection } from "@/components/campfit/v2/DestinationRecommendationsSection"
 import { SectionIntro } from "@/components/campfit/v2/V2Controls"
 import type { FitScoreAxis, RecommendationCardV2, RecommendationReportV2, RecommendationTier } from "@/types/campfitV2"
 
@@ -42,6 +43,8 @@ export function ConsultingReportView({ report, recommendationRunId }: Consulting
       <ReportSection title="우리 가족에게 맞는 캠프 방식">
         <SimpleList sectionId="program-modes" items={report.recommendedProgramModes} />
       </ReportSection>
+
+      <DestinationRecommendationsSection recommendations={report.destinationRecommendations} />
 
       <section className="grid gap-3">
         <h3 className="text-lg font-bold text-[var(--text-primary)]">우리 가족에게 맞는 선택 방향</h3>

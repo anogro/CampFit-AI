@@ -3,6 +3,7 @@ import { loadCampfitProgramCatalog } from "@/lib/campfit/supabaseProgramCatalog"
 import { getTravelCostAssumptions, estimateAvailableProgramBudget } from "@/lib/campfit/v2/budgetEstimator"
 import { getV2ApiClient, loadAnsweredDynamicAnswers, loadLatestAIExtraction, loadV2SessionBundle, updateV2SessionStatus } from "@/lib/campfit/v2/apiRepository"
 import { RecommendV2RequestSchema } from "@/lib/campfit/v2/apiSchemas"
+import { loadCityFitProfiles } from "@/lib/campfit/v2/cityProfileRepository"
 import { buildCampfitV2ConsultingProfile } from "@/lib/campfit/v2/profileBuilder"
 import { saveCampfitV2RecommendationRun } from "@/lib/campfit/v2/recommendationRunRepository"
 import { buildCampfitV2Report } from "@/lib/campfit/v2/reportBuilder"
@@ -19,12 +20,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "지금은 리포트를 만들 수 없습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 })
   }
 
-  const [bundle, extraction, dynamicAnswers, assumptions, camps] = await Promise.all([
+  const [bundle, extraction, dynamicAnswers, assumptions, camps, cityFitProfiles] = await Promise.all([
     loadV2SessionBundle(client, parsed.data.sessionId),
     loadLatestAIExtraction(client, parsed.data.sessionId),
     loadAnsweredDynamicAnswers(client, parsed.data.sessionId),
     getTravelCostAssumptions(),
     loadCampfitProgramCatalog(),
+    loadCityFitProfiles(),
   ])
   if (bundle === null || extraction === null) {
     return NextResponse.json({ message: "리포트를 만들 상담 정보를 찾을 수 없습니다. 처음부터 다시 시도해 주세요." }, { status: 404 })
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
     budgetEstimates,
   })
   const matchingResult = recommendCampsV2(consultingProfile, { camps })
-  const report = buildCampfitV2Report(consultingProfile, matchingResult)
+  const report = buildCampfitV2Report(consultingProfile, matchingResult, { cityFitProfiles })
   const recommendationRunId = await saveCampfitV2RecommendationRun({
     sessionId: parsed.data.sessionId,
     profile: consultingProfile,

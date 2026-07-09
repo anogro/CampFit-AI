@@ -1,4 +1,5 @@
 import type { CampfitV2MatchingResult, RecommendationCardV2WithScore } from "@/lib/campfit/v2/v2MatchingWrapper"
+import { buildDestinationRecommendations } from "@/lib/campfit/v2/destinationAdvisor"
 import {
   childAge,
   koreanSupportNeed,
@@ -8,8 +9,13 @@ import {
   riskSignals,
   stringArrayValue,
 } from "@/lib/campfit/v2/profileAccess"
+import type { CityFitProfile } from "@/types/campfitCity"
 import type { ConsultingProfile, ExcludedCandidateV2, ExcludedSummaryGroup, FitScoreSummary, RegionGroup, ReportOptionGroup } from "@/types/campfitV2"
 import type { RecommendationReportV2 } from "@/types/campfitV2"
+
+type ReportBuilderOptions = {
+  readonly cityFitProfiles?: readonly CityFitProfile[]
+}
 
 const fallbackFitScoreSummary: FitScoreSummary = {
   overallScore: 58,
@@ -29,6 +35,7 @@ const fallbackFitScoreSummary: FitScoreSummary = {
 export function buildCampfitV2Report(
   profile: ConsultingProfile,
   matchingResult: CampfitV2MatchingResult,
+  options: ReportBuilderOptions = {},
 ): RecommendationReportV2 {
   const reviewCandidates = candidatesForReview(matchingResult)
   const fitScoreSummary = buildReportFitScoreSummary(reviewCandidates)
@@ -39,6 +46,11 @@ export function buildCampfitV2Report(
     familySummary: buildFamilySummary(profile),
     childReadinessSummary: buildChildReadinessSummary(profile),
     recommendedProgramModes: buildRecommendedProgramModes(profile, matchingResult),
+    destinationRecommendations: buildDestinationRecommendations({
+      profile,
+      matchingResult,
+      cityFitProfiles: options.cityFitProfiles ?? [],
+    }),
     optionGroups: buildOptionGroups(profile, matchingResult, reviewCandidates),
     recommendations: reviewCandidates,
     excludedCandidates: matchingResult.excludedCandidates,

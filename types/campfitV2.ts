@@ -211,6 +211,7 @@ export type RecommendationReportV2 = {
   readonly familySummary: string
   readonly childReadinessSummary: string
   readonly recommendedProgramModes: readonly string[]
+  readonly destinationRecommendations: readonly import("@/types/campfitCity").DestinationRecommendationV2[]
   readonly optionGroups: readonly ReportOptionGroup[]
   readonly recommendations: readonly RecommendationCardV2[]
   readonly excludedCandidates: readonly ExcludedCandidateV2[]
@@ -234,3 +235,6 @@ export type ExcludedSummaryGroup = {
   readonly label: string
   readonly count: number
 }
+
+export { cityDataQualities } from "@/types/campfitCity"
+export type { CityDataQuality, CityFitProfile, DestinationRecommendationV2 } from "@/types/campfitCity"

@@ -7,6 +7,7 @@ const aiUnderstandingReviewSource = readFileSync(join(process.cwd(), "components
 const dynamicQuestionFlowSource = readFileSync(join(process.cwd(), "components/campfit/v2/DynamicQuestionFlow.tsx"), "utf8")
 const campFitV2FlowSource = readFileSync(join(process.cwd(), "components/campfit/v2/CampFitV2Flow.tsx"), "utf8")
 const consultingReportViewSource = readFileSync(join(process.cwd(), "components/campfit/v2/ConsultingReportView.tsx"), "utf8")
+const destinationRecommendationsSource = readFileSync(join(process.cwd(), "components/campfit/v2/DestinationRecommendationsSection.tsx"), "utf8")
 
 describe("CampFit v2 UI copy", () => {
   it("Given required intake form When checking copy Then school-year question is absent", () => {
@@ -68,6 +69,8 @@ describe("CampFit v2 UI copy", () => {
     expect(consultingReportViewSource).toContain("우리 가족에게 맞는 선택 방향")
     expect(consultingReportViewSource).toContain("지금 조건에서 먼저 검토해볼 후보")
     expect(consultingReportViewSource).toContain("제외 후보 요약")
+    expect(destinationRecommendationsSource).toContain("검토하기 좋은 도시·지역 방향")
+    expect(destinationRecommendationsSource).toContain("도시 정보 보기")
   })
 
   it("Given consulting report view When checking copy Then failure-first and raw-key language is absent", () => {

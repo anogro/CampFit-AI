@@ -2,6 +2,7 @@ import { z } from "zod"
 import {
   accommodationPreferences,
   budgetScopes,
+  cityDataQualities,
   departureWindows,
   koreanSupportNeeds,
   parentAccompanimentModes,
@@ -199,6 +200,23 @@ const ExcludedCandidateSchema = z
   })
   .strict()
 
+const DestinationRecommendationSchema = z
+  .object({
+    key: z.string().min(1),
+    title: z.string().min(1),
+    cityName: z.string().min(1).optional(),
+    countryName: z.string().min(1).optional(),
+    regionGroup: z.union([z.enum(regionGroups), z.literal("unknown")]),
+    score: z.number().int().min(0).max(100),
+    fitLabel: z.string().min(1),
+    whyFits: z.array(z.string().min(1)),
+    tradeoffs: z.array(z.string().min(1)),
+    verifyBeforeConsulting: z.array(z.string().min(1)),
+    cityPageUrl: z.string().min(1).optional(),
+    dataQuality: z.enum(cityDataQualities),
+  })
+  .strict()
+
 export const RecommendationReportSchema = z
   .object({
     conclusion: z.string().min(1),
@@ -206,6 +224,7 @@ export const RecommendationReportSchema = z
     familySummary: z.string().min(1),
     childReadinessSummary: z.string().min(1),
     recommendedProgramModes: z.array(z.string().min(1)),
+    destinationRecommendations: z.array(DestinationRecommendationSchema),
     optionGroups: z.array(z.object({
       key: z.enum(["keep_preferred_region", "prioritize_child_fit", "prioritize_budget_and_support"]),
       title: z.string().min(1),
