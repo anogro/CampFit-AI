@@ -1,6 +1,6 @@
 import type { AIExtractionResult, DynamicQuestion, NaturalConsultationInput, RecommendationReportV2, RequiredIntake } from "@/types/campfitV2"
 
-export type CampFitV2Step = "required_intake" | "natural_input" | "ai_review" | "dynamic_questions" | "report"
+export type CampFitV2Step = "landing" | "required_intake" | "natural_input" | "ai_review" | "dynamic_questions" | "report"
 
 export type MaterializedQuestionView = DynamicQuestion & {
   readonly dynamicQuestionId: string

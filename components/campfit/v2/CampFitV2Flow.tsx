@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { CampfitStartHero } from "@/components/campfit/CampfitStartHero"
 import { AIUnderstandingReview } from "@/components/campfit/v2/AIUnderstandingReview"
 import { ConsultingReportView } from "@/components/campfit/v2/ConsultingReportView"
 import { DynamicQuestionFlow, type DynamicQuestionAnswerDraft } from "@/components/campfit/v2/DynamicQuestionFlow"
@@ -21,7 +22,7 @@ type CreateV2SessionResponse = {
 }
 
 export function CampFitV2Flow() {
-  const [step, setStep] = useState<CampFitV2Step>("required_intake")
+  const [step, setStep] = useState<CampFitV2Step>("landing")
   const [requiredIntake, setRequiredIntake] = useState<RequiredIntake>(initialRequiredIntake)
   const [naturalInput, setNaturalInput] = useState<NaturalConsultationInput>(initialNaturalInput)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -96,6 +97,10 @@ export function CampFitV2Flow() {
     setReport(result.report)
     setRecommendationRunId(result.recommendationRunId)
     setStep("report")
+  }
+
+  if (step === "landing") {
+    return <CampfitStartHero onStart={() => setStep("required_intake")} />
   }
 
   return (
