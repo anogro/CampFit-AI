@@ -5,7 +5,7 @@ import { DestinationRecommendationsSection } from "@/components/campfit/v2/Desti
 import { FitRadarChart } from "@/components/campfit/v2/FitRadarChart"
 import { SectionIntro } from "@/components/campfit/v2/V2Controls"
 import { buildDisplayFitAxes, buildRiskManagementNote, type DisplayFitAxis } from "@/lib/campfit/v2/fitDisplay"
-import type { FitScoreAxis, RecommendationCardV2, RecommendationReportV2, RecommendationTier } from "@/types/campfitV2"
+import type { FitScoreAxis, ProgramModeRecommendation, RecommendationCardV2, RecommendationReportV2, RecommendationTier } from "@/types/campfitV2"
 
 type ConsultingReportViewProps = {
   readonly report: RecommendationReportV2
@@ -51,7 +51,7 @@ export function ConsultingReportView({ report }: ConsultingReportViewProps) {
       <DestinationRecommendationsSection recommendations={report.destinationRecommendations} />
 
       <ReportSection title="추천 프로그램 방식">
-        <SimpleList sectionId="program-modes" items={report.recommendedProgramModes} />
+        <ProgramModeCards recommendations={report.programModeRecommendations} />
       </ReportSection>
 
       <section className="grid gap-3">
@@ -126,6 +126,35 @@ function CandidateCard({ card, index }: { readonly card: RecommendationCardV2; r
         <SimpleList sectionId={`checklist-${card.programId}`} items={card.consultingChecklist.slice(0, 4)} />
       </details>
     </article>
+  )
+}
+
+function ProgramModeCards({ recommendations }: { readonly recommendations: readonly ProgramModeRecommendation[] }) {
+  return (
+    <div className="grid gap-3 lg:grid-cols-3">
+      {recommendations.map((recommendation) => (
+        <article key={`program-mode-${recommendation.key}`} className="grid gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-4 shadow-[var(--shadow-soft)]">
+          {recommendation.imagePath ? (
+            <img
+              src={recommendation.imagePath}
+              alt={recommendation.imageAlt}
+              className="h-36 w-full rounded-md object-cover"
+            />
+          ) : null}
+          <div className="flex items-start justify-between gap-3">
+            <div className="grid gap-1">
+              <p className="text-xs font-bold text-[var(--accent-primary)]">{tierLabel(recommendation.tier)}</p>
+              <h4 className="text-base font-bold text-[var(--text-primary)] [word-break:keep-all]">{recommendation.title}</h4>
+            </div>
+            <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-sm font-extrabold tabular-nums text-[var(--accent-primary)]">{recommendation.score}점</span>
+          </div>
+          <p className="text-sm font-semibold leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{recommendation.fitLabel}</p>
+          <CompactList sectionId={`program-mode-why-${recommendation.key}`} title="잘 맞는 점" items={recommendation.whyFits.slice(0, 2)} />
+          <CompactList sectionId={`program-mode-tradeoff-${recommendation.key}`} title="확인하거나 조정할 점" items={recommendation.tradeoffs.slice(0, 2)} emphasized />
+          <CompactList sectionId={`program-mode-verify-${recommendation.key}`} title="상담 전 확인할 점" items={recommendation.verifyBeforeConsulting.slice(0, 2)} />
+        </article>
+      ))}
+    </div>
   )
 }
 

@@ -7,6 +7,7 @@ import {
   koreanSupportNeeds,
   parentAccompanimentModes,
   fitAxisKeys,
+  programModeKeys,
   questionTypes,
   recommendationTiers,
   regionGroups,
@@ -217,13 +218,40 @@ const DestinationRecommendationSchema = z
   })
   .strict()
 
+const ProgramModeRecommendationSchema = z
+  .object({
+    key: z.enum(programModeKeys),
+    title: z.string().min(1),
+    shortTitle: z.string().min(1).optional(),
+    description: z.string().min(1).optional(),
+    score: z.number().int().min(0).max(100),
+    tier: z.enum(recommendationTiers),
+    fitLabel: z.string().min(1),
+    whyFits: z.array(z.string().min(1)),
+    tradeoffs: z.array(z.string().min(1)),
+    bestFor: z.array(z.string().min(1)),
+    verifyBeforeConsulting: z.array(z.string().min(1)),
+    scoreBreakdown: z.object({
+      childFit: z.number().int().min(0).max(100),
+      goalFit: z.number().int().min(0).max(100),
+      supportFit: z.number().int().min(0).max(100),
+      familyConstraintFit: z.number().int().min(0).max(100),
+      riskFit: z.number().int().min(0).max(100),
+      budgetRealityFit: z.number().int().min(0).max(100),
+    }).strict(),
+    imageKey: z.string().min(1),
+    imagePath: z.string().min(1).nullable(),
+    imageAlt: z.string().min(1),
+  })
+  .strict()
+
 export const RecommendationReportSchema = z
   .object({
     conclusion: z.string().min(1),
     fitScoreSummary: RecommendationCardSchema.shape.fitScoreSummary,
     familySummary: z.string().min(1),
     childReadinessSummary: z.string().min(1),
-    recommendedProgramModes: z.array(z.string().min(1)),
+    programModeRecommendations: z.array(ProgramModeRecommendationSchema).min(3),
     destinationRecommendations: z.array(DestinationRecommendationSchema),
     optionGroups: z.array(z.object({
       key: z.enum(["keep_preferred_region", "prioritize_child_fit", "prioritize_budget_and_support"]),

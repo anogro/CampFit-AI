@@ -52,6 +52,8 @@ describe("buildCampfitV2Report", () => {
     expect(report.conclusion.length).toBeGreaterThan(20)
     expect(report.conclusion).not.toContain("가능한 후보가 없습니다")
     expect(report.optionGroups.length).toBe(3)
+    expect(report.programModeRecommendations.length).toBeGreaterThanOrEqual(3)
+    expect(new Set(report.programModeRecommendations.map((item) => item.score)).size).toBeGreaterThan(1)
     expect(report.recommendations).toHaveLength(1)
     expect(report.recommendations[0]?.programName).toBe("조건부 검토 후보")
   })

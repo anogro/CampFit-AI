@@ -1,10 +1,10 @@
 import type { CampfitV2MatchingResult, RecommendationCardV2WithScore } from "@/lib/campfit/v2/v2MatchingWrapper"
 import { buildDestinationRecommendations } from "@/lib/campfit/v2/destinationAdvisor"
+import { buildProgramModeRecommendations } from "@/lib/campfit/v2/programModeAdvisor"
 import {
   childAge,
   koreanSupportNeed,
   parentAccompanimentMode,
-  preferredProgramTypes,
   preferredRegions,
   riskSignals,
   stringArrayValue,
@@ -45,7 +45,7 @@ export function buildCampfitV2Report(
     fitScoreSummary,
     familySummary: buildFamilySummary(profile),
     childReadinessSummary: buildChildReadinessSummary(profile),
-    recommendedProgramModes: buildRecommendedProgramModes(profile, matchingResult),
+    programModeRecommendations: buildProgramModeRecommendations(profile),
     destinationRecommendations: buildDestinationRecommendations({
       profile,
       matchingResult,
@@ -77,22 +77,6 @@ export function buildChildReadinessSummary(profile: ConsultingProfile): string {
   }
 
   return "현재 입력만으로는 아이 준비도를 단정하기보다, 캠프 난이도와 초기 적응 지원을 함께 비교하는 편이 적합합니다."
-}
-
-export function buildRecommendedProgramModes(
-  profile: ConsultingProfile,
-  matchingResult: CampfitV2MatchingResult,
-): readonly string[] {
-  const preferences = preferredProgramTypes(profile)
-  if (matchingResult.recommendations.length === 0 && matchingResult.relaxedCandidates.length === 0) {
-    return ["정확히 맞는 후보는 부족하지만, 조건을 조정해 가까운 선택지를 좁히는 방식"]
-  }
-
-  if (preferences.some((value) => value.includes("school"))) {
-    return ["국제학교 분위기를 경험할 수 있는 방학캠프형", "초급 부담을 낮춘 부모동반 ESL + 액티비티형", "관리 장치가 있는 영어노출 캠프"]
-  }
-
-  return ["안정적인 첫 해외캠프형", "영어 거부감 완화 중심 프로그램", "문화 경험과 활동 균형형"]
 }
 
 export function buildAvoidProgramTypes(profile: ConsultingProfile): readonly string[] {
