@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { camps } from "@/data/campfit/camps"
 import { buildCampfitV2ConsultingProfile } from "@/lib/campfit/v2/profileBuilder"
+import { buildDisplayFitAxes, buildRiskManagementNote } from "@/lib/campfit/v2/fitDisplay"
 import { buildCampfitV2Report } from "@/lib/campfit/v2/reportBuilder"
 import { recommendCampsV2, type CampfitV2MatchingResult, type RecommendationCardV2WithScore } from "@/lib/campfit/v2/v2MatchingWrapper"
 import type { AIExtractionResult, CityFitProfile, ExcludedCandidateV2, RequiredIntake } from "@/types/campfitV2"
@@ -74,6 +75,8 @@ describe("buildCampfitV2Report", () => {
     const report = buildCampfitV2Report(profile, matching)
 
     expect(report.fitScoreSummary.axes).toHaveLength(7)
+    expect(buildDisplayFitAxes(report.fitScoreSummary.axes)).toHaveLength(6)
+    expect(buildRiskManagementNote(report.fitScoreSummary.axes)).toContain("리스크 관리:")
     expect(report.optionGroups.length).toBe(3)
     expect(JSON.stringify(report)).not.toMatch(/\bgrade\b/i)
     expect(JSON.stringify(report)).not.toMatch(/\bbudgetIncludesFlight\b/)

@@ -209,11 +209,11 @@ function buildOptionGroups(
 
 function buildExcludedSummaryGroups(candidates: readonly ExcludedCandidateV2[]): readonly ExcludedSummaryGroup[] {
   const groups = [
-    { key: "budget", label: "예산/총비용 조건 때문에 제외된 후보", count: countByReason(candidates, "예산") },
-    { key: "duration", label: "기간 조건 때문에 제외된 후보", count: countByReason(candidates, "기간") },
-    { key: "korean_support", label: "한국어 지원 조건 때문에 제외된 후보", count: countByReason(candidates, "한국어") },
-    { key: "parent", label: "부모 동행 조건 때문에 제외된 후보", count: countByReason(candidates, "부모") },
-    { key: "region", label: "지역 필수 조건 때문에 제외된 후보", count: countByReason(candidates, "지역") },
+    { key: "budget", label: "예산/총비용 조건으로 우선순위가 낮아진 후보", count: countByReason(candidates, "예산") },
+    { key: "duration", label: "기간 조건으로 우선순위가 낮아진 후보", count: countByReason(candidates, "기간") },
+    { key: "korean_support", label: "한국어 지원 조건으로 우선순위가 낮아진 후보", count: countByReason(candidates, "한국어") },
+    { key: "parent", label: "부모 동행 조건으로 우선순위가 낮아진 후보", count: countByReason(candidates, "부모") },
+    { key: "region", label: "지역 조건으로 우선순위가 낮아진 후보", count: countByReason(candidates, "지역") },
   ] as const
   return groups.filter((group) => group.count > 0)
 }

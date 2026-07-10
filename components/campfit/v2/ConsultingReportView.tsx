@@ -2,52 +2,60 @@
 
 import type { ReactNode } from "react"
 import { DestinationRecommendationsSection } from "@/components/campfit/v2/DestinationRecommendationsSection"
+import { FitRadarChart } from "@/components/campfit/v2/FitRadarChart"
 import { SectionIntro } from "@/components/campfit/v2/V2Controls"
+import { buildDisplayFitAxes, buildRiskManagementNote, type DisplayFitAxis } from "@/lib/campfit/v2/fitDisplay"
 import type { FitScoreAxis, RecommendationCardV2, RecommendationReportV2, RecommendationTier } from "@/types/campfitV2"
 
 type ConsultingReportViewProps = {
   readonly report: RecommendationReportV2
-  readonly recommendationRunId: string | null
 }
 
-export function ConsultingReportView({ report, recommendationRunId }: ConsultingReportViewProps) {
+export function ConsultingReportView({ report }: ConsultingReportViewProps) {
   const candidates = report.recommendations.slice(0, 3)
+  const displayAxes = buildDisplayFitAxes(report.fitScoreSummary.axes)
+  const riskManagementNote = buildRiskManagementNote(report.fitScoreSummary.axes)
 
   return (
     <section className="grid gap-6" aria-labelledby="campfit-v2-report-title">
       <SectionIntro
         eyebrow="컨설팅 리포트"
-        title="추천보다 중요한 건, 지금 무엇을 선택하고 무엇을 조정할지입니다."
-        description="점수는 절대 평가가 아니라 현재 입력 조건 기준의 비교용 적합도입니다. 비용은 실제 견적 전까지 상담 전 확인 항목으로 표시합니다."
+        title="아이에게 맞는 캠프 방향을 정리했어요"
+        description="입력해주신 조건을 기준으로 맞는 방향, 조정할 점, 상담 전 확인할 내용을 함께 정리했습니다."
       />
-      {recommendationRunId ? <p className="text-xs font-semibold text-[var(--text-tertiary)]">리포트 번호: {recommendationRunId}</p> : null}
 
-      <ReportSection title="오늘의 결론">
-        <p className="text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{report.conclusion}</p>
-      </ReportSection>
-
-      <section className="apple-glass-soft grid gap-5 rounded-[24px] p-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-[var(--text-primary)]">종합 적합도</h3>
-            <p className="text-sm leading-6 text-[var(--text-secondary)]">현재 조건 기준의 비교용 점수입니다.</p>
-          </div>
-          <div className="text-left sm:text-right">
-            <p className="text-[2rem] font-extrabold leading-none text-[var(--accent-primary)]">{report.fitScoreSummary.overallScore}<span className="text-base">점</span></p>
-            <p className="mt-1 text-sm font-bold text-[var(--text-primary)]">{report.fitScoreSummary.label}</p>
-          </div>
-        </div>
-        <AxisGrid axes={report.fitScoreSummary.axes} />
+      <section className="grid gap-3 rounded-lg border border-[var(--border-subtle)] border-l-4 border-l-[var(--accent-primary)] bg-[var(--surface-elevated)] p-5 shadow-[var(--shadow-soft)]">
+        <h3 className="text-lg font-bold text-[var(--text-primary)]">오늘의 결론</h3>
+        <p className="max-w-4xl text-base font-medium leading-7 text-[var(--text-ink)] [word-break:keep-all]">{report.conclusion}</p>
       </section>
 
-      <ReportSection title="우리 가족에게 맞는 캠프 방식">
-        <SimpleList sectionId="program-modes" items={report.recommendedProgramModes} />
-      </ReportSection>
+      <section className="apple-glass-soft grid gap-6 rounded-lg p-5 md:p-6" aria-labelledby="campfit-fit-summary-title">
+        <div className="grid gap-2">
+          <div>
+            <h3 id="campfit-fit-summary-title" className="text-xl font-bold text-[var(--text-primary)]">현재 입력 기준 적합도</h3>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">아래 점수는 입력해주신 조건을 기준으로 비교한 참고 지표입니다. 실제 비용과 운영 조건은 상담 전 확인이 필요합니다.</p>
+          </div>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] lg:items-center">
+          <div className="grid gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-5">
+            <p className="text-sm font-bold text-[var(--text-secondary)]">종합 점수</p>
+            <p className="text-5xl font-extrabold leading-none tabular-nums text-[var(--accent-primary)]">{report.fitScoreSummary.overallScore}<span className="ml-1 text-lg">점</span></p>
+            <p className="text-sm font-bold text-[var(--text-primary)]">{tierLabel(report.fitScoreSummary.tier)}</p>
+            <p className="rounded-md bg-[var(--surface-tint-yellow)] px-3 py-2 text-sm leading-6 text-[var(--status-warning)] [word-break:keep-all]">{riskManagementNote}</p>
+          </div>
+          <FitRadarChart axes={displayAxes} />
+        </div>
+        <AxisGrid axes={displayAxes} />
+      </section>
 
       <DestinationRecommendationsSection recommendations={report.destinationRecommendations} />
 
+      <ReportSection title="추천 프로그램 방식">
+        <SimpleList sectionId="program-modes" items={report.recommendedProgramModes} />
+      </ReportSection>
+
       <section className="grid gap-3">
-        <h3 className="text-lg font-bold text-[var(--text-primary)]">우리 가족에게 맞는 선택 방향</h3>
+        <h3 className="text-lg font-bold text-[var(--text-primary)]">추천 조합 TOP 3</h3>
         <div className="grid gap-3 lg:grid-cols-3">
           {report.optionGroups.map((group, index) => (
             <article key={`option-${index}-${group.key}`} className="apple-glass-soft grid gap-3 rounded-[20px] p-4">
@@ -65,7 +73,7 @@ export function ConsultingReportView({ report, recommendationRunId }: Consulting
       </section>
 
       <section className="grid gap-3">
-        <h3 className="text-lg font-bold text-[var(--text-primary)]">지금 조건에서 먼저 검토해볼 후보</h3>
+        <h3 className="text-lg font-bold text-[var(--text-primary)]">현재 조건에서 먼저 검토할 후보</h3>
         {candidates.length > 0 ? (
           <div className="grid gap-4">
             {candidates.map((card, index) => <CandidateCard key={`candidate-${index}-${card.programId}`} card={card} index={index} />)}
@@ -77,7 +85,7 @@ export function ConsultingReportView({ report, recommendationRunId }: Consulting
         )}
       </section>
 
-      <ReportSection title="처음 원했던 방향에서 확인이 필요한 부분">
+      <ReportSection title="원래 원했던 방향에서 확인할 점">
         <SimpleList sectionId="mismatch-summary" items={uniqueStrings(candidates.flatMap((card) => card.mismatchedConditions)).slice(0, 5)} emptyText="큰 조건 불일치는 아직 선명하게 잡히지 않았습니다." />
       </ReportSection>
 
@@ -109,10 +117,10 @@ function CandidateCard({ card, index }: { readonly card: RecommendationCardV2; r
       <p className="text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{card.fitSummary}</p>
       <AxisPills axes={card.fitScoreSummary.axes.slice(0, 4)} />
       <div className="grid gap-3 lg:grid-cols-2">
-        <CompactList sectionId={`matched-${card.programId}`} title="맞는 조건" items={card.matchedConditions.slice(0, 3)} />
-        <CompactList sectionId={`mismatch-${card.programId}`} title="맞지 않는 조건" items={card.mismatchedConditions.slice(0, 3)} emphasized />
+        <CompactList sectionId={`matched-${card.programId}`} title="잘 맞는 점" items={card.matchedConditions.slice(0, 3)} />
+        <CompactList sectionId={`mismatch-${card.programId}`} title="확인하거나 조정할 점" items={card.mismatchedConditions.slice(0, 3)} emphasized />
       </div>
-      <CompactList sectionId={`despite-${card.programId}`} title="그럼에도 검토할 이유" items={[card.recommendDespiteMismatchReason ?? "조건 확인 후 비교할 수 있는 후보입니다."]} />
+      <CompactList sectionId={`despite-${card.programId}`} title="그래도 살펴볼 만한 이유" items={[card.recommendDespiteMismatchReason ?? "조건 확인 후 비교할 수 있는 후보입니다."]} />
       <details className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3">
         <summary className="cursor-pointer text-sm font-bold text-[var(--text-primary)]">상담 전 확인할 점 더 보기</summary>
         <SimpleList sectionId={`checklist-${card.programId}`} items={card.consultingChecklist.slice(0, 4)} />
@@ -125,7 +133,7 @@ function ExcludedSummary({ report }: { readonly report: RecommendationReportV2 }
   const details = report.excludedCandidates.slice(0, 5)
   return (
     <section className="apple-glass-soft grid gap-3 rounded-[24px] p-5">
-      <h3 className="text-lg font-bold text-[var(--text-primary)]">제외 후보 요약</h3>
+      <h3 className="text-lg font-bold text-[var(--text-primary)]">이번 조건에서 뒤로 미룬 후보</h3>
       <SimpleList
         sectionId="excluded-summary"
         items={report.excludedSummaryGroups.map((group) => `${group.label}: ${group.count}개`)}
@@ -158,11 +166,11 @@ function ReportSection({ title, children }: { readonly title: string; readonly c
   )
 }
 
-function AxisGrid({ axes }: { readonly axes: readonly FitScoreAxis[] }) {
+function AxisGrid({ axes }: { readonly axes: readonly DisplayFitAxis[] }) {
   return (
     <div className="grid gap-2 md:grid-cols-2">
       {axes.map((axis, index) => (
-        <div key={`axis-${index}-${axis.key}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3">
+        <div key={`axis-${index}-${axis.label}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-bold text-[var(--text-primary)]">{axis.label}</p>
             <p className="text-sm font-extrabold text-[var(--accent-primary)]">{axis.score}점</p>
@@ -209,13 +217,13 @@ function SimpleList({ sectionId, items, emptyText = "해당 항목은 상담에�
 function tierLabel(tier: RecommendationTier): string {
   switch (tier) {
     case "best_fit":
-      return "가장 적합"
+      return "우선 검토"
     case "good_with_support":
-      return "지원 조건 확인 후 적합"
+      return "지원장치가 있으면 적합"
     case "possible_if_adjusted":
-      return "조건을 조정하면 검토 가능"
+      return "조건 조정 후 검토"
     case "not_recommended":
-      return "지금은 우선순위가 낮음"
+      return "현재 조건에서는 비추천"
   }
 }
 
