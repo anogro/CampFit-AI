@@ -65,12 +65,22 @@ describe("CampFit v2 UI copy", () => {
 
   it("Given consulting report view When checking copy Then decision report sections are present", () => {
     expect(consultingReportViewSource).toContain("오늘의 결론")
-    expect(consultingReportViewSource).toContain("종합 적합도")
-    expect(consultingReportViewSource).toContain("우리 가족에게 맞는 선택 방향")
-    expect(consultingReportViewSource).toContain("지금 조건에서 먼저 검토해볼 후보")
-    expect(consultingReportViewSource).toContain("제외 후보 요약")
+    expect(consultingReportViewSource).toContain("현재 입력 기준 적합도")
+    expect(consultingReportViewSource).toContain("추천 조합 TOP 3")
+    expect(consultingReportViewSource).toContain("추천 프로그램 방식")
+    expect(consultingReportViewSource).toContain("잘 맞는 점")
+    expect(consultingReportViewSource).toContain("확인하거나 조정할 점")
+    expect(consultingReportViewSource).toContain("상담 전 확인할 점")
+    expect(consultingReportViewSource).toContain("현재 조건에서 먼저 검토할 후보")
+    expect(consultingReportViewSource).toContain("이번 조건에서 뒤로 미룬 후보")
     expect(destinationRecommendationsSource).toContain("검토하기 좋은 도시·지역 방향")
     expect(destinationRecommendationsSource).toContain("도시 정보 보기")
+  })
+
+  it("Given consulting report view When checking internal output Then run identifiers and version labels are absent", () => {
+    expect(consultingReportViewSource).not.toContain("리포트 번호")
+    expect(consultingReportViewSource).not.toContain("추천 실행 ID")
+    expect(consultingReportViewSource).not.toContain("CampFit v2")
   })
 
   it("Given consulting report view When checking copy Then failure-first and raw-key language is absent", () => {
@@ -82,6 +92,7 @@ describe("CampFit v2 UI copy", () => {
     expect(consultingReportViewSource).not.toContain("unknown_cost_assumption")
     expect(consultingReportViewSource).not.toContain("parent_can_stay")
     expect(consultingReportViewSource).not.toContain("daily_korean_communication")
+    expect(consultingReportViewSource).not.toContain("international_school_regular")
   })
 
   it("Given consulting report view When checking list rendering Then text is not used as the React key", () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { camps } from "@/data/campfit/camps"
 import { buildCampfitV2ConsultingProfile } from "@/lib/campfit/v2/profileBuilder"
+import { buildDisplayFitAxes, buildRiskManagementNote } from "@/lib/campfit/v2/fitDisplay"
 import { buildCampfitV2Report } from "@/lib/campfit/v2/reportBuilder"
 import { recommendCampsV2, type CampfitV2MatchingResult, type RecommendationCardV2WithScore } from "@/lib/campfit/v2/v2MatchingWrapper"
 import type { AIExtractionResult, CityFitProfile, ExcludedCandidateV2, RequiredIntake } from "@/types/campfitV2"
@@ -51,6 +52,8 @@ describe("buildCampfitV2Report", () => {
     expect(report.conclusion.length).toBeGreaterThan(20)
     expect(report.conclusion).not.toContain("가능한 후보가 없습니다")
     expect(report.optionGroups.length).toBe(3)
+    expect(report.programModeRecommendations.length).toBeGreaterThanOrEqual(3)
+    expect(new Set(report.programModeRecommendations.map((item) => item.score)).size).toBeGreaterThan(1)
     expect(report.recommendations).toHaveLength(1)
     expect(report.recommendations[0]?.programName).toBe("조건부 검토 후보")
   })
@@ -74,6 +77,8 @@ describe("buildCampfitV2Report", () => {
     const report = buildCampfitV2Report(profile, matching)
 
     expect(report.fitScoreSummary.axes).toHaveLength(7)
+    expect(buildDisplayFitAxes(report.fitScoreSummary.axes)).toHaveLength(6)
+    expect(buildRiskManagementNote(report.fitScoreSummary.axes)).toContain("리스크 관리:")
     expect(report.optionGroups.length).toBe(3)
     expect(JSON.stringify(report)).not.toMatch(/\bgrade\b/i)
     expect(JSON.stringify(report)).not.toMatch(/\bbudgetIncludesFlight\b/)

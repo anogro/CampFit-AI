@@ -59,6 +59,88 @@ export type QuestionType = (typeof questionTypes)[number]
 export const recommendationTiers = ["best_fit", "good_with_support", "possible_if_adjusted", "not_recommended"] as const
 export type RecommendationTier = (typeof recommendationTiers)[number]
 
+export const programModeKeys = [
+  "international_school_regular",
+  "international_school_camp",
+  "family_esl",
+  "language_school_esl",
+  "managed_immersion",
+  "activity_sports",
+  "steam_project",
+  "homestay_schooling",
+  "residential_international_camp",
+  "culture_activity",
+] as const
+export type ProgramModeKey = (typeof programModeKeys)[number]
+
+export type ProgramModeFitProfile = {
+  readonly modeKey: ProgramModeKey
+  readonly title: string
+  readonly shortTitle: string
+  readonly description: string
+  readonly englishExposure: number
+  readonly academicIntensity: number
+  readonly parentSeparationLoad: number
+  readonly independenceRequired: number
+  readonly socialIntensity: number
+  readonly routineStability: number
+  readonly activityLoad: number
+  readonly beginnerFriendly: number
+  readonly parentAccompanimentFit: number
+  readonly koreanSupportCompatibility: number
+  readonly smallGroupFit: number
+  readonly emotionalSafetyFit: number
+  readonly dailyLifeSupportNeed: number
+  readonly dailyLifeSupportCoverage: number
+  readonly englishConfidenceFit: number
+  readonly englishImprovementFit: number
+  readonly internationalSchoolExposureFit: number
+  readonly culturalExposureFit: number
+  readonly confidenceGrowthFit: number
+  readonly independenceGrowthFit: number
+  readonly academicGrowthFit: number
+  readonly activityExperienceFit: number
+  readonly studyAbroadTrialFit: number
+  readonly safeCareFit: number
+  readonly budgetPressure: number
+  readonly durationFlexibility: number
+  readonly parentStayPracticality: number
+  readonly bestFor: readonly string[]
+  readonly watchOut: readonly string[]
+  readonly verifyBeforeConsulting: readonly string[]
+  readonly imageKey: string
+  readonly imageAlt: string
+  readonly imageTheme: string
+  readonly imagePath: string | null
+}
+
+export type ProgramModeScoreBreakdown = {
+  readonly childFit: number
+  readonly goalFit: number
+  readonly supportFit: number
+  readonly familyConstraintFit: number
+  readonly riskFit: number
+  readonly budgetRealityFit: number
+}
+
+export type ProgramModeRecommendation = {
+  readonly key: ProgramModeKey
+  readonly title: string
+  readonly shortTitle?: string
+  readonly description?: string
+  readonly score: number
+  readonly tier: RecommendationTier
+  readonly fitLabel: string
+  readonly whyFits: readonly string[]
+  readonly tradeoffs: readonly string[]
+  readonly bestFor: readonly string[]
+  readonly verifyBeforeConsulting: readonly string[]
+  readonly scoreBreakdown: ProgramModeScoreBreakdown
+  readonly imageKey: string
+  readonly imagePath: string | null
+  readonly imageAlt: string
+}
+
 export type TravelerCounts = {
   readonly child: number
   readonly parent: number
@@ -210,7 +292,7 @@ export type RecommendationReportV2 = {
   readonly fitScoreSummary: FitScoreSummary
   readonly familySummary: string
   readonly childReadinessSummary: string
-  readonly recommendedProgramModes: readonly string[]
+  readonly programModeRecommendations: readonly ProgramModeRecommendation[]
   readonly destinationRecommendations: readonly import("@/types/campfitCity").DestinationRecommendationV2[]
   readonly optionGroups: readonly ReportOptionGroup[]
   readonly recommendations: readonly RecommendationCardV2[]

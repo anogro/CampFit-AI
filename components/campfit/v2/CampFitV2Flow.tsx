@@ -30,7 +30,6 @@ export function CampFitV2Flow() {
   const [dynamicQuestions, setDynamicQuestions] = useState<readonly MaterializedQuestionView[]>([])
   const [dynamicAnswers, setDynamicAnswers] = useState<readonly DynamicQuestionAnswerDraft[]>([])
   const [report, setReport] = useState<RecommendationReportV2 | null>(null)
-  const [recommendationRunId, setRecommendationRunId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -95,7 +94,6 @@ export function CampFitV2Flow() {
   async function recommend(activeSessionId: string): Promise<void> {
     const result = await postJson<RecommendV2Response>("/api/campfit/v2/recommend", { sessionId: activeSessionId })
     setReport(result.report)
-    setRecommendationRunId(result.recommendationRunId)
     setStep("report")
   }
 
@@ -111,7 +109,7 @@ export function CampFitV2Flow() {
             <img src="/images/Small Logo.png" alt="" className="h-6 w-6 object-contain" draggable={false} />
             <p className="text-sm font-extrabold tracking-[0.04em] text-[var(--text-primary)]">ANOGRO</p>
           </div>
-          <p className="text-sm font-medium text-[var(--text-tertiary)]">CampFit v2</p>
+          {step === "report" ? null : <p className="text-sm font-medium text-[var(--text-tertiary)]">CampFit v2</p>}
         </div>
         <div className="grid gap-3">
           <h1 className="max-w-3xl text-[1.85rem] font-bold leading-[1.08] text-[var(--text-primary)] [word-break:keep-all] sm:text-[2.35rem] md:text-[2.85rem]">
@@ -128,7 +126,7 @@ export function CampFitV2Flow() {
         {step === "natural_input" ? <NaturalConsultationForm value={naturalInput} loading={loading} onBack={() => setStep("required_intake")} onChange={setNaturalInput} onSubmit={startAnalysis} /> : null}
         {step === "ai_review" && aiSummary ? <AIUnderstandingReview summary={aiSummary} loading={loading} onBack={() => setStep("natural_input")} onContinue={loadQuestionsOrRecommend} /> : null}
         {step === "dynamic_questions" ? <DynamicQuestionFlow questions={dynamicQuestions} answers={dynamicAnswers} loading={loading} onChange={setDynamicAnswers} onSubmit={submitDynamicAnswers} /> : null}
-        {step === "report" && report ? <ConsultingReportView report={report} recommendationRunId={recommendationRunId} /> : null}
+        {step === "report" && report ? <ConsultingReportView report={report} /> : null}
         {error ? <p className="mt-5 rounded-md bg-[var(--surface-tint-yellow)] px-3 py-2 text-sm font-semibold text-[var(--status-warning)]">{error}</p> : null}
       </main>
     </div>
