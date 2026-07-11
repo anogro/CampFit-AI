@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-vi.mock("server-only", () => ({}))
-
 import {
   createProgramVerificationBackfillReadRepository,
   findBackfillProgramLinkWarnings,
-  type BackfillReadExecutor,
-  type BackfillReadRequest,
-  type BackfillReadResponse,
-} from "@/lib/campfit/v2/programVerificationBackfillRepository"
+  parseProgramVerificationBackfillScoringVersionRow,
+} from "@/lib/campfit/v2/programVerificationBackfillReadCore"
+import { createShadowProgramQualityScoringVersion } from "@/lib/campfit/v2/programQualityScorer"
+import type {
+  BackfillReadExecutor,
+  BackfillReadRequest,
+  BackfillReadResponse,
+} from "@/lib/campfit/v2/programVerificationBackfillContracts"
 
 function legacyRow(id: string, programId: string) {
   return {
@@ -201,5 +203,31 @@ describe("ProgramVerificationBackfillReadRepository", () => {
       programId: "missing-program",
       verificationId: "verification-1",
     }])
+  })
+
+  it("maps the database scoring row and normalizes Supabase timestamps for CLI use", () => {
+    const version = createShadowProgramQualityScoringVersion()
+
+    const mapped = parseProgramVerificationBackfillScoringVersionRow({
+      id: version.id,
+      version_key: version.versionKey,
+      description: version.description ?? null,
+      status: version.status,
+      prior_score: version.priorScore,
+      confidence_weights: version.confidenceWeights,
+      dimension_weights: version.dimensionWeights,
+      public_visibility_rules: version.publicVisibilityRules,
+      rule_config: {
+        ...version.ruleConfig,
+        sourceAuthorityWeights: version.sourceAuthorityWeights,
+      },
+      created_at: "2026-07-11T00:00:00+00:00",
+      activated_at: "2026-07-11T00:00:00+00:00",
+      retired_at: null,
+    })
+
+    expect(mapped).toEqual(version)
+    expect(mapped.createdAt).toBe("2026-07-11T00:00:00.000Z")
+    expect(mapped.activatedAt).toBe("2026-07-11T00:00:00.000Z")
   })
 })
