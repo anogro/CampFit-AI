@@ -91,9 +91,9 @@ export const initialRequiredIntake: RequiredIntake = {
   totalBudgetAllInKrwMax: 8_000_000,
   budgetScope: "family_total",
   travelerCounts: { child: 1, parent: 1, sibling: 0 },
-  preferredRegionGroups: ["oceania"],
+  preferredRegionGroups: [],
   regionPriority: "strong",
   parentAccompanimentMode: "parent_can_stay",
   koreanSupportNeed: "daily_korean_communication",
-  accommodationPreferences: ["parent_stay"],
+  accommodationPreferences: [],
 }

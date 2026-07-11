@@ -10,6 +10,10 @@ type RequiredIntakeFormProps = {
   readonly onNext: () => void
 }
 
+export function canContinueRequiredIntake(value: RequiredIntake): boolean {
+  return value.preferredRegionGroups.length > 0
+}
+
 export function RequiredIntakeForm({ value, onChange, onNext }: RequiredIntakeFormProps) {
   return (
     <section className="grid gap-6" aria-labelledby="campfit-v2-required-title">
@@ -105,7 +109,7 @@ export function RequiredIntakeForm({ value, onChange, onNext }: RequiredIntakeFo
         onChange={(accommodationPreferences) => onChange({ ...value, accommodationPreferences })}
       />
       <div className="flex justify-end">
-        <PrimaryButton onClick={onNext}>상황 입력으로 이동</PrimaryButton>
+        <PrimaryButton disabled={!canContinueRequiredIntake(value)} onClick={onNext}>상황 입력으로 이동</PrimaryButton>
       </div>
     </section>
   )
