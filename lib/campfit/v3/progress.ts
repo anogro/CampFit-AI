@@ -48,6 +48,7 @@ export function isReadyForRecommendation(state: CampfitV3ConversationState): boo
 }
 
 export function progressMessage(progress: number): string {
+  if (progress >= 100) return "상담이 완료됐어요. 결과를 확인해 주세요"
   if (progress >= 90) return "이제 결과에 필요한 마지막 조건을 확인하고 있어요"
   if (progress >= 70) return "가족에게 필요한 지원과 도시 조건을 살펴보고 있어요"
   if (progress >= 50) return "가족의 기본 조건을 확인했어요"

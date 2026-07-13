@@ -1,0 +1,148 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+
+const processConversationMessage = vi.hoisted(() => vi.fn())
+const providerConstructed = vi.hoisted(() => vi.fn())
+
+vi.mock("@/lib/campfit/v3/conversationService", () => ({ processConversationMessage }))
+vi.mock("@/lib/campfit/v3/server/geminiProvider", () => ({
+  GeminiCampfitV3Provider: class MockGeminiCampfitV3Provider {
+    constructor() {
+      providerConstructed()
+    }
+  },
+}))
+
+import { POST } from "@/app/api/campfit/v3/conversation/message/route"
+
+const basicInfo = {
+  childAges: [8],
+  departureWindow: "2026년 8월",
+  durationWeeks: 2,
+  budgetMinKrw: 5_000_000,
+  budgetMaxKrw: 8_000_000,
+  adultCount: 1,
+  childCount: 1,
+  guardianStaysNearby: true as const,
+}
+
+const state = {
+  facts: {},
+  askedQuestionKeys: ["childEnglishLevel"],
+  completedQuestionKeys: [],
+  failedQuestionKeys: [],
+  currentQuestionKey: "childEnglishLevel",
+  questionCount: 1,
+  progress: 0,
+  unresolved: [],
+  conflicts: [],
+}
+
+const serviceResponse = {
+  assistantMessage: "답변을 확인했어요.",
+  updatedState: state,
+  updatedBasicInfo: basicInfo,
+  quickReplies: [],
+  questionKey: "experienceGoals",
+  progress: 12,
+  progressMessage: "상담을 시작했어요.",
+  readyForRecommendation: false,
+  conflicts: [],
+  warnings: [],
+  aiUsed: true,
+  diagnostics: {
+    providerCallAttempted: true,
+    providerResponseValidated: true,
+    aiUsed: true,
+    fallbackReason: null,
+    rawPrompt: "must never leave the server",
+    model: "internal-model-name",
+  },
+}
+
+function request(): Request {
+  return new Request("http://localhost/api/campfit/v3/conversation/message", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      transcript: [],
+      currentState: state,
+      basicInfo,
+      userMessage: "영어는 초급이에요",
+      quickReplyKey: null,
+    }),
+  })
+}
+
+describe("CampFit v3 conversation message route", () => {
+  beforeEach(() => {
+    processConversationMessage.mockResolvedValue(serviceResponse)
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.clearAllMocks()
+  })
+
+  it("uses the server Gemini provider for a normal free-text request", async () => {
+    vi.stubEnv("NODE_ENV", "test")
+    const response = await POST(request())
+
+    expect(response.status).toBe(200)
+    expect(providerConstructed).toHaveBeenCalledTimes(1)
+    expect(processConversationMessage).toHaveBeenCalledWith(expect.objectContaining({
+      userMessage: "영어는 초급이에요",
+      quickReplyKey: null,
+      provider: expect.anything(),
+    }))
+  })
+
+  it("always strips diagnostics from production responses", async () => {
+    vi.stubEnv("NODE_ENV", "production")
+    vi.stubEnv("CAMPFIT_V3_INCLUDE_DIAGNOSTICS", "true")
+
+    const payload = await (await POST(request())).json() as Record<string, unknown>
+
+    expect(payload).not.toHaveProperty("diagnostics")
+    expect(JSON.stringify(payload)).not.toContain("must never leave the server")
+    expect(JSON.stringify(payload)).not.toContain("internal-model-name")
+  })
+
+  it("exposes only the safe diagnostics allowlist during explicit local debugging", async () => {
+    vi.stubEnv("NODE_ENV", "development")
+    vi.stubEnv("CAMPFIT_V3_INCLUDE_DIAGNOSTICS", "true")
+
+    const payload = await (await POST(request())).json() as Record<string, unknown>
+
+    expect(payload["diagnostics"]).toEqual({
+      providerCallAttempted: true,
+      providerResponseValidated: true,
+      aiUsed: true,
+      fallbackReason: null,
+    })
+    expect(JSON.stringify(payload)).not.toContain("rawPrompt")
+    expect(JSON.stringify(payload)).not.toContain("model")
+  })
+
+  it("does not expose diagnostics without the explicit debug flag", async () => {
+    vi.stubEnv("NODE_ENV", "development")
+    vi.stubEnv("CAMPFIT_V3_INCLUDE_DIAGNOSTICS", "false")
+
+    const payload = await (await POST(request())).json() as Record<string, unknown>
+
+    expect(payload).not.toHaveProperty("diagnostics")
+  })
+
+  it("does not claim a failed answer was saved", async () => {
+    processConversationMessage.mockRejectedValue(new Error("provider failed"))
+
+    const response = await POST(request())
+    const payload = await response.json() as Record<string, unknown>
+
+    expect(response.status).toBe(500)
+    expect(payload).toEqual({
+      message: "답변을 처리하지 못했어요. 선택지를 고르거나 잠시 후 다시 시도해 주세요.",
+    })
+    expect(JSON.stringify(payload)).not.toContain("보관")
+    expect(JSON.stringify(payload)).not.toContain("provider failed")
+  })
+})

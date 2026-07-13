@@ -9,6 +9,22 @@ import type { CampfitV3ModelResponseSchema } from "@/lib/campfit/v3/schemas"
 
 export type CampfitV3ModelResponse = z.infer<typeof CampfitV3ModelResponseSchema>
 
+export type CampfitV3ProviderDiagnosticCode =
+  | "ok"
+  | "not_configured"
+  | "quota_limited"
+  | "http_error"
+  | "network_error"
+  | "schema_invalid"
+
+export type CampfitV3ProviderDiagnostic = {
+  readonly code: CampfitV3ProviderDiagnosticCode
+  readonly httpStatus: number | null
+  readonly repaired: boolean
+  readonly requestCount: number
+  readonly elapsedMs: number
+}
+
 export type AnalyzeConversationInput = {
   readonly transcript: readonly CampfitV3TranscriptMessage[]
   readonly currentState: CampfitV3ConversationState
@@ -25,4 +41,5 @@ export interface CampfitV3LLMProvider {
     readonly state: CampfitV3ConversationState
     readonly deterministicResult: CampfitV3RecommendationResult
   }): Promise<string | null>
+  getLastDiagnostic?(): CampfitV3ProviderDiagnostic | null
 }

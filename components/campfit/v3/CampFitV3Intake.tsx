@@ -1,76 +1,70 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { V3Header } from "@/components/campfit/v3/CampFitV3Flow"
+import {
+  campfitV3BudgetOptions,
+  countCompletedChildRows,
+  validateCampfitV3IntakeDraft,
+  type CampfitV3IntakeDraft,
+} from "@/components/campfit/v3/intakeDraft"
 import type { CampfitV3BasicInfo } from "@/types/campfitV3"
 
 type Props = {
-  readonly initialValue: CampfitV3BasicInfo | null
+  readonly draft: CampfitV3IntakeDraft
+  readonly onDraftChange: (value: CampfitV3IntakeDraft) => void
   readonly onBack: () => void
   readonly onSubmit: (value: CampfitV3BasicInfo) => Promise<void>
 }
 
-const budgetOptions = [
-  { label: "300만~500만 원", min: 3_000_000, max: 5_000_000 },
-  { label: "500만~800만 원", min: 5_000_000, max: 8_000_000 },
-  { label: "800만~1,200만 원", min: 8_000_000, max: 12_000_000 },
-  { label: "1,200만~2,000만 원", min: 12_000_000, max: 20_000_000 },
-] as const
+type TouchedFields = Readonly<Record<string, boolean>>
 
-export function CampFitV3Intake({ initialValue, onBack, onSubmit }: Props) {
-  const [childAges, setChildAges] = useState<number[]>(initialValue ? [...initialValue.childAges] : [8])
-  const [departureWindow, setDepartureWindow] = useState(initialValue?.departureWindow ?? "")
-  const [durationWeeks, setDurationWeeks] = useState(initialValue?.durationWeeks ?? 2)
-  const initialBudgetIndex = initialValue
-    ? budgetOptions.findIndex((option) => option.min === initialValue.budgetMinKrw && option.max === initialValue.budgetMaxKrw)
-    : 1
-  const [budgetMode, setBudgetMode] = useState(initialBudgetIndex >= 0 ? String(initialBudgetIndex) : "custom")
-  const [budgetMin, setBudgetMin] = useState(initialValue ? Math.round(initialValue.budgetMinKrw / 10_000) : 500)
-  const [budgetMax, setBudgetMax] = useState(initialValue ? Math.round(initialValue.budgetMaxKrw / 10_000) : 800)
-  const [adultCount, setAdultCount] = useState(initialValue?.adultCount ?? 1)
+export function CampFitV3Intake({ draft, onDraftChange, onBack, onSubmit }: Props) {
+  const [touched, setTouched] = useState<TouchedFields>({})
+  const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const validation = useMemo(() => validateCampfitV3IntakeDraft(draft), [draft])
+  const completedChildCount = useMemo(() => countCompletedChildRows(draft), [draft])
 
-  const selectedBudget = budgetMode === "custom" ? null : budgetOptions[Number(budgetMode)]
-  const minKrw = selectedBudget?.min ?? budgetMin * 10_000
-  const maxKrw = selectedBudget?.max ?? budgetMax * 10_000
-  const valid = useMemo(
-    () => childAges.length >= 1
-      && childAges.every((age) => Number.isInteger(age) && age >= 5 && age <= 12)
-      && departureWindow.trim().length >= 2
-      && durationWeeks >= 1 && durationWeeks <= 4
-      && adultCount >= 1
-      && minKrw >= 0
-      && maxKrw > 0
-      && minKrw <= maxKrw,
-    [adultCount, childAges, departureWindow, durationWeeks, maxKrw, minKrw],
-  )
+  function updateDraft(patch: Partial<CampfitV3IntakeDraft>): void {
+    onDraftChange({ ...draft, ...patch })
+  }
 
-  function updateAge(index: number, age: number): void {
-    setChildAges((current) => current.map((value, itemIndex) => itemIndex === index ? age : value))
+  function updateAge(index: number, age: string): void {
+    updateDraft({ childAges: draft.childAges.map((value, itemIndex) => itemIndex === index ? age : value) })
   }
 
   function addChild(): void {
-    setChildAges((current) => current.length >= 5 ? current : [...current, 8])
+    if (draft.childAges.length >= 5) return
+    clearChildTouches()
+    updateDraft({ childAges: [...draft.childAges, ""] })
   }
 
   function removeChild(index: number): void {
-    setChildAges((current) => current.length === 1 ? current : current.filter((_, itemIndex) => itemIndex !== index))
+    if (draft.childAges.length === 1) return
+    clearChildTouches()
+    updateDraft({ childAges: draft.childAges.filter((_, itemIndex) => itemIndex !== index) })
+  }
+
+  function markTouched(key: string): void {
+    setTouched((current) => ({ ...current, [key]: true }))
+  }
+
+  function clearChildTouches(): void {
+    setTouched((current) => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith("child-"))))
+  }
+
+  function showError(key: string): boolean {
+    return submitted || touched[key] === true
   }
 
   async function submit(): Promise<void> {
-    if (!valid || submitting) return
+    setSubmitted(true)
+    const current = validateCampfitV3IntakeDraft(draft)
+    if (current.value === null || submitting) return
     setSubmitting(true)
     try {
-      await onSubmit({
-        childAges,
-        departureWindow: departureWindow.trim(),
-        durationWeeks,
-        budgetMinKrw: minKrw,
-        budgetMaxKrw: maxKrw,
-        adultCount,
-        childCount: childAges.length,
-        guardianStaysNearby: true,
-      })
+      await onSubmit(current.value)
     } finally {
       setSubmitting(false)
     }
@@ -80,73 +74,133 @@ export function CampFitV3Intake({ initialValue, onBack, onSubmit }: Props) {
     <main className="mx-auto flex min-h-dvh w-full max-w-[1280px] flex-col px-4 py-2 sm:px-6 lg:px-10">
       <V3Header />
       <section className="mx-auto grid w-full max-w-[1120px] flex-1 items-center py-3">
-        <div className="apple-glass overflow-hidden rounded-[28px]">
+        <form className="apple-glass overflow-hidden rounded-[28px]" noValidate onSubmit={(event) => { event.preventDefault(); void submit() }}>
           <div className="border-b border-[var(--border-default)] px-5 py-4 sm:px-8 lg:flex lg:items-end lg:justify-between lg:gap-8">
             <div>
               <p className="text-xs font-black tracking-[.12em] text-[var(--accent-primary)]">STEP 1 · 기본 조건</p>
               <h1 className="mt-2 text-2xl font-bold tracking-[-.03em] sm:text-3xl">먼저 기본 조건만 알려주세요</h1>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">자세한 기대와 걱정은 다음 대화에서 편하게 말씀해 주세요.</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">각 항목을 직접 확인하면 채팅을 시작할 수 있어요. 자세한 기대와 걱정은 다음 대화에서 편하게 말씀해 주세요.</p>
             </div>
             <p className="mt-3 text-xs font-semibold text-[var(--text-tertiary)] lg:mt-0">부모·보호자가 같은 도시나 인근에 머무는 1~4주 프로그램 기준</p>
           </div>
 
           <div className="grid gap-x-8 gap-y-4 px-5 py-4 sm:px-8 lg:grid-cols-2">
-            <Field title="1. 캠프 시작 시점 아이 만 나이" helper="아이를 추가하면 이동 인원의 아동 수도 함께 바뀝니다.">
-              <div className="flex flex-wrap items-end gap-2">
-                {childAges.map((age, index) => (
-                  <label className="min-w-[112px] flex-1" key={index}>
-                    <span className="mb-1 block text-xs font-bold text-[var(--text-secondary)]">{index + 1}번째 아이</span>
-                    <span className="flex items-center gap-2">
-                      <input aria-label={`${index + 1}번째 아이 나이`} className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-white px-3 font-bold" min={5} max={12} inputMode="numeric" type="number" value={age} onChange={(event) => updateAge(index, Number(event.target.value))} />
-                      {childAges.length > 1 ? <button className="min-h-12 shrink-0 rounded-xl border border-[var(--border-default)] px-3 text-xs font-bold text-[var(--text-secondary)]" type="button" onClick={() => removeChild(index)}>삭제</button> : null}
-                    </span>
-                  </label>
+            <Field id="child-ages" title="1. 캠프 시작 시점 아이 만 나이" helper="아이별로 만 5세부터 12세까지 입력해 주세요.">
+              <div className="flex flex-wrap items-start gap-2">
+                {draft.childAges.map((age, index) => {
+                  const error = validation.errors.childAges[index] ?? null
+                  const errorId = `child-age-${index}-error`
+                  return (
+                    <label className="min-w-[132px] flex-1" key={index}>
+                      <span className="mb-1 block text-xs font-bold text-[var(--text-secondary)]">{index + 1}번째 아이</span>
+                      <span className="flex items-center gap-2">
+                        <input
+                          aria-describedby={showError(`child-${index}`) && error ? errorId : undefined}
+                          aria-invalid={showError(`child-${index}`) && error !== null}
+                          aria-label={`${index + 1}번째 아이 만 나이`}
+                          className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-white px-3 font-bold outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]"
+                          inputMode="numeric"
+                          max={12}
+                          min={5}
+                          placeholder="5~12"
+                          step={1}
+                          type="number"
+                          value={age}
+                          onBlur={() => markTouched(`child-${index}`)}
+                          onChange={(event) => updateAge(index, event.target.value)}
+                        />
+                        {draft.childAges.length > 1 ? <button className="min-h-12 shrink-0 rounded-xl border border-[var(--border-default)] px-3 text-xs font-bold text-[var(--text-secondary)]" type="button" onClick={() => removeChild(index)}>삭제</button> : null}
+                      </span>
+                      <ErrorText id={errorId} show={showError(`child-${index}`)}>{error}</ErrorText>
+                    </label>
+                  )
+                })}
+                <button className="min-h-12 whitespace-nowrap rounded-2xl border border-[var(--cta-glass-border)] bg-[var(--accent-soft)] px-4 text-sm font-extrabold text-[var(--accent-primary)] disabled:opacity-40" type="button" disabled={draft.childAges.length >= 5} onClick={addChild}>+ 아이 추가</button>
+              </div>
+            </Field>
+
+            <Field id="departure" title="2. 출발 시기" helper="정확한 날짜가 아니어도 괜찮아요.">
+              <input
+                aria-describedby={showError("departureWindow") && validation.errors.departureWindow ? "departure-error" : undefined}
+                aria-invalid={showError("departureWindow") && validation.errors.departureWindow !== null}
+                aria-labelledby="departure-title"
+                className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-white px-4 outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]"
+                maxLength={80}
+                placeholder="예: 다음 여름방학, 2027년 1월"
+                type="text"
+                value={draft.departureWindow}
+                onBlur={() => markTouched("departureWindow")}
+                onChange={(event) => updateDraft({ departureWindow: event.target.value })}
+              />
+              <ErrorText id="departure-error" show={showError("departureWindow")}>{validation.errors.departureWindow}</ErrorText>
+            </Field>
+
+            <Field id="duration" title="3. 가능한 기간" helper="가족이 해외에 머물 수 있는 기간을 골라주세요.">
+              <div aria-labelledby="duration-title" className="grid grid-cols-4 gap-2">
+                {[1, 2, 3, 4].map((week) => (
+                  <button
+                    aria-pressed={draft.durationWeeks === week}
+                    className={`min-h-12 whitespace-nowrap rounded-2xl border px-2 text-sm font-bold outline-none focus:ring-4 focus:ring-[var(--focus-ring)] ${draft.durationWeeks === week ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]" : "border-[var(--border-default)] bg-white"}`}
+                    type="button"
+                    key={week}
+                    onBlur={() => markTouched("durationWeeks")}
+                    onClick={() => updateDraft({ durationWeeks: week })}
+                  >{week}주</button>
                 ))}
-                <button className="min-h-12 whitespace-nowrap rounded-2xl border border-[var(--cta-glass-border)] bg-[var(--accent-soft)] px-4 text-sm font-extrabold text-[var(--accent-primary)] disabled:opacity-40" type="button" disabled={childAges.length >= 5} onClick={addChild}>+ 아이 추가</button>
               </div>
+              <ErrorText id="duration-error" show={showError("durationWeeks")}>{validation.errors.durationWeeks}</ErrorText>
             </Field>
 
-            <Field title="2. 출발 시기" helper="정확한 날짜가 아니어도 괜찮아요.">
-              <input className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-white px-4" type="text" placeholder="예: 다음 여름방학, 2027년 1월" value={departureWindow} onChange={(event) => setDepartureWindow(event.target.value)} />
-            </Field>
-
-            <Field title="3. 가능한 기간" helper="가족이 해외에 머물 수 있는 기간을 골라주세요.">
-              <div className="grid grid-cols-4 gap-2">
-                {[1, 2, 3, 4].map((week) => <button className={`min-h-12 whitespace-nowrap rounded-2xl border px-2 text-sm font-bold ${durationWeeks === week ? "border-[var(--accent-primary)] bg-[var(--accent-soft)] text-[var(--accent-primary)]" : "border-[var(--border-default)] bg-white"}`} type="button" key={week} onClick={() => setDurationWeeks(week)}>{week}주</button>)}
-              </div>
-            </Field>
-
-            <Field title="4. 가족 전체 예산" helper="항공·숙소·생활비를 포함한 범위입니다.">
-              <select className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-white px-4 font-semibold" value={budgetMode} onChange={(event) => setBudgetMode(event.target.value)}>
-                {budgetOptions.map((option, index) => <option value={index} key={option.label}>{option.label}</option>)}
+            <Field id="budget" title="4. 가족 전체 예산" helper="항공·숙소·생활비를 포함한 범위를 선택해 주세요.">
+              <select
+                aria-describedby={showError("budget") && validation.errors.budget ? "budget-error" : undefined}
+                aria-invalid={showError("budget") && validation.errors.budget !== null}
+                aria-labelledby="budget-title"
+                className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-white px-4 font-semibold outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]"
+                value={draft.budgetMode}
+                onBlur={() => markTouched("budget")}
+                onChange={(event) => updateDraft({ budgetMode: event.target.value as CampfitV3IntakeDraft["budgetMode"] })}
+              >
+                <option value="" disabled>예산 범위를 선택해 주세요</option>
+                {campfitV3BudgetOptions.map((option) => <option value={option.key} key={option.key}>{option.label}</option>)}
                 <option value="custom">직접 입력</option>
               </select>
-              {budgetMode === "custom" ? (
+              {draft.budgetMode === "custom" ? (
                 <div className="mt-2 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2 text-sm">
-                  <input aria-label="최소 예산" className="min-h-11 min-w-0 rounded-xl border border-[var(--border-default)] px-3" min={0} type="number" value={budgetMin} onChange={(event) => setBudgetMin(Number(event.target.value))} />
+                  <input aria-label="최소 예산" className="min-h-11 min-w-0 rounded-xl border border-[var(--border-default)] px-3 outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]" inputMode="numeric" min={0} placeholder="최소" step={1} type="number" value={draft.budgetMinManwon} onBlur={() => markTouched("budget")} onChange={(event) => updateDraft({ budgetMinManwon: event.target.value })} />
                   <span>~</span>
-                  <input aria-label="최대 예산" className="min-h-11 min-w-0 rounded-xl border border-[var(--border-default)] px-3" min={1} type="number" value={budgetMax} onChange={(event) => setBudgetMax(Number(event.target.value))} />
+                  <input aria-label="최대 예산" className="min-h-11 min-w-0 rounded-xl border border-[var(--border-default)] px-3 outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]" inputMode="numeric" min={1} placeholder="최대" step={1} type="number" value={draft.budgetMaxManwon} onBlur={() => markTouched("budget")} onChange={(event) => updateDraft({ budgetMaxManwon: event.target.value })} />
                   <span>만원</span>
                 </div>
               ) : null}
+              <ErrorText id="budget-error" show={showError("budget")}>{validation.errors.budget}</ErrorText>
             </Field>
 
-            <Field title="5. 이동 인원" helper="아동 수는 위 나이 입력과 자동으로 연결됩니다.">
+            <Field id="travelers" title="5. 이동 인원" helper="완료한 아이 나이 행의 수가 아동 인원에 자동 반영됩니다.">
               <div className="grid grid-cols-2 gap-3">
                 <label>
                   <span className="mb-1 block text-xs font-bold text-[var(--text-secondary)]">성인</span>
-                  <select className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-white px-4 font-bold" value={adultCount} onChange={(event) => setAdultCount(Number(event.target.value))}>
-                    {[1, 2, 3, 4, 5, 6].map((count) => <option value={count} key={count}>{count}명</option>)}
+                  <select
+                    aria-describedby={showError("adultCount") && validation.errors.adultCount ? "adult-count-error" : undefined}
+                    aria-invalid={showError("adultCount") && validation.errors.adultCount !== null}
+                    className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-white px-4 font-bold outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]"
+                    value={draft.adultCount ?? ""}
+                    onBlur={() => markTouched("adultCount")}
+                    onChange={(event) => updateDraft({ adultCount: event.target.value === "" ? null : Number(event.target.value) })}
+                  >
+                    <option value="" disabled>선택</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((count) => <option value={count} key={count}>{count}명</option>)}
                   </select>
                 </label>
                 <label>
                   <span className="mb-1 block text-xs font-bold text-[var(--text-secondary)]">아이</span>
-                  <input className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 font-bold" readOnly value={`${childAges.length}명`} />
+                  <input aria-label="입력이 완료된 아이 수" className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 font-bold" readOnly value={`${completedChildCount}명`} />
                 </label>
               </div>
+              <ErrorText id="adult-count-error" show={showError("adultCount")}>{validation.errors.adultCount}</ErrorText>
             </Field>
 
-            <div className="flex items-center rounded-2xl border border-[var(--border-default)] bg-[var(--surface-tint-green)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)]">
+            <div className="flex items-center rounded-2xl border border-[var(--border-default)] bg-[var(--surface-tint-green)] px-4 py-3 text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">
               <span className="mr-3 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white font-black text-[var(--accent-primary)]">✓</span>
               아이가 낮 프로그램에 참여하는 동안 보호자는 같은 도시나 인근에 머무르는 조건입니다.
             </div>
@@ -154,20 +208,28 @@ export function CampFitV3Intake({ initialValue, onBack, onSubmit }: Props) {
 
           <div className="flex items-center justify-between gap-3 border-t border-[var(--border-default)] px-5 py-3 sm:px-8">
             <button className="glass-button-muted min-h-12 rounded-full px-5 text-sm font-bold" type="button" onClick={onBack}>이전</button>
-            <button className="glass-cta min-h-12 whitespace-nowrap rounded-full px-7 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-40" type="button" disabled={!valid || submitting} onClick={submit}>{submitting ? "상담을 준비하는 중…" : "채팅 시작하기 →"}</button>
+            <div className="flex min-w-0 items-center gap-3">
+              <p className="hidden text-right text-xs font-semibold text-[var(--text-tertiary)] sm:block">필수 항목을 모두 확인하면 채팅을 시작할 수 있어요.</p>
+              <button className="glass-cta min-h-12 whitespace-nowrap rounded-full px-7 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-40" type="submit" disabled={validation.value === null || submitting}>{submitting ? "상담을 준비하는 중…" : "채팅 시작하기 →"}</button>
+            </div>
           </div>
-        </div>
+        </form>
       </section>
     </main>
   )
 }
 
-function Field({ title, helper, children }: { readonly title: string; readonly helper: string; readonly children: React.ReactNode }) {
+function Field({ id, title, helper, children }: { readonly id: string; readonly title: string; readonly helper: string; readonly children: ReactNode }) {
   return (
     <fieldset className="min-w-0">
-      <legend className="text-sm font-extrabold text-[var(--text-primary)]">{title}</legend>
-      <p className="mb-2 mt-1 text-xs leading-5 text-[var(--text-tertiary)]">{helper}</p>
+      <legend className="text-sm font-extrabold text-[var(--text-primary)]" id={`${id}-title`}>{title}</legend>
+      <p className="mb-2 mt-1 text-xs leading-5 text-[var(--text-tertiary)] [word-break:keep-all]">{helper}</p>
       {children}
     </fieldset>
   )
+}
+
+function ErrorText({ id, show, children }: { readonly id: string; readonly show: boolean; readonly children: string | null }) {
+  if (!show || children === null) return null
+  return <p className="mt-1 text-xs font-semibold leading-5 text-[var(--status-error)]" id={id} role="alert">{children}</p>
 }

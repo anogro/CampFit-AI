@@ -97,14 +97,20 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
 ]
 
 export function selectNextQuestion(state: CampfitV3ConversationState): CampfitV3Question | null {
-  if (state.questionCount >= 10) return null
+  const current = getQuestion(state.currentQuestionKey)
+  if (current !== null && shouldAsk(current, state) && !isQuestionCompleted(current, state)) return current
   const asked = new Set(state.askedQuestionKeys)
+  const retry = [...campfitV3QuestionBank]
+    .sort((left, right) => right.priority - left.priority)
+    .find((question) => asked.has(question.key) && shouldAsk(question, state) && !isQuestionCompleted(question, state))
+  if (retry !== undefined) return retry
+  if (state.questionCount >= 10) return null
   return [...campfitV3QuestionBank]
     .sort((left, right) => right.priority - left.priority)
     .find((question) => {
       if (asked.has(question.key)) return false
-      if (question.shouldAsk && !question.shouldAsk(state)) return false
-      return question.completedBy.some((key) => state.facts[key as keyof typeof state.facts] === undefined)
+      if (!shouldAsk(question, state)) return false
+      return !isQuestionCompleted(question, state)
     }) ?? null
 }
 
@@ -113,6 +119,21 @@ export function getQuestion(key: string | null): CampfitV3Question | null {
 }
 
 export function allowedQuestionKeys(state: CampfitV3ConversationState): readonly string[] {
-  const asked = new Set(state.askedQuestionKeys)
-  return campfitV3QuestionBank.filter((question) => !asked.has(question.key)).map((question) => question.key)
+  return campfitV3QuestionBank
+    .filter((question) => shouldAsk(question, state) && !isQuestionCompleted(question, state))
+    .map((question) => question.key)
+}
+
+export function isQuestionCompleted(question: CampfitV3Question, state: CampfitV3ConversationState): boolean {
+  if (state.failedQuestionKeys.includes(question.key)) return false
+  if (state.completedQuestionKeys.includes(question.key)) return true
+  return question.completedBy.every((key) => {
+    const fact = state.facts[key as keyof typeof state.facts]
+    if (fact === undefined || fact.source === "ai_inference") return false
+    return !state.conflicts.some((conflict) => conflict.key === key)
+  })
+}
+
+function shouldAsk(question: CampfitV3Question, state: CampfitV3ConversationState): boolean {
+  return question.shouldAsk === undefined || question.shouldAsk(state)
 }

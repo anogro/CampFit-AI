@@ -146,6 +146,8 @@ describe("CampFit v3 state and question engine", () => {
     expect(response.aiUsed).toBe(false)
     expect(response.questionKey).toBe("special_care_follow_up")
     expect(response.updatedState.facts.childEnglishLevel?.value).toBe("beginner")
+    expect(response.warnings).toContain("AI 분석을 사용할 수 없어 입력 문장에서 확인 가능한 내용만 반영했습니다.")
+    expect(response.warnings.join(" ")).not.toContain("같은 질문")
   })
 
   it("does not spend a model call for an allowlisted quick reply", async () => {
@@ -156,8 +158,132 @@ describe("CampFit v3 state and question engine", () => {
       explainRecommendation: async () => null,
     }
     const start = startConversation(basicInfo)
-    await processConversationMessage({ transcript: [], currentState: start.updatedState, basicInfo, userMessage: "단어·짧은 표현 정도예요", quickReplyKey: "basic", provider })
+    const response = await processConversationMessage({ transcript: [], currentState: start.updatedState, basicInfo, userMessage: "단어·짧은 표현 정도예요", quickReplyKey: "basic", provider })
     expect(calls).toBe(0)
+    expect(response.diagnostics).toEqual({ providerCallAttempted: false, providerResponseValidated: false, aiUsed: false, fallbackReason: null })
+  })
+
+  it("re-asks the current question without moving progress when free text cannot update its slot", async () => {
+    const start = startConversation(basicInfo)
+    const response = await processConversationMessage({ transcript: [], currentState: start.updatedState, basicInfo, userMessage: "아직 생각 중이에요", quickReplyKey: null, provider: nullProvider })
+    expect(response.questionKey).toBe("child_english_level")
+    expect(response.updatedState.failedQuestionKeys).toContain("child_english_level")
+    expect(response.updatedState.completedQuestionKeys).not.toContain("child_english_level")
+    expect(response.progress).toBe(start.progress)
+    expect(response.readyForRecommendation).toBe(false)
+    expect(response.diagnostics?.fallbackReason).toBe("provider_unavailable")
+  })
+
+  it("applies conversational budget corrections to the returned basic info", async () => {
+    const start = startConversation({ ...basicInfo, budgetMaxKrw: 7_000_000 })
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo: { ...basicInfo, budgetMaxKrw: 7_000_000 },
+      userMessage: "예산은 700만 원이 아니라 900만 원까지 가능해요.",
+      quickReplyKey: null,
+      provider: nullProvider,
+    })
+    expect(response.updatedBasicInfo.budgetMinKrw).toBe(5_000_000)
+    expect(response.updatedBasicInfo.budgetMaxKrw).toBe(9_000_000)
+    expect(response.updatedState.facts.budgetRangeKrw?.source).toBe("user_correction")
+  })
+
+  it("extracts a strong Oceania preference while allowing alternatives", () => {
+    const facts = extractDeterministicFacts("호주가 가장 좋지만 가족 전체 예산은 700만 원 정도라 다른 지역도 괜찮아요.", basicInfo)
+    expect(facts.find((fact) => fact.key === "preferredRegions")?.value).toEqual(["oceania"])
+    expect(facts.find((fact) => fact.key === "regionImportance")?.value).toBe("strong")
+  })
+
+  it("lets later natural language correct a quick-reply fact", async () => {
+    let state = applyQuickReply(createInitialConversationState(), "child_english_level", "beginner", "영어가 거의 낯설어요")
+    state = {
+      ...state,
+      askedQuestionKeys: ["child_english_level", "parent_communication_need"],
+      completedQuestionKeys: ["child_english_level"],
+      currentQuestionKey: "parent_communication_need",
+      questionCount: 2,
+      progress: 42,
+    }
+    const response = await processConversationMessage({ transcript: [], currentState: state, basicInfo, userMessage: "아니라 아이 영어는 중급이에요.", quickReplyKey: null, provider: nullProvider })
+    expect(response.updatedState.facts.childEnglishLevel?.value).toBe("intermediate")
+    expect(response.updatedState.facts.childEnglishLevel?.source).toBe("user_correction")
+  })
+
+  it("canonicalizes special-care free text before sending it to the provider", async () => {
+    let seenMessage = ""
+    let seenTranscript = ""
+    const provider: CampfitV3LLMProvider = {
+      analyzeConversation: async (input) => {
+        seenMessage = input.userMessage
+        seenTranscript = input.transcript.at(-1)?.content ?? ""
+        return null
+      },
+      generateConsultingResponse: async () => null,
+      explainRecommendation: async () => null,
+    }
+    const state = {
+      ...createInitialConversationState(),
+      askedQuestionKeys: ["special_care_follow_up"],
+      currentQuestionKey: "special_care_follow_up",
+      questionCount: 1,
+      progress: 35,
+    }
+    const raw = "특정 약을 매일 복용해서 별도 확인이 필요해요"
+    const response = await processConversationMessage({ transcript: [{ role: "user", content: raw, questionKey: "special_care_follow_up" }], currentState: state, basicInfo, userMessage: raw, quickReplyKey: null, provider })
+    expect(seenMessage).toBe("있어요. 상담할 때 별도로 확인할게요")
+    expect(seenTranscript).toBe("있어요. 상담할 때 별도로 확인할게요")
+    expect(response.updatedState.facts.specialCareFollowUp?.value).toBe("required")
+    expect(response.updatedState.facts.specialCareFollowUp?.evidence).not.toContain("약")
+  })
+
+  it("redacts volunteered health details outside the special-care question", async () => {
+    const seen: string[] = []
+    const provider: CampfitV3LLMProvider = {
+      analyzeConversation: async (input) => {
+        seen.push(input.userMessage, ...input.transcript.map((item) => item.content))
+        return null
+      },
+      generateConsultingResponse: async () => null,
+      explainRecommendation: async () => null,
+    }
+    const start = startConversation(basicInfo)
+    const raw = "아이가 천식 진단을 받아 특정 약을 매일 복용해요"
+    const response = await processConversationMessage({
+      transcript: [{ role: "user", content: raw }],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: raw,
+      quickReplyKey: null,
+      provider,
+    })
+    expect(seen).toEqual([
+      "있어요. 상담할 때 별도로 확인할게요",
+      "있어요. 상담할 때 별도로 확인할게요",
+    ])
+    expect(response.questionKey).toBe("child_english_level")
+    expect(response.updatedState.facts.specialCareFollowUp?.value).toBe("required")
+    expect(Object.values(response.updatedState.facts).every((fact) => fact === undefined || !fact.evidence.includes("천식"))).toBe(true)
+  })
+
+  it("does not redact ordinary Korean-support wording containing 약간", async () => {
+    let seenMessage = ""
+    const provider: CampfitV3LLMProvider = {
+      analyzeConversation: async (input) => { seenMessage = input.userMessage; return null },
+      generateConsultingResponse: async () => null,
+      explainRecommendation: async () => null,
+    }
+    const start = startConversation(basicInfo)
+    const message = "한국어 지원이 약간 있으면 좋겠어요"
+    await processConversationMessage({ transcript: [], currentState: start.updatedState, basicInfo, userMessage: message, quickReplyKey: null, provider })
+    expect(seenMessage).toBe(message)
+  })
+
+  it("does not misclassify special-care negation or compound support as none", () => {
+    const negated = extractDeterministicFacts("알레르기가 없는 것은 아니에요", basicInfo, "special_care_follow_up")
+    const compound = extractDeterministicFacts("건강 문제는 없지만 복약 확인은 필요해요", basicInfo, "special_care_follow_up")
+    expect(negated.find((fact) => fact.key === "specialCareFollowUp")?.value).toBe("required")
+    expect(compound.find((fact) => fact.key === "specialCareFollowUp")?.value).toBe("required")
   })
 
   it("never exceeds ten recorded questions in fallback mode", async () => {

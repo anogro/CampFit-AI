@@ -29,13 +29,16 @@ export const CampfitV3FactSchema = z.object({
   confidence: z.number().min(0).max(1),
   evidence: z.string().max(240),
   updatedAt: z.string().datetime(),
-})
+}).superRefine(validateFactContract)
 
 export const CampfitV3ConversationStateSchema = z.object({
   facts: z.record(CampfitV3FactSchema),
   askedQuestionKeys: z.array(z.string().min(1).max(80)).max(10),
+  completedQuestionKeys: z.array(z.string().min(1).max(80)).max(10).default([]),
+  failedQuestionKeys: z.array(z.string().min(1).max(80)).max(10).default([]),
   currentQuestionKey: z.string().min(1).max(80).nullable(),
   questionCount: z.number().int().min(0).max(10),
+  progress: z.number().min(0).max(100).default(0),
   unresolved: z.array(z.enum(campfitV3FactKeys)).max(20),
   conflicts: z.array(z.object({ key: z.enum(campfitV3FactKeys), reason: z.string().max(240) })).max(20),
 })
@@ -58,7 +61,7 @@ export const CampfitV3ModelResponseSchema = z.object({
       source: z.enum(["explicit_user_statement", "ai_inference"]),
       confidence: z.number().min(0).max(1),
       evidence: z.string().trim().min(1).max(240),
-    }),
+    }).superRefine(validateFactContract),
   ).max(20),
   unresolved: z.array(z.enum(campfitV3FactKeys)).max(20),
   conflicts: z.array(z.object({ key: z.enum(campfitV3FactKeys), reason: z.string().max(240) })).max(20),
@@ -82,6 +85,7 @@ export const CampfitV3ConversationMessageRequestSchema = z.object({
 export const CampfitV3ConversationResponseSchema = z.object({
   assistantMessage: z.string().min(1).max(1000),
   updatedState: CampfitV3ConversationStateSchema,
+  updatedBasicInfo: CampfitV3BasicInfoSchema,
   quickReplies: z.array(z.object({ key: z.string().min(1).max(80), label: z.string().min(1).max(200) })).max(12),
   questionKey: z.string().min(1).max(80).nullable(),
   progress: z.number().min(0).max(100),
@@ -90,6 +94,19 @@ export const CampfitV3ConversationResponseSchema = z.object({
   conflicts: z.array(z.object({ key: z.enum(campfitV3FactKeys), reason: z.string().max(240) })).max(20),
   warnings: z.array(z.string().max(300)).max(10),
   aiUsed: z.boolean(),
+  diagnostics: z.object({
+    providerCallAttempted: z.boolean(),
+    providerResponseValidated: z.boolean(),
+    aiUsed: z.boolean(),
+    fallbackReason: z.enum([
+      "provider_unavailable",
+      "request_failed",
+      "rate_limited",
+      "schema_validation_failed",
+      "repair_failed",
+      "target_slot_not_updated",
+    ]).nullable(),
+  }).optional(),
 })
 
 const CampfitV3CostEstimateSchema = z.object({
@@ -125,6 +142,7 @@ export const CampfitV3RecommendationResultSchema = z.object({
   verificationChecklist: z.array(z.string()).max(50),
   alternatives: z.array(z.string()).max(20),
   limitedResult: z.boolean(),
+  catalogSource: z.enum(["supabase", "static_fallback", "unavailable"]),
 })
 
 export const CampfitV3RecommendRequestSchema = z.object({
@@ -132,3 +150,63 @@ export const CampfitV3RecommendRequestSchema = z.object({
   finalState: CampfitV3ConversationStateSchema,
   basicInfo: CampfitV3BasicInfoSchema,
 })
+
+const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], readonly string[]>> = {
+  childEnglishLevel: ["child"],
+  parentEnglishCommunication: ["parent"],
+  isFirstOverseasEducationExperience: ["child"],
+  dayProgramSeparationReadiness: ["child"],
+  preferredActivities: ["preference"],
+  experienceGoals: ["preference"],
+  preferredRegions: ["preference"],
+  regionImportance: ["preference"],
+  koreanSupportNeed: ["constraint"],
+  parentCommunicationNeed: ["constraint"],
+  beginnerSupportNeed: ["constraint"],
+  initialAdaptationSupportNeed: ["constraint"],
+  parentStayGoals: ["parent"],
+  specialCareFollowUp: ["constraint"],
+  studyOnlyAvoidance: ["preference"],
+  budgetRangeKrw: ["constraint"],
+  departureWindow: ["constraint"],
+  durationWeeks: ["constraint"],
+}
+
+const goalStrengthSchema = z.enum(["primary", "secondary", "mentioned", "none"])
+const valueSchemas: Readonly<Record<(typeof campfitV3FactKeys)[number], z.ZodTypeAny>> = {
+  childEnglishLevel: z.enum(["beginner", "basic", "intermediate", "advanced"]),
+  parentEnglishCommunication: z.enum(["possible", "limited", "not_possible"]),
+  isFirstOverseasEducationExperience: z.boolean(),
+  dayProgramSeparationReadiness: z.enum(["needs_close_support", "with_initial_support", "ready"]),
+  preferredActivities: z.array(z.string().trim().min(1).max(80)).max(12),
+  experienceGoals: z.object({
+    schoolSchooling: goalStrengthSchema,
+    englishIntensive: goalStrengthSchema,
+    subjectProject: goalStrengthSchema,
+    cultureActivity: goalStrengthSchema,
+  }),
+  preferredRegions: z.array(z.enum(["southeast_asia", "oceania", "north_america", "europe"])).max(4),
+  regionImportance: z.enum(["must", "strong", "soft", "no_preference"]),
+  koreanSupportNeed: z.enum(["must_daily", "emergency_only", "preferred", "none"]),
+  parentCommunicationNeed: z.enum(["daily", "issue_only", "occasional", "not_important"]),
+  beginnerSupportNeed: z.boolean(),
+  initialAdaptationSupportNeed: z.boolean(),
+  parentStayGoals: z.array(z.enum(["restWellness", "cafeDining", "tourismCulture", "natureBeach", "remoteWork", "childScheduleFirst"])).max(6),
+  specialCareFollowUp: z.enum(["none", "required", "unknown"]),
+  studyOnlyAvoidance: z.boolean(),
+  budgetRangeKrw: z.object({ min: z.number().int().nonnegative(), max: z.number().int().positive() }).refine((value) => value.min <= value.max),
+  departureWindow: z.string().trim().min(2).max(80),
+  durationWeeks: z.number().int().min(1).max(4),
+}
+
+function validateFactContract(
+  value: { readonly key: (typeof campfitV3FactKeys)[number]; readonly subject: string; readonly value?: unknown },
+  context: z.RefinementCtx,
+): void {
+  if (!expectedSubjects[value.key].includes(value.subject)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["subject"], message: "fact subject does not match its key" })
+  }
+  if (!Object.prototype.hasOwnProperty.call(value, "value") || !valueSchemas[value.key].safeParse(value.value).success) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["value"], message: "fact value does not match its key" })
+  }
+}

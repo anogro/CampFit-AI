@@ -26,6 +26,9 @@ export const campfitV3FactKeys = [
   "parentStayGoals",
   "specialCareFollowUp",
   "studyOnlyAvoidance",
+  "budgetRangeKrw",
+  "departureWindow",
+  "durationWeeks",
 ] as const
 export type CampfitV3FactKey = (typeof campfitV3FactKeys)[number]
 
@@ -47,8 +50,11 @@ export type CampfitV3Conflict = {
 export type CampfitV3ConversationState = {
   readonly facts: Partial<Record<CampfitV3FactKey, CampfitV3Fact>>
   readonly askedQuestionKeys: readonly string[]
+  readonly completedQuestionKeys: readonly string[]
+  readonly failedQuestionKeys: readonly string[]
   readonly currentQuestionKey: string | null
   readonly questionCount: number
+  readonly progress: number
   readonly unresolved: readonly CampfitV3FactKey[]
   readonly conflicts: readonly CampfitV3Conflict[]
 }
@@ -75,9 +81,26 @@ export type CampfitV3QuickReply = {
   readonly label: string
 }
 
+export type CampfitV3FallbackReason =
+  | "provider_unavailable"
+  | "request_failed"
+  | "rate_limited"
+  | "schema_validation_failed"
+  | "repair_failed"
+  | "target_slot_not_updated"
+  | null
+
+export type CampfitV3AiDiagnostics = {
+  readonly providerCallAttempted: boolean
+  readonly providerResponseValidated: boolean
+  readonly aiUsed: boolean
+  readonly fallbackReason: CampfitV3FallbackReason
+}
+
 export type CampfitV3ConversationResponse = {
   readonly assistantMessage: string
   readonly updatedState: CampfitV3ConversationState
+  readonly updatedBasicInfo: CampfitV3BasicInfo
   readonly quickReplies: readonly CampfitV3QuickReply[]
   readonly questionKey: string | null
   readonly progress: number
@@ -86,6 +109,7 @@ export type CampfitV3ConversationResponse = {
   readonly conflicts: readonly CampfitV3Conflict[]
   readonly warnings: readonly string[]
   readonly aiUsed: boolean
+  readonly diagnostics?: CampfitV3AiDiagnostics | undefined
 }
 
 export type ExperienceDirectionKey = "schoolSchooling" | "englishIntensive" | "subjectProject" | "cultureActivity"
@@ -145,4 +169,5 @@ export type CampfitV3RecommendationResult = {
   readonly verificationChecklist: readonly string[]
   readonly alternatives: readonly string[]
   readonly limitedResult: boolean
+  readonly catalogSource: "supabase" | "static_fallback" | "unavailable"
 }

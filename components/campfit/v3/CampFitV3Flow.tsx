@@ -1,9 +1,16 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { CampFitV3Chat } from "@/components/campfit/v3/CampFitV3Chat"
 import { CampFitV3Intake } from "@/components/campfit/v3/CampFitV3Intake"
 import { CampFitV3Result } from "@/components/campfit/v3/CampFitV3Result"
+import { sanitizeConversationInput } from "@/components/campfit/v3/conversationInput"
+import {
+  emptyCampfitV3IntakeDraft,
+  intakeDraftFromBasicInfo,
+  parseStoredIntakeDraft,
+  type CampfitV3IntakeDraft,
+} from "@/components/campfit/v3/intakeDraft"
 import {
   CampfitV3BasicInfoSchema,
   CampfitV3ConversationResponseSchema,
@@ -21,6 +28,7 @@ import type {
 type Stage = "start" | "intake" | "chat" | "loading" | "result"
 type StoredSession = {
   readonly stage: Stage
+  readonly intakeDraft: CampfitV3IntakeDraft
   readonly basicInfo: CampfitV3BasicInfo | null
   readonly conversation: CampfitV3ConversationResponse | null
   readonly transcript: readonly CampfitV3TranscriptMessage[]
@@ -31,12 +39,14 @@ const storageKey = "campfit-v3-conversational-mvp"
 
 export function CampFitV3Flow() {
   const [stage, setStage] = useState<Stage>("start")
+  const [intakeDraft, setIntakeDraft] = useState<CampfitV3IntakeDraft>(emptyCampfitV3IntakeDraft)
   const [basicInfo, setBasicInfo] = useState<CampfitV3BasicInfo | null>(null)
   const [conversation, setConversation] = useState<CampfitV3ConversationResponse | null>(null)
   const [transcript, setTranscript] = useState<readonly CampfitV3TranscriptMessage[]>([])
   const [result, setResult] = useState<CampfitV3RecommendationResult | null>(null)
   const [hydrated, setHydrated] = useState(false)
   const [error, setError] = useState("")
+  const skipNextSessionWriteRef = useRef(false)
 
   useEffect(() => {
     try {
@@ -48,7 +58,12 @@ export function CampFitV3Flow() {
         const parsedConversation = CampfitV3ConversationResponseSchema.safeParse(saved.conversation)
         const parsedTranscript = CampfitV3TranscriptSchema.safeParse(saved.transcript)
         const parsedResult = CampfitV3RecommendationResultSchema.safeParse(saved.result)
-        if (parsedBasic.success) setBasicInfo(parsedBasic.data)
+        const parsedDraft = parseStoredIntakeDraft(saved.intakeDraft)
+        if (parsedBasic.success) {
+          setBasicInfo(parsedBasic.data)
+          if (parsedDraft === null) setIntakeDraft(intakeDraftFromBasicInfo(parsedBasic.data))
+        }
+        if (parsedDraft !== null) setIntakeDraft(parsedDraft)
         if (parsedConversation.success) setConversation(parsedConversation.data)
         if (parsedTranscript.success) setTranscript(parsedTranscript.data)
         if (parsedResult.success) setResult(parsedResult.data)
@@ -66,9 +81,14 @@ export function CampFitV3Flow() {
 
   useEffect(() => {
     if (!hydrated) return
-    const value: StoredSession = { stage, basicInfo, conversation, transcript, result }
+    if (skipNextSessionWriteRef.current) {
+      skipNextSessionWriteRef.current = false
+      sessionStorage.removeItem(storageKey)
+      return
+    }
+    const value: StoredSession = { stage, intakeDraft, basicInfo, conversation, transcript, result }
     sessionStorage.setItem(storageKey, JSON.stringify(value))
-  }, [basicInfo, conversation, hydrated, result, stage, transcript])
+  }, [basicInfo, conversation, hydrated, intakeDraft, result, stage, transcript])
 
   async function beginConversation(info: CampfitV3BasicInfo): Promise<void> {
     setError("")
@@ -77,7 +97,8 @@ export function CampFitV3Flow() {
       const first: CampfitV3TranscriptMessage = response.questionKey
         ? { role: "assistant", content: response.assistantMessage, questionKey: response.questionKey }
         : { role: "assistant", content: response.assistantMessage }
-      setBasicInfo(info)
+      setBasicInfo(response.updatedBasicInfo)
+      setIntakeDraft(intakeDraftFromBasicInfo(response.updatedBasicInfo))
       setConversation(response)
       setTranscript([first])
       setResult(null)
@@ -87,12 +108,12 @@ export function CampFitV3Flow() {
     }
   }
 
-  async function submitAnswer(message: string, quickReplyKey: string | null): Promise<void> {
-    if (!basicInfo || !conversation) return
+  async function submitAnswer(message: string, quickReplyKey: string | null): Promise<boolean> {
+    if (!basicInfo || !conversation) return false
     setError("")
     const sensitiveQuestion = conversation.questionKey === "special_care_follow_up"
-    const safeMessage = sensitiveQuestion && quickReplyKey === null
-      ? "있어요. 상담할 때 별도로 확인할게요"
+    const safeMessage = quickReplyKey === null
+      ? sanitizeConversationInput(message, sensitiveQuestion).safeMessage
       : message
     const userMessage: CampfitV3TranscriptMessage = conversation.questionKey
       ? { role: "user", content: safeMessage, questionKey: conversation.questionKey }
@@ -111,8 +132,12 @@ export function CampFitV3Flow() {
         : { role: "assistant", content: response.assistantMessage }
       setTranscript([...nextTranscript, assistantMessage])
       setConversation(response)
+      setBasicInfo(response.updatedBasicInfo)
+      setIntakeDraft(intakeDraftFromBasicInfo(response.updatedBasicInfo))
+      return true
     } catch (caught) {
       setError(errorMessage(caught))
+      return false
     }
   }
 
@@ -135,8 +160,10 @@ export function CampFitV3Flow() {
   }
 
   function reset(): void {
+    skipNextSessionWriteRef.current = true
     sessionStorage.removeItem(storageKey)
     setStage("start")
+    setIntakeDraft({ ...emptyCampfitV3IntakeDraft, childAges: [""] })
     setBasicInfo(null)
     setConversation(null)
     setTranscript([])
@@ -146,17 +173,27 @@ export function CampFitV3Flow() {
 
   const content = useMemo(() => {
     if (stage === "start") return <StartScreen onStart={() => setStage("intake")} />
-    if (stage === "intake") return <CampFitV3Intake initialValue={basicInfo} onBack={() => setStage("start")} onSubmit={beginConversation} />
+    if (stage === "intake") return <CampFitV3Intake draft={intakeDraft} onDraftChange={setIntakeDraft} onBack={() => setStage("start")} onSubmit={beginConversation} />
     if (stage === "chat" && conversation && basicInfo) {
       return <CampFitV3Chat basicInfo={basicInfo} conversation={conversation} transcript={transcript} onAnswer={submitAnswer} onEditBasic={() => setStage("intake")} onResult={generateResult} />
     }
     if (stage === "loading") return <LoadingScreen />
-    if (stage === "result" && result) return <CampFitV3Result result={result} onRestart={reset} />
+    if (stage === "result" && result && basicInfo && conversation) {
+      return (
+        <CampFitV3Result
+          result={result}
+          basicInfo={basicInfo}
+          conversationState={conversation.updatedState}
+          onBack={() => setStage("chat")}
+          onRestart={reset}
+        />
+      )
+    }
     return <StartScreen onStart={() => setStage("intake")} />
-  }, [basicInfo, conversation, result, stage, transcript])
+  }, [basicInfo, conversation, intakeDraft, result, stage, transcript])
 
   return (
-    <div className="min-h-dvh overflow-x-hidden bg-[var(--surface-secondary)] text-[var(--text-primary)]">
+    <div className={`${stage === "chat" ? "h-dvh overflow-hidden" : "min-h-dvh overflow-x-hidden"} bg-[var(--surface-secondary)] text-[var(--text-primary)]`}>
       {content}
       {error ? <div className="fixed bottom-4 left-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 rounded-2xl border border-[var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-[var(--status-error)] shadow-lg" role="alert">{error}</div> : null}
     </div>
@@ -165,25 +202,25 @@ export function CampFitV3Flow() {
 
 function StartScreen({ onStart }: { readonly onStart: () => void }) {
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[1280px] flex-col px-4 py-5 sm:px-6 lg:px-10">
+    <main className="mx-auto flex min-h-dvh w-full max-w-[1280px] flex-col px-4 py-3 sm:px-6 sm:py-5 lg:px-10">
       <V3Header />
-      <section className="grid flex-1 items-center gap-8 py-10 lg:grid-cols-[1.02fr_.98fr] lg:gap-12 lg:py-12">
-        <div className="order-2 lg:order-1">
-          <div className="mb-5 flex flex-wrap gap-2" aria-label="주요 경험 방향">
+      <section className="grid flex-1 items-center gap-6 py-6 sm:gap-8 sm:py-10 lg:grid-cols-[1.02fr_.98fr] lg:gap-12 lg:py-12">
+        <div className="order-1">
+          <div className="mb-4 flex flex-wrap gap-2 sm:mb-5" aria-label="주요 경험 방향">
             {["스쿨링", "방학캠프", "문화체험", "영어몰입"].map((item) => <span className="rounded-full border border-[var(--cta-glass-border)] bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-primary)]" key={item}>{item}</span>)}
           </div>
-          <h1 className="max-w-[720px] text-[2.25rem] font-bold leading-[1.08] tracking-[-.035em] [word-break:keep-all] sm:text-[3rem] lg:text-[3.5rem]">
+          <h1 className="max-w-[720px] text-[2rem] font-bold leading-[1.08] tracking-[-.035em] [word-break:keep-all] sm:text-[3rem] lg:text-[3.5rem]">
             완벽한 캠프는 없어도,<br />우리 가족의 기준은 있습니다
           </h1>
-          <p className="mt-6 max-w-[620px] text-base font-medium leading-7 text-[var(--text-secondary)] [word-break:keep-all] sm:text-lg sm:leading-8">
-            후기와 광고만으로 알기 어려운 아이의 경험 목표, 필요한 지원, 가족의 체류 조건을 대화로 차근차근 정리해드려요.
+          <p className="mt-4 max-w-[620px] text-base font-medium leading-7 text-[var(--text-secondary)] [word-break:keep-all] sm:mt-6 sm:text-lg sm:leading-8">
+            아이의 경험 목표와 가족의 체류 조건을 짧은 대화로 정리해, 비교할 기준을 함께 세워드려요.
           </p>
-          <button className="glass-cta mt-8 inline-flex min-h-14 items-center justify-center rounded-full px-7 text-base font-extrabold transition hover:-translate-y-0.5" type="button" onClick={onStart}>
+          <button className="glass-cta mt-6 inline-flex min-h-14 items-center justify-center rounded-full px-7 text-base font-extrabold transition hover:-translate-y-0.5 sm:mt-8" type="button" onClick={onStart}>
             AI 상담 시작하기 <span className="ml-2" aria-hidden>→</span>
           </button>
-          <p className="mt-4 text-sm text-[var(--text-tertiary)]">약 5~8개의 짧은 질문 · 입력 내용은 현재 브라우저 세션에만 보관</p>
+          <p className="mt-3 text-sm text-[var(--text-tertiary)] sm:mt-4">일반적으로 5~8개, 복합 조건은 최대 10개의 짧은 질문 · 입력 내용은 현재 브라우저 세션에만 보관</p>
         </div>
-        <div className="order-1 mx-auto w-full max-w-[560px] lg:order-2">
+        <div className="order-2 mx-auto w-full max-w-[320px] sm:max-w-[480px] lg:max-w-[560px]">
           <img className="h-auto w-full object-contain" src="/images/campfit image.png" alt="노트북으로 해외 교육 경험을 준비하는 부모와 아이" />
         </div>
       </section>
@@ -198,7 +235,7 @@ export function V3Header() {
         <img className="h-6 w-auto object-contain" src="/images/Small Logo.png" alt="" />
         <span className="text-lg font-black tracking-[-.03em] text-[#18382a]">ANOGRO</span>
       </div>
-      <span className="rounded-full border border-[var(--border-default)] bg-white px-3 py-2 text-xs font-extrabold text-[var(--accent-primary)] sm:text-sm">CampFit AI</span>
+      <span className="text-xs font-extrabold text-[var(--accent-primary)] sm:text-sm">CampFit AI</span>
     </header>
   )
 }

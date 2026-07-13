@@ -7,7 +7,11 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ message: "기본정보를 다시 확인해 주세요." }, { status: 400 })
   }
-  return NextResponse.json(startConversation(parsed.data.basicInfo))
+  const response = startConversation(parsed.data.basicInfo)
+  const publicResponse = { ...response }
+  delete publicResponse.diagnostics
+
+  return NextResponse.json(publicResponse)
 }
 
 async function safeJson(request: Request): Promise<unknown> {
