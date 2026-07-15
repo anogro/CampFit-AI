@@ -127,7 +127,6 @@ export function allowedQuestionKeys(state: CampfitV3ConversationState): readonly
 }
 
 export function isQuestionCompleted(question: CampfitV3Question, state: CampfitV3ConversationState): boolean {
-  if (state.failedQuestionKeys.includes(question.key)) return false
   if (state.completedQuestionKeys.includes(question.key)) return true
   return question.completedBy.every((key) => {
     const fact = state.facts[key as keyof typeof state.facts]

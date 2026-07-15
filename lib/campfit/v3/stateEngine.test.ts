@@ -273,6 +273,32 @@ describe("CampFit v3 state and question engine", () => {
     expect(response.diagnostics?.fallbackReason).toBe("provider_unavailable")
   })
 
+  it("lets a quick reply recover a question that previously failed free-text validation", async () => {
+    const start = startConversation(basicInfo)
+    const failed = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "아직 생각 중이에요",
+      quickReplyKey: null,
+      provider: nullProvider,
+    })
+
+    const recovered = await processConversationMessage({
+      transcript: [],
+      currentState: failed.updatedState,
+      basicInfo,
+      userMessage: "영어가 거의 낯설어요",
+      quickReplyKey: "beginner",
+      provider: nullProvider,
+    })
+
+    expect(recovered.updatedState.facts.childEnglishLevel?.value).toBe("beginner")
+    expect(recovered.updatedState.completedQuestionKeys).toContain("child_english_level")
+    expect(recovered.updatedState.failedQuestionKeys).not.toContain("child_english_level")
+    expect(recovered.questionKey).toBe("special_care_follow_up")
+  })
+
   it("applies conversational budget corrections to the returned basic info", async () => {
     const start = startConversation({ ...basicInfo, budgetMaxKrw: 7_000_000 })
     const response = await processConversationMessage({

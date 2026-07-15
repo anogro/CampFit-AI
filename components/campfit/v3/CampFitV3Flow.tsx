@@ -5,6 +5,7 @@ import { CampFitV3Chat } from "@/components/campfit/v3/CampFitV3Chat"
 import { CampFitV3Intake } from "@/components/campfit/v3/CampFitV3Intake"
 import { CampFitV3Result } from "@/components/campfit/v3/CampFitV3Result"
 import { sanitizeConversationInput } from "@/components/campfit/v3/conversationInput"
+import { shouldDiscardStoredCampfitV3Session } from "@/components/campfit/v3/sessionMode"
 import {
   emptyCampfitV3IntakeDraft,
   intakeDraftFromBasicInfo,
@@ -57,7 +58,7 @@ export function CampFitV3Flow() {
       const raw = sessionStorage.getItem(storageKey)
       if (raw) {
         const saved = JSON.parse(raw) as Partial<StoredSession>
-        if (demoRequested && saved.demoMode !== true) {
+        if (shouldDiscardStoredCampfitV3Session(demoRequested, saved.demoMode)) {
           sessionStorage.removeItem(storageKey)
         } else {
           if (saved.demoMode === true) setDemoMode(true)
