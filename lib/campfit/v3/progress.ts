@@ -18,7 +18,7 @@ export function calculateProgress(basicInfo: CampfitV3BasicInfo, state: CampfitV
   const factCredit = weightedSlots.reduce((sum, slot) => {
     const fact = state.facts[slot.key]
     if (slot.key === "dayProgramSeparationReadiness" && state.facts.isFirstOverseasEducationExperience?.value === false) return sum + slot.weight
-    if (!fact || state.conflicts.some((conflict) => conflict.key === slot.key)) return sum
+    if (!fact || fact.status === "unknown" || fact.status === "tentative" || state.conflicts.some((conflict) => conflict.key === slot.key)) return sum
     if (fact.source === "ai_inference") return sum + (fact.confidence >= 0.85 ? slot.weight * 0.5 : 0)
     return sum + slot.weight
   }, 0)
@@ -39,12 +39,18 @@ export function isReadyForRecommendation(state: CampfitV3ConversationState): boo
   ]
   const requiredComplete = required.every((key) => {
     const fact = state.facts[key]
-    return fact !== undefined && fact.source !== "ai_inference" && !state.conflicts.some((conflict) => conflict.key === key)
+    return fact !== undefined
+      && fact.status !== "unknown"
+      && fact.status !== "tentative"
+      && !state.conflicts.some((conflict) => conflict.key === key)
   })
   if (!requiredComplete) return false
   if (state.facts.isFirstOverseasEducationExperience?.value !== true) return true
   const separation = state.facts.dayProgramSeparationReadiness
-  return separation !== undefined && separation.source !== "ai_inference" && !state.conflicts.some((conflict) => conflict.key === "dayProgramSeparationReadiness")
+  return separation !== undefined
+    && separation.status !== "unknown"
+    && separation.status !== "tentative"
+    && !state.conflicts.some((conflict) => conflict.key === "dayProgramSeparationReadiness")
 }
 
 export function progressMessage(progress: number): string {

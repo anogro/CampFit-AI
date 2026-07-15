@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { campfitV3FactKeys, campfitV3FactSources, campfitV3FactSubjects } from "@/types/campfitV3"
+import { campfitV3FactKeys, campfitV3FactSources, campfitV3FactStatuses, campfitV3FactSubjects } from "@/types/campfitV3"
 
 export const CampfitV3BasicInfoSchema = z
   .object({
@@ -27,6 +27,7 @@ export const CampfitV3FactSchema = z.object({
   value: z.unknown(),
   source: z.enum(campfitV3FactSources),
   confidence: z.number().min(0).max(1),
+  status: z.enum(campfitV3FactStatuses).default("known"),
   evidence: z.string().max(240),
   updatedAt: z.string().datetime(),
 }).superRefine(validateFactContract)
@@ -96,16 +97,30 @@ export const CampfitV3ConversationResponseSchema = z.object({
   aiUsed: z.boolean(),
   diagnostics: z.object({
     providerCallAttempted: z.boolean(),
+    providerResponseReceived: z.boolean(),
     providerResponseValidated: z.boolean(),
     aiUsed: z.boolean(),
     fallbackReason: z.enum([
-      "provider_unavailable",
-      "request_failed",
+      "timeout",
+      "network_error",
+      "invalid_request",
+      "permission_denied",
+      "model_not_found",
       "rate_limited",
+      "provider_cancelled",
+      "provider_internal",
+      "provider_unavailable",
+      "empty_response",
+      "json_parse_failed",
       "schema_validation_failed",
-      "repair_failed",
+      "semantic_validation_failed",
+      "unknown_provider_error",
       "target_slot_not_updated",
     ]).nullable(),
+    providerHttpStatus: z.number().int().min(100).max(599).nullable(),
+    providerErrorStatus: z.string().regex(/^[A-Z][A-Z0-9_]{0,79}$/).nullable(),
+    providerRequestCount: z.number().int().min(0).max(2),
+    elapsedMs: z.number().int().nonnegative(),
   }).optional(),
 })
 
@@ -142,13 +157,14 @@ export const CampfitV3RecommendationResultSchema = z.object({
   verificationChecklist: z.array(z.string()).max(50),
   alternatives: z.array(z.string()).max(20),
   limitedResult: z.boolean(),
-  catalogSource: z.enum(["supabase", "static_fallback", "unavailable"]),
+  catalogSource: z.enum(["supabase", "static_fallback", "demo", "unavailable"]),
 })
 
 export const CampfitV3RecommendRequestSchema = z.object({
   transcript: CampfitV3TranscriptSchema,
   finalState: CampfitV3ConversationStateSchema,
   basicInfo: CampfitV3BasicInfoSchema,
+  demo: z.boolean().optional(),
 })
 
 const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], readonly string[]>> = {
@@ -157,6 +173,10 @@ const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], read
   isFirstOverseasEducationExperience: ["child"],
   dayProgramSeparationReadiness: ["child"],
   preferredActivities: ["preference"],
+  destinationPreference: ["preference"],
+  socialPreference: ["child", "preference"],
+  desiredOutcomes: ["preference"],
+  worries: ["parent", "family"],
   experienceGoals: ["preference"],
   preferredRegions: ["preference"],
   regionImportance: ["preference"],
@@ -166,9 +186,10 @@ const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], read
   initialAdaptationSupportNeed: ["constraint"],
   parentStayGoals: ["parent"],
   specialCareFollowUp: ["constraint"],
-  studyOnlyAvoidance: ["preference"],
-  budgetRangeKrw: ["constraint"],
-  departureWindow: ["constraint"],
+      studyOnlyAvoidance: ["preference"],
+      budgetRangeKrw: ["constraint"],
+      budgetIncludesFlight: ["constraint"],
+      departureWindow: ["constraint"],
   durationWeeks: ["constraint"],
 }
 
@@ -179,6 +200,10 @@ const valueSchemas: Readonly<Record<(typeof campfitV3FactKeys)[number], z.ZodTyp
   isFirstOverseasEducationExperience: z.boolean(),
   dayProgramSeparationReadiness: z.enum(["needs_close_support", "with_initial_support", "ready"]),
   preferredActivities: z.array(z.string().trim().min(1).max(80)).max(12),
+  destinationPreference: z.array(z.string().trim().min(1).max(80)).max(8),
+  socialPreference: z.array(z.string().trim().min(1).max(80)).max(8),
+  desiredOutcomes: z.array(z.string().trim().min(1).max(120)).max(8),
+  worries: z.array(z.string().trim().min(1).max(120)).max(8),
   experienceGoals: z.object({
     schoolSchooling: goalStrengthSchema,
     englishIntensive: goalStrengthSchema,
@@ -195,6 +220,7 @@ const valueSchemas: Readonly<Record<(typeof campfitV3FactKeys)[number], z.ZodTyp
   specialCareFollowUp: z.enum(["none", "required", "unknown"]),
   studyOnlyAvoidance: z.boolean(),
   budgetRangeKrw: z.object({ min: z.number().int().nonnegative(), max: z.number().int().positive() }).refine((value) => value.min <= value.max),
+  budgetIncludesFlight: z.boolean(),
   departureWindow: z.string().trim().min(2).max(80),
   durationWeeks: z.number().int().min(1).max(4),
 }

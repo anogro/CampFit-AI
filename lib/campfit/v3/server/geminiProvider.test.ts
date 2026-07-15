@@ -26,7 +26,9 @@ describe("GeminiCampfitV3Provider", () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
     if (originalKey === undefined) delete process.env["GEMINI_API_KEY"]
     else process.env["GEMINI_API_KEY"] = originalKey
   })
@@ -39,35 +41,24 @@ describe("GeminiCampfitV3Provider", () => {
     expect(response?.facts[0]?.value).toBe("beginner")
     expect(provider.getLastValidatedResponse()?.facts[0]?.value).toBe("beginner")
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(provider.getLastDiagnostic()).toMatchObject({ code: "ok", repaired: false, requestCount: 1 })
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "ok",
+      providerResponseReceived: true,
+      httpStatus: 200,
+      errorStatus: null,
+      repaired: false,
+      requestCount: 1,
+    })
     const body = requestBody(fetchMock, 0)
     const generationConfig = body["generationConfig"] as Record<string, unknown>
-    const responseJsonSchema = generationConfig["responseJsonSchema"] as Record<string, unknown>
-    expect(generationConfig).toMatchObject({ responseMimeType: "application/json", temperature: 0, maxOutputTokens: 4_096 })
+    expect(generationConfig).toEqual({
+      responseMimeType: "application/json",
+      temperature: 0,
+      maxOutputTokens: 4_096,
+    })
+    expect(generationConfig).not.toHaveProperty("responseJsonSchema")
     expect(generationConfig).not.toHaveProperty("responseSchema")
-    expect(responseJsonSchema["required"]).toEqual([
-      "assistantMessage", "facts", "unresolved", "conflicts",
-      "suggestedNextQuestionKey", "nextAction", "readyForRecommendation",
-    ])
-    const properties = responseJsonSchema["properties"] as Record<string, Record<string, unknown>>
-    expect(properties["suggestedNextQuestionKey"]?.["anyOf"]).toEqual([
-      { type: "string", enum: ["child_english_level"] },
-      { type: "null" },
-    ])
-    const factItems = properties["facts"]?.["items"] as Record<string, unknown>
-    const variants = factItems["anyOf"] as Array<Record<string, unknown>>
-    expect(variants).toHaveLength(18)
-    const childEnglishVariant = variants.find((variant) => {
-      const variantProperties = variant["properties"] as Record<string, Record<string, unknown>>
-      return (variantProperties["key"]?.["enum"] as string[] | undefined)?.[0] === "childEnglishLevel"
-    })
-    expect(childEnglishVariant).toMatchObject({
-      properties: {
-        key: { enum: ["childEnglishLevel"] },
-        subject: { enum: ["child"] },
-        value: { enum: ["beginner", "basic", "intermediate", "advanced"] },
-      },
-    })
+    expect(generationConfig).not.toHaveProperty("_responseJsonSchema")
   })
 
   it("repairs a response with missing required control fields", async () => {
@@ -109,10 +100,17 @@ describe("GeminiCampfitV3Provider", () => {
     const response = await provider.analyzeConversation(input)
     expect(response).not.toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(requestBody(fetchMock, 0)["generationConfig"]).toHaveProperty("responseJsonSchema")
-    expect(requestBody(fetchMock, 1)["generationConfig"]).toHaveProperty("responseJsonSchema")
-    expect(requestBody(fetchMock, 0)["generationConfig"]).not.toHaveProperty("responseSchema")
-    expect(requestBody(fetchMock, 1)["generationConfig"]).not.toHaveProperty("responseSchema")
+    for (const index of [0, 1]) {
+      const generationConfig = requestBody(fetchMock, index)["generationConfig"] as Record<string, unknown>
+      expect(generationConfig).toEqual({
+        responseMimeType: "application/json",
+        temperature: 0,
+        maxOutputTokens: 4_096,
+      })
+      expect(generationConfig).not.toHaveProperty("responseJsonSchema")
+      expect(generationConfig).not.toHaveProperty("responseSchema")
+      expect(generationConfig).not.toHaveProperty("_responseJsonSchema")
+    }
     expect(provider.getLastDiagnostic()).toMatchObject({ code: "ok", repaired: true, requestCount: 2 })
   })
 
@@ -148,6 +146,93 @@ describe("GeminiCampfitV3Provider", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
+  it("normalizes an empty suggested question to null in JSON mode", async () => {
+    const raw = validModelResponse()
+    raw.suggestedNextQuestionKey = ""
+    const fetchMock = vi.fn(async () => geminiResponse(raw))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider({ maxProviderRequests: 1 })
+
+    const response = await provider.analyzeConversation({ ...input, allowedQuestionKeys: [] })
+
+    expect(response?.suggestedNextQuestionKey).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(provider.getLastDiagnostic()).toMatchObject({ code: "ok", repaired: false, requestCount: 1 })
+  })
+
+  it("does not repair invalid JSON when the evaluation request limit is one", async () => {
+    const fetchMock = vi.fn(async () => geminiTextResponse("not-json"))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider({ maxProviderRequests: 1 })
+
+    expect(await provider.analyzeConversation(input)).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "json_parse_failed",
+      providerResponseReceived: true,
+      repaired: false,
+      requestCount: 1,
+    })
+  })
+
+  it("classifies valid JSON with a schema mismatch without evaluation repair", async () => {
+    const fetchMock = vi.fn(async () => geminiTextResponse("null"))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider({ maxProviderRequests: 1 })
+
+    expect(await provider.analyzeConversation(input)).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "schema_validation_failed",
+      repaired: false,
+      requestCount: 1,
+    })
+  })
+
+  it("classifies a semantic mismatch without evaluation repair", async () => {
+    const duplicate = validModelResponse()
+    duplicate.facts.push({ ...duplicate.facts[0]! })
+    const fetchMock = vi.fn(async () => geminiResponse(duplicate))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider({ maxProviderRequests: 1 })
+
+    expect(await provider.analyzeConversation(input)).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "semantic_validation_failed",
+      repaired: false,
+      requestCount: 1,
+    })
+  })
+
+  it("rejects internal counselor terms and multiple user-facing questions", async () => {
+    const raw = validModelResponse()
+    raw.assistantMessage = "slot validation을 확인했어요? 다음 질문도 답해주세요?"
+    const fetchMock = vi.fn(async () => geminiResponse(raw))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider({ maxProviderRequests: 1 })
+
+    expect(await provider.analyzeConversation(input)).toBeNull()
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "semantic_validation_failed",
+      requestCount: 1,
+    })
+  })
+
+  it("rejects detailed health information echoed in the model response", async () => {
+    const raw = validModelResponse()
+    raw.assistantMessage = "알레르기 항목은 상담 전에 확인할게요."
+    const fetchMock = vi.fn(async () => geminiResponse(raw))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider({ maxProviderRequests: 1 })
+
+    expect(await provider.analyzeConversation(input)).toBeNull()
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "semantic_validation_failed",
+      requestCount: 1,
+    })
+  })
+
   it("repairs duplicate fact keys instead of silently applying the last value", async () => {
     const duplicate = validModelResponse()
     duplicate.facts.push({ ...duplicate.facts[0]!, value: "advanced", evidence: "duplicate" })
@@ -168,22 +253,28 @@ describe("GeminiCampfitV3Provider", () => {
     const response = await provider.analyzeConversation(input)
     expect(response).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(provider.getLastDiagnostic()).toMatchObject({ code: "schema_invalid", repaired: true, requestCount: 2 })
+    expect(provider.getLastDiagnostic()).toMatchObject({ code: "schema_validation_failed", repaired: true, requestCount: 2 })
   })
 
   it("does not retry a quota response", async () => {
-    const fetchMock = vi.fn(async () => new Response("", { status: 429 }))
+    const fetchMock = vi.fn(async () => providerErrorResponse(429, "RESOURCE_EXHAUSTED"))
     vi.stubGlobal("fetch", fetchMock)
     const provider = new GeminiCampfitV3Provider()
     expect(await provider.analyzeConversation(input)).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(provider.getLastDiagnostic()).toMatchObject({ code: "quota_limited", httpStatus: 429, requestCount: 1 })
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "rate_limited",
+      providerResponseReceived: true,
+      httpStatus: 429,
+      errorStatus: "RESOURCE_EXHAUSTED",
+      requestCount: 1,
+    })
   })
 
   it("clears the last validated response before a later failed request", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(geminiResponse(validModelResponse()))
-      .mockResolvedValueOnce(new Response("", { status: 429 }))
+      .mockResolvedValueOnce(providerErrorResponse(429, "RESOURCE_EXHAUSTED"))
     vi.stubGlobal("fetch", fetchMock)
     const provider = new GeminiCampfitV3Provider()
     expect(await provider.analyzeConversation(input)).not.toBeNull()
@@ -202,7 +293,7 @@ describe("GeminiCampfitV3Provider", () => {
     const provider = new GeminiCampfitV3Provider()
     expect(await provider.analyzeConversation(input)).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(provider.getLastDiagnostic()).toMatchObject({ code: "http_error", httpStatus: 200, requestCount: 1 })
+    expect(provider.getLastDiagnostic()).toMatchObject({ code: "empty_response", providerResponseReceived: true, httpStatus: 200, requestCount: 1 })
   })
 
   it("joins every text part before parsing the structured response", async () => {
@@ -230,7 +321,7 @@ describe("GeminiCampfitV3Provider", () => {
     const provider = new GeminiCampfitV3Provider()
     expect(await provider.analyzeConversation(input)).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(provider.getLastDiagnostic()).toMatchObject({ code: "network_error", httpStatus: null, requestCount: 1 })
+    expect(provider.getLastDiagnostic()).toMatchObject({ code: "network_error", providerResponseReceived: false, httpStatus: null, requestCount: 1 })
   })
 
   it("reports missing configuration without making a request", async () => {
@@ -240,7 +331,122 @@ describe("GeminiCampfitV3Provider", () => {
     const provider = new GeminiCampfitV3Provider()
     expect(await provider.analyzeConversation(input)).toBeNull()
     expect(fetchMock).not.toHaveBeenCalled()
-    expect(provider.getLastDiagnostic()).toMatchObject({ code: "not_configured", requestCount: 0 })
+    expect(provider.getLastDiagnostic()).toMatchObject({ code: "provider_unavailable", providerResponseReceived: false, requestCount: 0 })
+  })
+
+  it.each([
+    [400, "INVALID_ARGUMENT", "invalid_request"],
+    [403, "PERMISSION_DENIED", "permission_denied"],
+    [404, "NOT_FOUND", "model_not_found"],
+    [429, "RESOURCE_EXHAUSTED", "rate_limited"],
+    [500, "INTERNAL", "provider_internal"],
+    [503, "UNAVAILABLE", "provider_unavailable"],
+  ] as const)("maps HTTP %i to %s safely", async (status, errorStatus, code) => {
+    const fetchMock = vi.fn(async () => providerErrorResponse(status, errorStatus))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider()
+
+    expect(await provider.analyzeConversation(input)).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code,
+      providerResponseReceived: true,
+      httpStatus: status,
+      errorStatus,
+      requestCount: 1,
+    })
+  })
+
+  it("classifies the provider timeout without retrying", async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })))
+    }))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider()
+    const pending = provider.analyzeConversation(input)
+
+    await vi.advanceTimersByTimeAsync(25_000)
+    expect(await pending).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "timeout",
+      providerResponseReceived: false,
+      httpStatus: null,
+      requestCount: 1,
+    })
+  })
+
+  it("distinguishes provider cancellation from its own timeout", async () => {
+    const fetchMock = vi.fn(async () => { throw Object.assign(new Error("cancelled"), { name: "AbortError" }) })
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider()
+
+    expect(await provider.analyzeConversation(input)).toBeNull()
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "provider_cancelled",
+      providerResponseReceived: false,
+      requestCount: 1,
+    })
+  })
+
+  it("separates an invalid HTTP 200 JSON body from an empty model response", async () => {
+    const fetchMock = vi.fn(async () => new Response("not-json", {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider()
+
+    expect(await provider.analyzeConversation(input)).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "json_parse_failed",
+      providerResponseReceived: true,
+      httpStatus: 200,
+      requestCount: 1,
+    })
+  })
+
+  it("classifies a repeated semantic violation after the single repair", async () => {
+    const duplicate = validModelResponse()
+    duplicate.facts.push({ ...duplicate.facts[0]! })
+    const fetchMock = vi.fn(async () => geminiResponse(duplicate))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider()
+
+    expect(await provider.analyzeConversation(input)).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "semantic_validation_failed",
+      providerResponseReceived: true,
+      repaired: true,
+      requestCount: 2,
+    })
+  })
+
+  it("never places the API key, prompt, or raw provider error in diagnostics", async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({
+      error: {
+        status: "INVALID_ARGUMENT",
+        message: "test-key and the full prompt must not escape",
+        details: [{ raw: input.userMessage }],
+      },
+    }), { status: 400, headers: { "Content-Type": "application/json" } }))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider()
+
+    expect(await provider.analyzeConversation(input)).toBeNull()
+    const diagnostic = provider.getLastDiagnostic()
+    const serialized = JSON.stringify(diagnostic)
+    const endpoint = String(fetchMock.mock.calls[0]?.[0])
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined
+    expect(endpoint).not.toContain("test-key")
+    expect(new Headers(init?.headers).get("x-goog-api-key")).toBe("test-key")
+    expect(serialized).not.toContain("test-key")
+    expect(serialized).not.toContain(input.userMessage)
+    expect(serialized).not.toContain("full prompt")
+    expect(diagnostic).toMatchObject({ code: "invalid_request", errorStatus: "INVALID_ARGUMENT" })
   })
 })
 
@@ -276,6 +482,13 @@ function geminiResponse(value: unknown): Response {
 function geminiTextResponse(text: string): Response {
   return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }), {
     status: 200,
+    headers: { "Content-Type": "application/json" },
+  })
+}
+
+function providerErrorResponse(status: number, errorStatus: string): Response {
+  return new Response(JSON.stringify({ error: { status: errorStatus, message: "safe test error" } }), {
+    status,
     headers: { "Content-Type": "application/json" },
   })
 }

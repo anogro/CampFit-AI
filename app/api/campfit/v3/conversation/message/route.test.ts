@@ -6,8 +6,8 @@ const providerConstructed = vi.hoisted(() => vi.fn())
 vi.mock("@/lib/campfit/v3/conversationService", () => ({ processConversationMessage }))
 vi.mock("@/lib/campfit/v3/server/geminiProvider", () => ({
   GeminiCampfitV3Provider: class MockGeminiCampfitV3Provider {
-    constructor() {
-      providerConstructed()
+    constructor(options?: unknown) {
+      providerConstructed(options)
     }
   },
 }))
@@ -51,10 +51,17 @@ const serviceResponse = {
   aiUsed: true,
   diagnostics: {
     providerCallAttempted: true,
+    providerResponseReceived: true,
     providerResponseValidated: true,
     aiUsed: true,
     fallbackReason: null,
+    providerHttpStatus: 200,
+    providerErrorStatus: null,
+    providerRequestCount: 1,
+    elapsedMs: 5_106,
     rawPrompt: "must never leave the server",
+    rawProviderBody: "must also never leave the server",
+    apiKey: "secret-key",
     model: "internal-model-name",
   },
 }
@@ -89,11 +96,28 @@ describe("CampFit v3 conversation message route", () => {
 
     expect(response.status).toBe(200)
     expect(providerConstructed).toHaveBeenCalledTimes(1)
+    expect(providerConstructed).toHaveBeenCalledWith({ maxProviderRequests: 2 })
     expect(processConversationMessage).toHaveBeenCalledWith(expect.objectContaining({
       userMessage: "영어는 초급이에요",
       quickReplyKey: null,
       provider: expect.anything(),
     }))
+  })
+
+  it("disables repair only for an explicit non-production evaluation", async () => {
+    vi.stubEnv("NODE_ENV", "development")
+    vi.stubEnv("CAMPFIT_V3_GEMINI_EVALUATION_SINGLE_REQUEST", "true")
+
+    expect((await POST(request())).status).toBe(200)
+    expect(providerConstructed).toHaveBeenCalledWith({ maxProviderRequests: 1 })
+  })
+
+  it("ignores the evaluation-only single-request flag in production", async () => {
+    vi.stubEnv("NODE_ENV", "production")
+    vi.stubEnv("CAMPFIT_V3_GEMINI_EVALUATION_SINGLE_REQUEST", "true")
+
+    expect((await POST(request())).status).toBe(200)
+    expect(providerConstructed).toHaveBeenCalledWith({ maxProviderRequests: 2 })
   })
 
   it("always strips diagnostics from production responses", async () => {
@@ -115,11 +139,18 @@ describe("CampFit v3 conversation message route", () => {
 
     expect(payload["diagnostics"]).toEqual({
       providerCallAttempted: true,
+      providerResponseReceived: true,
       providerResponseValidated: true,
       aiUsed: true,
       fallbackReason: null,
+      providerHttpStatus: 200,
+      providerErrorStatus: null,
+      providerRequestCount: 1,
+      elapsedMs: 5_106,
     })
     expect(JSON.stringify(payload)).not.toContain("rawPrompt")
+    expect(JSON.stringify(payload)).not.toContain("rawProviderBody")
+    expect(JSON.stringify(payload)).not.toContain("secret-key")
     expect(JSON.stringify(payload)).not.toContain("model")
   })
 

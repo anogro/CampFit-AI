@@ -14,8 +14,8 @@ export type CampfitV3Question = {
 export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
   {
     key: "child_english_level",
-    title: "아이의 현재 영어 사용 수준은 어느 정도인가요?",
-    helper: "부모님의 영어 능력과는 분리해서 아이 기준으로 알려주세요.",
+    title: "기본 정보는 확인했어요. 이제 아이와 해외 캠프를 고민하게 된 이유를 편하게 말씀해주세요. 영어, 아이 성향, 기대하는 변화, 관심 있는 나라를 한 번에 말씀하셔도 좋아요. 아이 영어 수준은 어느 정도인지도 함께 알려주실 수 있을까요?",
+    helper: "한 가지씩 답하지 않아도 괜찮아요. 떠오르는 내용을 자유롭게 적어주세요.",
     quickReplies: questionReplies([["beginner", "영어가 거의 낯설어요"], ["basic", "단어·짧은 표현 정도예요"], ["intermediate", "간단한 일상 대화가 가능해요"], ["advanced", "영어 수업도 참여할 수 있어요"]]),
     completedBy: ["childEnglishLevel"],
     priority: 100,
@@ -30,7 +30,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
   },
   {
     key: "korean_support_need",
-    title: "현지에서 한국어 지원은 어느 정도 필요할까요?",
+    title: "아이에게 필요한 현지 지원이 있다면 어떤 상황을 가장 먼저 생각하고 계세요? 한국어 지원은 매일 필요한지, 비상시에만 있으면 되는지도 함께 알려주세요.",
     helper: "상시 지원과 비상 상황 지원을 구분해 주세요.",
     quickReplies: questionReplies([["must_daily", "매일 한국어 지원이 꼭 필요해요"], ["emergency_only", "비상 상황에서만 필요해요"], ["preferred", "있으면 더 안심돼요"], ["none", "중요하지 않아요"]]),
     completedBy: ["koreanSupportNeed"],
@@ -38,7 +38,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
   },
   {
     key: "parent_communication_need",
-    title: "프로그램에서 부모님께 어느 정도로 소식을 전해주면 좋을까요?",
+    title: "아이 프로그램 시간 동안 부모님은 어떤 방식으로 소식을 받고 지내고 싶으세요? 원격근무나 휴식처럼 부모님 일정도 함께 말씀해주셔도 좋아요.",
     helper: "필요한 연락 빈도를 기준으로 골라주세요.",
     quickReplies: questionReplies([["daily", "매일 간단히 공유받고 싶어요"], ["issue_only", "문제가 있을 때 바로 연락받고 싶어요"], ["occasional", "가끔 소식을 받으면 충분해요"], ["not_important", "중요하지 않아요"]]),
     completedBy: ["parentCommunicationNeed"],
@@ -46,7 +46,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
   },
   {
     key: "primary_experience_goal",
-    title: "이번 경험에서 가장 중요하게 기대하는 것은 무엇인가요?",
+    title: "이번 경험을 통해 아이에게 어떤 변화가 생기면 가장 좋을까요? 학교·영어·프로젝트·문화활동 중 하나를 골라도 되고, 기대하는 모습을 편하게 설명해주셔도 됩니다.",
     helper: "다른 목표가 함께 있다면 자유 입력으로 덧붙여도 좋아요.",
     quickReplies: questionReplies([["schoolSchooling", "국제학교·스쿨링 경험"], ["englishIntensive", "영어 자신감과 집중 노출"], ["subjectProject", "STEM·예술·프로젝트"], ["cultureActivity", "문화·활동과 즐거운 경험"]]),
     completedBy: ["experienceGoals"],
@@ -54,7 +54,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
   },
   {
     key: "preferred_region",
-    title: "우선 살펴보고 싶은 지역이 있나요?",
+    title: "마음에 두고 있는 나라나 도시가 있나요? 아직 정하지 않았다면 아이에게 어울릴 곳을 함께 찾아도 괜찮아요.",
     helper: "지역을 정하지 않았다면 상관없음을 선택해도 됩니다.",
     quickReplies: questionReplies([["southeast_asia", "동남아시아"], ["oceania", "오세아니아"], ["north_america", "북미"], ["europe", "유럽"], ["no_preference", "지역은 상관없어요"]]),
     completedBy: ["preferredRegions"],
@@ -96,17 +96,19 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
   },
 ]
 
-export function selectNextQuestion(state: CampfitV3ConversationState): CampfitV3Question | null {
+export function selectNextQuestion(state: CampfitV3ConversationState, suggestedQuestionKey: string | null = null): CampfitV3Question | null {
   const current = getQuestion(state.currentQuestionKey)
   if (current !== null && shouldAsk(current, state) && !isQuestionCompleted(current, state)) return current
+  const suggested = getQuestion(suggestedQuestionKey)
+  if (suggested !== null && shouldAsk(suggested, state) && !isQuestionCompleted(suggested, state)) return suggested
   const asked = new Set(state.askedQuestionKeys)
   const retry = [...campfitV3QuestionBank]
-    .sort((left, right) => right.priority - left.priority)
+    .sort((left, right) => questionValue(right, state) - questionValue(left, state))
     .find((question) => asked.has(question.key) && shouldAsk(question, state) && !isQuestionCompleted(question, state))
   if (retry !== undefined) return retry
   if (state.questionCount >= 10) return null
   return [...campfitV3QuestionBank]
-    .sort((left, right) => right.priority - left.priority)
+    .sort((left, right) => questionValue(right, state) - questionValue(left, state))
     .find((question) => {
       if (asked.has(question.key)) return false
       if (!shouldAsk(question, state)) return false
@@ -129,9 +131,15 @@ export function isQuestionCompleted(question: CampfitV3Question, state: CampfitV
   if (state.completedQuestionKeys.includes(question.key)) return true
   return question.completedBy.every((key) => {
     const fact = state.facts[key as keyof typeof state.facts]
-    if (fact === undefined || fact.source === "ai_inference") return false
+    if (fact === undefined || fact.status === "unknown" || fact.status === "tentative") return false
     return !state.conflicts.some((conflict) => conflict.key === key)
   })
+}
+
+function questionValue(question: CampfitV3Question, state: CampfitV3ConversationState): number {
+  const unresolvedBoost = question.completedBy.some((key) => state.unresolved.includes(key as CampfitV3ConversationState["unresolved"][number])) ? 18 : 0
+  const conflictBoost = question.completedBy.some((key) => state.conflicts.some((conflict) => conflict.key === key)) ? 24 : 0
+  return question.priority + unresolvedBoost + conflictBoost
 }
 
 function shouldAsk(question: CampfitV3Question, state: CampfitV3ConversationState): boolean {

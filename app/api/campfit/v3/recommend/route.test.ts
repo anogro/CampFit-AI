@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const loadV3Catalog = vi.hoisted(() => vi.fn())
+const loadDemoCatalog = vi.hoisted(() => vi.fn())
 const isReadyForRecommendation = vi.hoisted(() => vi.fn())
 const buildRecommendation = vi.hoisted(() => vi.fn())
 const explainRecommendation = vi.hoisted(() => vi.fn())
 
 vi.mock("@/lib/campfit/v3/catalogRepository", () => ({ loadV3Catalog }))
+vi.mock("@/lib/campfit/v3/demoCatalog", () => ({ loadDemoCatalog }))
 vi.mock("@/lib/campfit/v3/progress", () => ({ isReadyForRecommendation }))
 vi.mock("@/lib/campfit/v3/recommendationEngine", () => ({ buildRecommendation }))
 vi.mock("@/lib/campfit/v3/server/geminiProvider", () => ({
@@ -51,11 +53,11 @@ const result = {
   catalogSource: "static_fallback" as const,
 }
 
-function request(): Request {
+function request(demo = false): Request {
   return new Request("http://localhost/api/campfit/v3/recommend", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ transcript: [], finalState, basicInfo }),
+    body: JSON.stringify({ transcript: [], finalState, basicInfo, ...(demo ? { demo: true } : {}) }),
   })
 }
 
@@ -63,6 +65,7 @@ describe("CampFit v3 recommendation route", () => {
   beforeEach(() => {
     isReadyForRecommendation.mockReturnValue(true)
     loadV3Catalog.mockResolvedValue({ programs: [], cities: [], source: "static_fallback" })
+    loadDemoCatalog.mockReturnValue({ programs: [], cities: [], source: "demo", warnings: [] })
     buildRecommendation.mockReturnValue(result)
     explainRecommendation.mockResolvedValue(null)
   })
@@ -80,6 +83,31 @@ describe("CampFit v3 recommendation route", () => {
 
     expect(response.status).toBe(200)
     expect(payload["catalogSource"]).toBe("static_fallback")
+  })
+
+  it("uses the demo catalog only when the request explicitly opts in", async () => {
+    vi.stubEnv("CAMPFIT_V3_AI_RESULT_EXPLANATION", "false")
+    buildRecommendation.mockReturnValue({ ...result, catalogSource: "demo" })
+
+    const response = await POST(request(true))
+    const payload = await response.json() as Record<string, unknown>
+
+    expect(response.status).toBe(200)
+    expect(loadDemoCatalog).toHaveBeenCalledTimes(1)
+    expect(loadV3Catalog).not.toHaveBeenCalled()
+    expect(buildRecommendation).toHaveBeenCalledWith(expect.objectContaining({ catalog: expect.objectContaining({ source: "demo" }) }))
+    expect(payload["catalogSource"]).toBe("demo")
+  })
+
+  it("does not switch to demo when the production catalog is unavailable", async () => {
+    loadV3Catalog.mockResolvedValue({ programs: [], cities: [], source: "unavailable", warnings: ["read failed"] })
+    buildRecommendation.mockReturnValue({ ...result, catalogSource: "unavailable" })
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(200)
+    expect(loadDemoCatalog).not.toHaveBeenCalled()
+    expect(buildRecommendation).toHaveBeenCalledWith(expect.objectContaining({ catalog: expect.objectContaining({ source: "unavailable" }) }))
   })
 
   it("keeps catalog provenance when an optional AI conclusion is used", async () => {

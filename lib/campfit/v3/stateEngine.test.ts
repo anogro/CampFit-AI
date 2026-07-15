@@ -160,7 +160,106 @@ describe("CampFit v3 state and question engine", () => {
     const start = startConversation(basicInfo)
     const response = await processConversationMessage({ transcript: [], currentState: start.updatedState, basicInfo, userMessage: "단어·짧은 표현 정도예요", quickReplyKey: "basic", provider })
     expect(calls).toBe(0)
-    expect(response.diagnostics).toEqual({ providerCallAttempted: false, providerResponseValidated: false, aiUsed: false, fallbackReason: null })
+    expect(response.diagnostics).toEqual({
+      providerCallAttempted: false,
+      providerResponseReceived: false,
+      providerResponseValidated: false,
+      aiUsed: false,
+      fallbackReason: null,
+      providerHttpStatus: null,
+      providerErrorStatus: null,
+      providerRequestCount: 0,
+      elapsedMs: 0,
+    })
+  })
+
+  it("reports a fully validated provider response without weakening deterministic facts", async () => {
+    const provider: CampfitV3LLMProvider = {
+      analyzeConversation: async () => ({
+        assistantMessage: "아이와 부모님의 영어 수준을 분리해 확인했어요.",
+        facts: [],
+        unresolved: [],
+        conflicts: [],
+        suggestedNextQuestionKey: "special_care_follow_up",
+        nextAction: "ask",
+        readyForRecommendation: false,
+      }),
+      generateConsultingResponse: async () => null,
+      explainRecommendation: async () => null,
+      getLastDiagnostic: () => ({
+        code: "ok",
+        providerResponseReceived: true,
+        httpStatus: 200,
+        errorStatus: null,
+        repaired: false,
+        requestCount: 1,
+        elapsedMs: 1_234,
+      }),
+    }
+    const start = startConversation(basicInfo)
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "아이는 영어가 초급이지만 저는 영어로 소통할 수 있어요.",
+      quickReplyKey: null,
+      provider,
+    })
+
+    expect(response.updatedState.facts.childEnglishLevel?.value).toBe("beginner")
+    expect(response.updatedState.facts.parentEnglishCommunication?.value).toBe("possible")
+    expect(response.updatedState.facts.koreanSupportNeed).toBeUndefined()
+    expect(response.diagnostics).toEqual({
+      providerCallAttempted: true,
+      providerResponseReceived: true,
+      providerResponseValidated: true,
+      aiUsed: true,
+      fallbackReason: null,
+      providerHttpStatus: 200,
+      providerErrorStatus: null,
+      providerRequestCount: 1,
+      elapsedMs: 1_234,
+    })
+  })
+
+  it("preserves deterministic fallback while exposing a timeout classification", async () => {
+    const provider: CampfitV3LLMProvider = {
+      analyzeConversation: async () => null,
+      generateConsultingResponse: async () => null,
+      explainRecommendation: async () => null,
+      getLastDiagnostic: () => ({
+        code: "timeout",
+        providerResponseReceived: false,
+        httpStatus: null,
+        errorStatus: null,
+        repaired: false,
+        requestCount: 1,
+        elapsedMs: 25_001,
+      }),
+    }
+    const start = startConversation(basicInfo)
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "아이 영어는 초급이에요",
+      quickReplyKey: null,
+      provider,
+    })
+
+    expect(response.updatedState.facts.childEnglishLevel?.value).toBe("beginner")
+    expect(response.aiUsed).toBe(false)
+    expect(response.diagnostics).toMatchObject({
+      providerCallAttempted: true,
+      providerResponseReceived: false,
+      providerResponseValidated: false,
+      aiUsed: false,
+      fallbackReason: "timeout",
+      providerHttpStatus: null,
+      providerErrorStatus: null,
+      providerRequestCount: 1,
+      elapsedMs: 25_001,
+    })
   })
 
   it("re-asks the current question without moving progress when free text cannot update its slot", async () => {

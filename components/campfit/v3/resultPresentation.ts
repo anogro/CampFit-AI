@@ -83,6 +83,16 @@ export function programCatalogPresentation(
       unavailableGuidance: null,
     }
   }
+  if (source === "demo") {
+    return {
+      sectionTitle: "시연용 예시 프로그램",
+      sectionSubtitle: "가상의 카탈로그로 추천 흐름과 비교 기준을 확인해보세요.",
+      notice: "시연용 예시입니다. 실제 운영·예약·가격 정보가 아니며 업체로 연결되지 않습니다.",
+      showProgramCards: true,
+      unavailableTitle: null,
+      unavailableGuidance: null,
+    }
+  }
   return {
     sectionTitle: "프로그램 정보 확인",
     sectionSubtitle: "프로그램 데이터 연결 상태를 다시 확인해주세요.",

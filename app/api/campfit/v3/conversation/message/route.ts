@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   try {
     const response = await processConversationMessage({
       ...parsed.data,
-      provider: new GeminiCampfitV3Provider(),
+      provider: new GeminiCampfitV3Provider(geminiProviderOptions()),
     })
     const validated = CampfitV3ConversationResponseSchema.parse(response)
     return NextResponse.json(toPublicConversationResponse(validated))
@@ -26,6 +26,12 @@ export async function POST(request: Request) {
       { status: 500 },
     )
   }
+}
+
+function geminiProviderOptions(): { readonly maxProviderRequests: 1 | 2 } {
+  const evaluationSingleRequest = process.env["NODE_ENV"] !== "production"
+    && process.env["CAMPFIT_V3_GEMINI_EVALUATION_SINGLE_REQUEST"] === "true"
+  return { maxProviderRequests: evaluationSingleRequest ? 1 : 2 }
 }
 
 function toPublicConversationResponse(
@@ -39,9 +45,14 @@ function toPublicConversationResponse(
     ...publicResponse,
     diagnostics: {
       providerCallAttempted: diagnostics.providerCallAttempted,
+      providerResponseReceived: diagnostics.providerResponseReceived,
       providerResponseValidated: diagnostics.providerResponseValidated,
       aiUsed: diagnostics.aiUsed,
       fallbackReason: diagnostics.fallbackReason,
+      providerHttpStatus: diagnostics.providerHttpStatus,
+      providerErrorStatus: diagnostics.providerErrorStatus,
+      providerRequestCount: diagnostics.providerRequestCount,
+      elapsedMs: diagnostics.elapsedMs,
     },
   }
 }

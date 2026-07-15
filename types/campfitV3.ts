@@ -16,6 +16,10 @@ export const campfitV3FactKeys = [
   "isFirstOverseasEducationExperience",
   "dayProgramSeparationReadiness",
   "preferredActivities",
+  "destinationPreference",
+  "socialPreference",
+  "desiredOutcomes",
+  "worries",
   "experienceGoals",
   "preferredRegions",
   "regionImportance",
@@ -27,10 +31,14 @@ export const campfitV3FactKeys = [
   "specialCareFollowUp",
   "studyOnlyAvoidance",
   "budgetRangeKrw",
+  "budgetIncludesFlight",
   "departureWindow",
   "durationWeeks",
 ] as const
 export type CampfitV3FactKey = (typeof campfitV3FactKeys)[number]
+
+export const campfitV3FactStatuses = ["known", "unknown", "tentative", "confirmed"] as const
+export type CampfitV3FactStatus = (typeof campfitV3FactStatuses)[number]
 
 export type CampfitV3Fact = {
   readonly key: CampfitV3FactKey
@@ -38,6 +46,8 @@ export type CampfitV3Fact = {
   readonly value: unknown
   readonly source: CampfitV3FactSource
   readonly confidence: number
+  /** Runtime-created facts always include this; optional keeps old session fixtures readable. */
+  readonly status?: CampfitV3FactStatus
   readonly evidence: string
   readonly updatedAt: string
 }
@@ -82,19 +92,33 @@ export type CampfitV3QuickReply = {
 }
 
 export type CampfitV3FallbackReason =
-  | "provider_unavailable"
-  | "request_failed"
+  | "timeout"
+  | "network_error"
+  | "invalid_request"
+  | "permission_denied"
+  | "model_not_found"
   | "rate_limited"
+  | "provider_cancelled"
+  | "provider_internal"
+  | "provider_unavailable"
+  | "empty_response"
+  | "json_parse_failed"
   | "schema_validation_failed"
-  | "repair_failed"
+  | "semantic_validation_failed"
+  | "unknown_provider_error"
   | "target_slot_not_updated"
   | null
 
 export type CampfitV3AiDiagnostics = {
   readonly providerCallAttempted: boolean
+  readonly providerResponseReceived: boolean
   readonly providerResponseValidated: boolean
   readonly aiUsed: boolean
   readonly fallbackReason: CampfitV3FallbackReason
+  readonly providerHttpStatus: number | null
+  readonly providerErrorStatus: string | null
+  readonly providerRequestCount: number
+  readonly elapsedMs: number
 }
 
 export type CampfitV3ConversationResponse = {
@@ -169,5 +193,5 @@ export type CampfitV3RecommendationResult = {
   readonly verificationChecklist: readonly string[]
   readonly alternatives: readonly string[]
   readonly limitedResult: boolean
-  readonly catalogSource: "supabase" | "static_fallback" | "unavailable"
+  readonly catalogSource: "supabase" | "static_fallback" | "demo" | "unavailable"
 }

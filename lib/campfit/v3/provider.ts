@@ -11,15 +11,26 @@ export type CampfitV3ModelResponse = z.infer<typeof CampfitV3ModelResponseSchema
 
 export type CampfitV3ProviderDiagnosticCode =
   | "ok"
-  | "not_configured"
-  | "quota_limited"
-  | "http_error"
+  | "timeout"
   | "network_error"
-  | "schema_invalid"
+  | "invalid_request"
+  | "permission_denied"
+  | "model_not_found"
+  | "rate_limited"
+  | "provider_cancelled"
+  | "provider_internal"
+  | "provider_unavailable"
+  | "empty_response"
+  | "json_parse_failed"
+  | "schema_validation_failed"
+  | "semantic_validation_failed"
+  | "unknown_provider_error"
 
 export type CampfitV3ProviderDiagnostic = {
   readonly code: CampfitV3ProviderDiagnosticCode
+  readonly providerResponseReceived: boolean
   readonly httpStatus: number | null
+  readonly errorStatus: string | null
   readonly repaired: boolean
   readonly requestCount: number
   readonly elapsedMs: number

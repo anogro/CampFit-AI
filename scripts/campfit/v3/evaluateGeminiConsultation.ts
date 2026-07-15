@@ -2,6 +2,12 @@ import { loadEnvConfig } from "@next/env"
 import { processConversationMessage, startConversation } from "@/lib/campfit/v3/conversationService"
 import { GeminiCampfitV3ProviderCore } from "@/lib/campfit/v3/geminiProviderCore"
 import type { CampfitV3ModelResponse, CampfitV3ProviderDiagnostic } from "@/lib/campfit/v3/provider"
+import {
+  buildGeminiObservabilityResult,
+  hasExactSubjectSeparationArguments,
+  isGeminiObservabilityGatePassed,
+  runSubjectSeparationObservation,
+} from "@/scripts/campfit/v3/geminiObservability"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationResponse,
@@ -99,81 +105,106 @@ const cases: readonly EvaluationCase[] = [
   },
 ]
 
-const provider = new GeminiCampfitV3ProviderCore()
-const caseResults: unknown[] = []
 type EvaluationStopReason = "rate_limited" | "provider_failed"
-let stoppedReason: EvaluationStopReason | null = null
-let isolatedCasesPass = true
 
-for (let index = 0; index < cases.length; index += 1) {
-  const evaluationCase = cases[index]!
-  const basicInfo = evaluationCase.basicInfo ?? baseBasicInfo
-  const start = startConversation(basicInfo)
-  const currentState = stateForQuestion(start.updatedState, evaluationCase.currentQuestionKey)
-  const started = Date.now()
-  const response = await processConversationMessage({
-    transcript: [],
-    currentState,
-    basicInfo,
-    userMessage: evaluationCase.message,
-    quickReplyKey: null,
-    provider,
-  })
-  const providerDiagnostic = provider.getLastDiagnostic()
-  const providerResponse = provider.getLastValidatedResponse()
-  const assertions = {
-    ...evaluationCase.assertModel(providerResponse),
-    ...(evaluationCase.assertOrchestration?.(response) ?? {}),
-    actualGeminiResponseValidated: response.aiUsed
-      && response.diagnostics?.providerResponseValidated === true
-      && providerDiagnostic?.code === "ok"
-      && providerResponse !== null,
+if (process.env["VITEST"] !== "true") await main()
+
+async function main(): Promise<void> {
+  if (!hasExactSubjectSeparationArguments(process.argv.slice(2))) {
+    const result = buildGeminiObservabilityResult({
+      response: null,
+      providerModel: null,
+      externalHttpStatus: null,
+      totalElapsedMs: 0,
+      invalidArguments: true,
+    })
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+    process.exitCode = 1
+    return
   }
-  const pass = Object.values(assertions).every(Boolean)
-  isolatedCasesPass = isolatedCasesPass && pass
-  caseResults.push({
-    name: evaluationCase.name,
-    elapsedMs: Date.now() - started,
-    diagnostics: response.diagnostics ?? null,
-    providerDiagnostic: publicDiagnostic(providerDiagnostic),
-    providerFacts: selectedModelFacts(providerResponse, evaluationCase.selectedKeys),
-    mergedStateFacts: selectedFacts(response, evaluationCase.selectedKeys),
-    assertions,
-    pass,
-  })
-  if (isRateLimited(response, providerDiagnostic)) {
-    stoppedReason = "rate_limited"
-    break
-  }
-  if (!assertions.actualGeminiResponseValidated) {
-    stoppedReason = "provider_failed"
-    break
-  }
-  if (index < cases.length - 1) await delay(3_000)
+
+  const provider = new GeminiCampfitV3ProviderCore({ maxProviderRequests: 1 })
+  const result = await runSubjectSeparationObservation(provider)
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
+  process.exitCode = isGeminiObservabilityGatePassed(result) ? 0 : 1
 }
 
-let sessionResult: unknown = null
-let singleSessionPass = false
-if (stoppedReason === null) {
-  const session = await evaluateSingleSession(provider)
-  sessionResult = session.result
-  singleSessionPass = session.pass
-  if (session.stoppedReason !== null) stoppedReason = session.stoppedReason
+async function runFullEvaluation(): Promise<void> {
+  const provider = new GeminiCampfitV3ProviderCore()
+  const caseResults: unknown[] = []
+  let stoppedReason: EvaluationStopReason | null = null
+  let isolatedCasesPass = true
+
+  for (let index = 0; index < cases.length; index += 1) {
+    const evaluationCase = cases[index]!
+    const basicInfo = evaluationCase.basicInfo ?? baseBasicInfo
+    const start = startConversation(basicInfo)
+    const currentState = stateForQuestion(start.updatedState, evaluationCase.currentQuestionKey)
+    const started = Date.now()
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState,
+      basicInfo,
+      userMessage: evaluationCase.message,
+      quickReplyKey: null,
+      provider,
+    })
+    const providerDiagnostic = provider.getLastDiagnostic()
+    const providerResponse = provider.getLastValidatedResponse()
+    const assertions = {
+      ...evaluationCase.assertModel(providerResponse),
+      ...(evaluationCase.assertOrchestration?.(response) ?? {}),
+      actualGeminiResponseValidated: response.aiUsed
+        && response.diagnostics?.providerResponseValidated === true
+        && providerDiagnostic?.code === "ok"
+        && providerResponse !== null,
+    }
+    const pass = Object.values(assertions).every(Boolean)
+    isolatedCasesPass = isolatedCasesPass && pass
+    caseResults.push({
+      name: evaluationCase.name,
+      elapsedMs: Date.now() - started,
+      diagnostics: response.diagnostics ?? null,
+      providerDiagnostic: publicDiagnostic(providerDiagnostic),
+      providerFacts: selectedModelFacts(providerResponse, evaluationCase.selectedKeys),
+      mergedStateFacts: selectedFacts(response, evaluationCase.selectedKeys),
+      assertions,
+      pass,
+    })
+    if (isRateLimited(response, providerDiagnostic)) {
+      stoppedReason = "rate_limited"
+      break
+    }
+    if (!assertions.actualGeminiResponseValidated) {
+      stoppedReason = "provider_failed"
+      break
+    }
+    if (index < cases.length - 1) await delay(3_000)
+  }
+
+  let sessionResult: unknown = null
+  let singleSessionPass = false
+  if (stoppedReason === null) {
+    const session = await evaluateSingleSession(provider)
+    sessionResult = session.result
+    singleSessionPass = session.pass
+    if (session.stoppedReason !== null) stoppedReason = session.stoppedReason
+  }
+
+  process.stdout.write(`${JSON.stringify({
+    executedCases: caseResults.length,
+    plannedCases: cases.length,
+    stoppedReason,
+    cases: caseResults,
+    singleSession: sessionResult,
+  }, null, 2)}\n`)
+
+  process.exitCode = stoppedReason === "rate_limited"
+    ? 2
+    : isolatedCasesPass && caseResults.length === cases.length && singleSessionPass
+      ? 0
+      : 1
 }
-
-console.log(JSON.stringify({
-  executedCases: caseResults.length,
-  plannedCases: cases.length,
-  stoppedReason,
-  cases: caseResults,
-  singleSession: sessionResult,
-}, null, 2))
-
-process.exitCode = stoppedReason === "rate_limited"
-  ? 2
-  : isolatedCasesPass && caseResults.length === cases.length && singleSessionPass
-    ? 0
-    : 1
 
 async function evaluateSingleSession(providerInstance: GeminiCampfitV3ProviderCore): Promise<{
   readonly result: unknown
@@ -379,7 +410,9 @@ function publicDiagnostic(diagnostic: CampfitV3ProviderDiagnostic | null) {
   if (diagnostic === null) return null
   return {
     code: diagnostic.code,
+    providerResponseReceived: diagnostic.providerResponseReceived,
     httpStatus: diagnostic.httpStatus,
+    errorStatus: diagnostic.errorStatus,
     repaired: diagnostic.repaired,
     requestCount: diagnostic.requestCount,
     elapsedMs: diagnostic.elapsedMs,
@@ -387,7 +420,7 @@ function publicDiagnostic(diagnostic: CampfitV3ProviderDiagnostic | null) {
 }
 
 function isRateLimited(response: CampfitV3ConversationResponse, diagnostic: CampfitV3ProviderDiagnostic | null): boolean {
-  return response.diagnostics?.fallbackReason === "rate_limited" || diagnostic?.code === "quota_limited"
+  return response.diagnostics?.fallbackReason === "rate_limited" || diagnostic?.code === "rate_limited"
 }
 
 function delay(ms: number): Promise<void> {

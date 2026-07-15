@@ -91,9 +91,10 @@ export function CampFitV3Result({
         </Section>
 
         <Section title="추천 도시" subtitle="서로 다른 역할의 도시를 비교해 선택 폭을 보여드려요.">
+          {result.catalogSource === "demo" ? <p className="mb-4 inline-flex rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-primary)]">시연용 도시 예시</p> : null}
           {result.destinationRecommendations.length ? (
             <div className="grid gap-4 md:grid-cols-3">
-              {result.destinationRecommendations.map((city) => <CityCard city={city} key={city.cityId} />)}
+              {result.destinationRecommendations.map((city) => <CityCard city={city} demo={result.catalogSource === "demo"} key={city.cityId} />)}
             </div>
           ) : (
             <Empty text="현재 조건에서 근거를 확인할 수 있는 도시가 없습니다." />
@@ -113,7 +114,7 @@ export function CampFitV3Result({
             </div>
           ) : result.programCandidates.length ? (
             <div className="grid gap-4 lg:grid-cols-3">
-              {result.programCandidates.map((program) => <ProgramCard program={program} key={program.programId} />)}
+              {result.programCandidates.map((program) => <ProgramCard program={program} demo={result.catalogSource === "demo"} key={program.programId} />)}
             </div>
           ) : (
             <Empty text="연령·기간·부모동반 조건을 모두 확인할 수 있는 프로그램 후보가 아직 없습니다." />
@@ -159,8 +160,8 @@ function Section({ title, subtitle, children }: { readonly title: string; readon
   )
 }
 
-function CityCard({ city }: { readonly city: CampfitV3DestinationRecommendation }) {
-  const href = buildAnogroCityHref(city.cityName)
+function CityCard({ city, demo }: { readonly city: CampfitV3DestinationRecommendation; readonly demo: boolean }) {
+  const href = demo ? null : buildAnogroCityHref(city.cityName)
   const card = <CityCardContent city={city} linked={href !== null} />
 
   if (!href) {
@@ -191,6 +192,7 @@ function CityCardContent({ city, linked }: { readonly city: CampfitV3Destination
       <div className="p-5">
         <p className="text-xs font-bold text-[var(--accent-primary)]">{city.role}</p>
         <h3 className="mt-1 text-xl font-black">{city.cityName}</h3>
+        {!linked ? <span className="mt-2 inline-flex rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent-primary)]">시연용 예시</span> : null}
         <p className="text-sm text-[var(--text-secondary)]">{city.countryName}</p>
         <p className="mt-3 text-sm leading-6 [word-break:keep-all]">{city.reason}</p>
         <div className="mt-4 rounded-xl bg-white p-3">
@@ -206,8 +208,8 @@ function CityCardContent({ city, linked }: { readonly city: CampfitV3Destination
   )
 }
 
-function ProgramCard({ program }: { readonly program: CampfitV3ProgramCandidate }) {
-  const href = safeProgramDetailHref(program.detailUrl)
+function ProgramCard({ program, demo }: { readonly program: CampfitV3ProgramCandidate; readonly demo: boolean }) {
+  const href = demo ? null : safeProgramDetailHref(program.detailUrl)
   const card = <ProgramCardContent program={program} linked={href !== null} />
 
   if (!href) {
@@ -235,6 +237,7 @@ function ProgramCardContent({ program, linked }: { readonly program: CampfitV3Pr
       )}
       <div className="flex flex-1 flex-col p-5">
         <span className="self-start rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[11px] font-bold text-[var(--accent-primary)]">{program.group}</span>
+        {!linked ? <span className="mt-2 self-start rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent-primary)]">시연용 예시</span> : null}
         <h3 className="mt-3 text-lg font-black leading-6 [word-break:keep-all]">{program.name}</h3>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">{program.cityName}, {program.countryName}</p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-[var(--text-secondary)]">

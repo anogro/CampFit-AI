@@ -28,6 +28,47 @@ export type V3PriceOption = {
   readonly status: string | null
 }
 
+export type V3DemoLevel = "low" | "medium" | "high"
+
+export type V3DemoProgramProfile = {
+  readonly dataSource: "synthetic_demo"
+  readonly isBookable: false
+  readonly verificationStatus: "synthetic_demo"
+  readonly primaryDirection: string
+  readonly secondaryDirections: readonly string[]
+  readonly availableSeasons: readonly string[]
+  readonly availableDurationsWeeks: readonly number[]
+  readonly childExperienceSignals: readonly string[]
+  readonly childFitProfile: Readonly<Record<string, V3DemoLevel>>
+  readonly parentCompatibilitySignals: readonly string[]
+  readonly supportProfile: Readonly<Record<string, string>>
+  readonly idealFor: readonly string[]
+  readonly notIdealFor: readonly string[]
+  readonly whyItFits: readonly string[]
+  readonly verificationChecklist: readonly string[]
+  readonly priceConfidence: string
+  readonly priceNotes: string
+  readonly displayBadge: string
+}
+
+export type V3DemoCityProfile = {
+  readonly dataSource: "synthetic_demo_profile"
+  readonly isSyntheticProfile: true
+  readonly cityArchetype: readonly string[]
+  readonly experienceStrengths: Readonly<Record<string, V3DemoLevel>>
+  readonly parentStayProfile: Readonly<Record<string, V3DemoLevel>>
+  readonly childStayProfile: Readonly<Record<string, V3DemoLevel>>
+  readonly mobilityProfile: Readonly<Record<string, string | boolean>>
+  readonly costProfile: Readonly<Record<string, string>>
+  readonly environmentProfile: Readonly<Record<string, V3DemoLevel>>
+  readonly supportEnvironment: Readonly<Record<string, V3DemoLevel>>
+  readonly citySignals: readonly string[]
+  readonly idealFor: readonly string[]
+  readonly notIdealFor: readonly string[]
+  readonly verificationChecklist: readonly string[]
+  readonly displayBadge: string
+}
+
 export type V3CatalogProgram = {
   readonly id: string
   readonly slug: string | null
@@ -63,6 +104,7 @@ export type V3CatalogProgram = {
   readonly status: "active"
   readonly catalogSource: Exclude<V3CatalogSource, "unavailable">
   readonly updatedAt: string | null
+  readonly demoProfile?: V3DemoProgramProfile
 }
 
 export type V3CatalogCity = {
@@ -78,6 +120,7 @@ export type V3CatalogCity = {
   readonly livingCostMonthlyKrw: number | null
   readonly housingCostMonthlyKrw: number | null
   readonly catalogSource: Exclude<V3CatalogSource, "unavailable">
+  readonly demoProfile?: V3DemoCityProfile
 }
 
 export type V3Catalog = {

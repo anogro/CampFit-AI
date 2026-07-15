@@ -12,90 +12,6 @@ import type {
 
 const defaultModel = "gemini-2.5-flash"
 const requestTimeoutMs = 25_000
-const factKeys = [
-  "childEnglishLevel",
-  "parentEnglishCommunication",
-  "isFirstOverseasEducationExperience",
-  "dayProgramSeparationReadiness",
-  "preferredActivities",
-  "experienceGoals",
-  "preferredRegions",
-  "regionImportance",
-  "koreanSupportNeed",
-  "parentCommunicationNeed",
-  "beginnerSupportNeed",
-  "initialAdaptationSupportNeed",
-  "parentStayGoals",
-  "specialCareFollowUp",
-  "studyOnlyAvoidance",
-  "budgetRangeKrw",
-  "departureWindow",
-  "durationWeeks",
-] as const
-const factSubjects = ["child", "parent", "preference", "constraint"] as const
-const factSources = ["explicit_user_statement", "ai_inference"] as const
-const goalStrengths = ["primary", "secondary", "mentioned", "none"] as const
-const factResponseContracts: Readonly<Record<(typeof factKeys)[number], {
-  readonly subject: (typeof factSubjects)[number]
-  readonly value: Readonly<Record<string, unknown>>
-}>> = {
-  childEnglishLevel: { subject: "child", value: { type: "string", enum: ["beginner", "basic", "intermediate", "advanced"] } },
-  parentEnglishCommunication: { subject: "parent", value: { type: "string", enum: ["possible", "limited", "not_possible"] } },
-  isFirstOverseasEducationExperience: { subject: "child", value: { type: "boolean" } },
-  dayProgramSeparationReadiness: { subject: "child", value: { type: "string", enum: ["needs_close_support", "with_initial_support", "ready"] } },
-  preferredActivities: { subject: "preference", value: { type: "array", maxItems: 12, items: { type: "string" } } },
-  experienceGoals: {
-    subject: "preference",
-    value: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        schoolSchooling: { type: "string", enum: [...goalStrengths] },
-        englishIntensive: { type: "string", enum: [...goalStrengths] },
-        subjectProject: { type: "string", enum: [...goalStrengths] },
-        cultureActivity: { type: "string", enum: [...goalStrengths] },
-      },
-      required: ["schoolSchooling", "englishIntensive", "subjectProject", "cultureActivity"],
-    },
-  },
-  preferredRegions: {
-    subject: "preference",
-    value: {
-      type: "array",
-      maxItems: 4,
-      items: { type: "string", enum: ["southeast_asia", "oceania", "north_america", "europe"] },
-    },
-  },
-  regionImportance: { subject: "preference", value: { type: "string", enum: ["must", "strong", "soft", "no_preference"] } },
-  koreanSupportNeed: { subject: "constraint", value: { type: "string", enum: ["must_daily", "emergency_only", "preferred", "none"] } },
-  parentCommunicationNeed: { subject: "constraint", value: { type: "string", enum: ["daily", "issue_only", "occasional", "not_important"] } },
-  beginnerSupportNeed: { subject: "constraint", value: { type: "boolean" } },
-  initialAdaptationSupportNeed: { subject: "constraint", value: { type: "boolean" } },
-  parentStayGoals: {
-    subject: "parent",
-    value: {
-      type: "array",
-      maxItems: 6,
-      items: { type: "string", enum: ["restWellness", "cafeDining", "tourismCulture", "natureBeach", "remoteWork", "childScheduleFirst"] },
-    },
-  },
-  specialCareFollowUp: { subject: "constraint", value: { type: "string", enum: ["none", "required", "unknown"] } },
-  studyOnlyAvoidance: { subject: "preference", value: { type: "boolean" } },
-  budgetRangeKrw: {
-    subject: "constraint",
-    value: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        min: { type: "integer", minimum: 0 },
-        max: { type: "integer", minimum: 1 },
-      },
-      required: ["min", "max"],
-    },
-  },
-  departureWindow: { subject: "constraint", value: { type: "string" } },
-  durationWeeks: { subject: "constraint", value: { type: "integer", minimum: 1, maximum: 4 } },
-}
 
 const GeminiResponseSchema = z.object({
   candidates: z.array(z.object({
@@ -105,8 +21,19 @@ const GeminiResponseSchema = z.object({
 
 type GeminiRequestResult = {
   readonly text: string | null
-  readonly code: Exclude<CampfitV3ProviderDiagnosticCode, "schema_invalid">
+  readonly code: Exclude<CampfitV3ProviderDiagnosticCode, "schema_validation_failed" | "semantic_validation_failed">
+  readonly requestMade: boolean
+  readonly providerResponseReceived: boolean
   readonly httpStatus: number | null
+  readonly errorStatus: string | null
+}
+
+type StructuredParseResult =
+  | { readonly model: CampfitV3ModelResponse; readonly error: null }
+  | { readonly model: null; readonly error: "json_parse_failed" | "schema_validation_failed" | "semantic_validation_failed" }
+
+export type GeminiProviderOptions = {
+  readonly maxProviderRequests?: 1 | 2
 }
 
 /**
@@ -116,6 +43,11 @@ type GeminiRequestResult = {
 export class GeminiCampfitV3ProviderCore implements CampfitV3LLMProvider {
   private diagnostic: CampfitV3ProviderDiagnostic | null = null
   private validatedResponse: CampfitV3ModelResponse | null = null
+  private readonly maxProviderRequests: 1 | 2
+
+  constructor(options: GeminiProviderOptions = {}) {
+    this.maxProviderRequests = options.maxProviderRequests ?? 2
+  }
 
   getLastDiagnostic(): CampfitV3ProviderDiagnostic | null {
     return this.diagnostic
@@ -143,195 +75,250 @@ export class GeminiCampfitV3ProviderCore implements CampfitV3LLMProvider {
       JSON.stringify({ basicInfo: input.basicInfo, facts: input.state.facts, result: input.deterministicResult }),
     ].join("\n")
     const started = Date.now()
-    const result = await requestGeminiOnce(prompt, conclusionResponseSchema)
-    this.diagnostic = diagnosticFromRequest(result, false, result.code === "not_configured" ? 0 : 1, Date.now() - started)
+    const result = await requestGeminiOnce(prompt)
+    this.diagnostic = diagnosticFromRequest(result, false, result.requestMade ? 1 : 0, Date.now() - started)
     if (result.text === null) return null
     const parsed = parseGeminiJson(result.text)
-    if (typeof parsed === "object" && parsed !== null && "conclusion" in parsed && typeof parsed.conclusion === "string") {
-      this.diagnostic = { code: "ok", httpStatus: result.httpStatus, repaired: false, requestCount: 1, elapsedMs: Date.now() - started }
-      return parsed.conclusion.slice(0, 500)
+    if (parsed.success
+      && typeof parsed.value === "object"
+      && parsed.value !== null
+      && "conclusion" in parsed.value
+      && typeof parsed.value.conclusion === "string") {
+      this.diagnostic = successfulDiagnostic(result, false, 1, Date.now() - started)
+      return parsed.value.conclusion.slice(0, 500)
     }
-    this.diagnostic = { code: "schema_invalid", httpStatus: result.httpStatus, repaired: false, requestCount: 1, elapsedMs: Date.now() - started }
+    this.diagnostic = {
+      ...diagnosticFromRequest(result, false, 1, Date.now() - started),
+      code: parsed.success ? "schema_validation_failed" : "json_parse_failed",
+    }
     return null
   }
 
   private async requestStructured(prompt: string, allowedQuestionKeys: readonly string[]): Promise<CampfitV3ModelResponse | null> {
     this.validatedResponse = null
     const started = Date.now()
-    const responseJsonSchema = conversationResponseJsonSchema(allowedQuestionKeys)
-    const first = await requestGeminiOnce(prompt, responseJsonSchema)
-    const firstCount = first.code === "not_configured" ? 0 : 1
+    const first = await requestGeminiOnce(prompt)
+    const firstCount = first.requestMade ? 1 : 0
     if (first.text === null) {
       this.diagnostic = diagnosticFromRequest(first, false, firstCount, Date.now() - started)
       return null
     }
 
-    const parsed = parseStructured(first.text, allowedQuestionKeys)
-    if (parsed !== null) {
-      this.validatedResponse = parsed
-      this.diagnostic = { code: "ok", httpStatus: first.httpStatus, repaired: false, requestCount: 1, elapsedMs: Date.now() - started }
-      return parsed
+    const parsed = parseGeminiStructuredResponse(first.text, allowedQuestionKeys)
+    if (parsed.model !== null) {
+      this.validatedResponse = parsed.model
+      this.diagnostic = successfulDiagnostic(first, false, 1, Date.now() - started)
+      return parsed.model
+    }
+
+    if (this.maxProviderRequests === 1) {
+      this.diagnostic = {
+        ...diagnosticFromRequest(first, false, 1, Date.now() - started),
+        code: parsed.error,
+      }
+      return null
     }
 
     const repair = await requestGeminiOnce([
       prompt,
       "이전 응답은 JSON 또는 fact 의미 계약을 충족하지 못했습니다.",
       "위 계약을 다시 확인하고 설명이나 markdown 없이 올바른 JSON 객체만 한 번 다시 반환하세요.",
-    ].join("\n"), responseJsonSchema)
+    ].join("\n"))
     if (repair.text === null) {
       this.diagnostic = diagnosticFromRequest(repair, true, 2, Date.now() - started)
       return null
     }
-    const repaired = parseStructured(repair.text, allowedQuestionKeys)
-    this.validatedResponse = repaired
-    this.diagnostic = repaired === null
-      ? { code: "schema_invalid", httpStatus: repair.httpStatus, repaired: true, requestCount: 2, elapsedMs: Date.now() - started }
-      : { code: "ok", httpStatus: repair.httpStatus, repaired: true, requestCount: 2, elapsedMs: Date.now() - started }
-    return repaired
+    const repaired = parseGeminiStructuredResponse(repair.text, allowedQuestionKeys)
+    this.validatedResponse = repaired.model
+    this.diagnostic = repaired.model === null
+      ? { ...diagnosticFromRequest(repair, true, 2, Date.now() - started), code: repaired.error }
+      : successfulDiagnostic(repair, true, 2, Date.now() - started)
+    return repaired.model
   }
 }
 
-function parseStructured(text: string, allowedQuestionKeys: readonly string[]): CampfitV3ModelResponse | null {
-  const parsed = CampfitV3ModelResponseSchema.safeParse(parseGeminiJson(text))
-  if (!parsed.success) return null
-  if (new Set(parsed.data.facts.map((fact) => fact.key)).size !== parsed.data.facts.length) return null
+export function parseGeminiStructuredResponse(text: string, allowedQuestionKeys: readonly string[]): StructuredParseResult {
+  const result = parseGeminiJson(text)
+  if (!result.success) return { model: null, error: "json_parse_failed" }
+  const json = normalizeSuggestedNextQuestion(result.value)
+  const parsed = CampfitV3ModelResponseSchema.safeParse(json)
+  if (!parsed.success) return { model: null, error: "schema_validation_failed" }
+  if (new Set(parsed.data.facts.map((fact) => fact.key)).size !== parsed.data.facts.length) {
+    return { model: null, error: "semantic_validation_failed" }
+  }
   if (parsed.data.suggestedNextQuestionKey !== null
-    && !allowedQuestionKeys.includes(parsed.data.suggestedNextQuestionKey)) return null
-  if (!parsed.data.facts.every(isSemanticallyValidModelFact)) return null
-  return parsed.data
+    && !allowedQuestionKeys.includes(parsed.data.suggestedNextQuestionKey)) {
+    return { model: null, error: "semantic_validation_failed" }
+  }
+  if (!isSafeUserFacingMessage(parsed.data.assistantMessage)
+    || parsed.data.assistantMessage.split(/[?？]/u).length - 1 > 1
+    || parsed.data.facts.some((fact) => containsDetailedHealthDisclosure(fact.evidence))
+    || parsed.data.facts.some((fact) => fact.source === "explicit_user_statement" && fact.confidence < 0.85)) {
+    return { model: null, error: "semantic_validation_failed" }
+  }
+  if (!parsed.data.facts.every(isSemanticallyValidModelFact)) {
+    return { model: null, error: "semantic_validation_failed" }
+  }
+  return { model: parsed.data, error: null }
 }
 
-async function requestGeminiOnce(prompt: string, responseJsonSchema: Readonly<Record<string, unknown>>): Promise<GeminiRequestResult> {
+const internalCounselorTerms = [
+  "slot",
+  "target",
+  "schema",
+  "validation",
+  "confidence score",
+  "fallback",
+  "parser",
+  "state merge",
+  "조건으로 연결하지 못했어요",
+] as const
+
+function isSafeUserFacingMessage(message: string): boolean {
+  const normalized = message.toLocaleLowerCase()
+  return !internalCounselorTerms.some((term) => normalized.includes(term.toLocaleLowerCase()))
+    && !containsDetailedHealthDisclosure(message)
+}
+
+function containsDetailedHealthDisclosure(value: string): boolean {
+  return /(질환명|진단명|복용약|약\s*이름|약명|복용량|병력|알레르기\s*(항목|이름|명칭)|천식|당뇨|아토피|뇌전증|간질|ADHD|자폐|우울증|공황장애|갑상선|심장병|크론병|셀리악)/iu.test(value)
+}
+
+function normalizeSuggestedNextQuestion(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value
+  if (!("suggestedNextQuestionKey" in value) || typeof value.suggestedNextQuestionKey !== "string") return value
+  return value.suggestedNextQuestionKey.trim() === ""
+    ? { ...value, suggestedNextQuestionKey: null }
+    : value
+}
+
+async function requestGeminiOnce(prompt: string): Promise<GeminiRequestResult> {
   const apiKey = process.env["GEMINI_API_KEY"]
-  if (!apiKey) return { text: null, code: "not_configured", httpStatus: null }
+  if (!apiKey) {
+    return {
+      text: null,
+      code: "provider_unavailable",
+      requestMade: false,
+      providerResponseReceived: false,
+      httpStatus: null,
+      errorStatus: null,
+    }
+  }
 
   const model = process.env["GEMINI_MODEL"] ?? defaultModel
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), requestTimeoutMs)
+  let timedOut = false
+  const timeout = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, requestTimeoutMs)
   try {
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       signal: controller.signal,
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           responseMimeType: "application/json",
-          responseJsonSchema,
           temperature: 0,
           maxOutputTokens: 4_096,
         },
       }),
     })
     if (!response.ok) {
-      await response.arrayBuffer()
       return {
         text: null,
-        code: response.status === 429 ? "quota_limited" : "http_error",
+        code: providerCodeFromHttpStatus(response.status),
+        requestMade: true,
+        providerResponseReceived: true,
         httpStatus: response.status,
+        errorStatus: await readProviderErrorStatus(response),
       }
     }
-    const parsed = GeminiResponseSchema.safeParse(await response.json())
+    let responseBody: unknown
+    try {
+      responseBody = await response.json()
+    } catch (error) {
+      if (isAbortError(error)) throw error
+      return {
+        text: null,
+        code: "json_parse_failed",
+        requestMade: true,
+        providerResponseReceived: true,
+        httpStatus: response.status,
+        errorStatus: null,
+      }
+    }
+    const parsed = GeminiResponseSchema.safeParse(responseBody)
     const textParts = parsed.success
       ? parsed.data.candidates?.[0]?.content?.parts
         ?.flatMap((part) => part.text === undefined ? [] : [part.text]) ?? []
       : []
     const text = textParts.length === 0 ? null : textParts.join("")
     return text === null
-      ? { text: null, code: "http_error", httpStatus: response.status }
-      : { text, code: "ok", httpStatus: response.status }
-  } catch {
-    return { text: null, code: "network_error", httpStatus: null }
+      ? {
+        text: null,
+        code: "empty_response",
+        requestMade: true,
+        providerResponseReceived: true,
+        httpStatus: response.status,
+        errorStatus: null,
+      }
+      : {
+        text,
+        code: "ok",
+        requestMade: true,
+        providerResponseReceived: true,
+        httpStatus: response.status,
+        errorStatus: null,
+      }
+  } catch (error) {
+    return {
+      text: null,
+      code: isAbortError(error) ? (timedOut ? "timeout" : "provider_cancelled") : "network_error",
+      requestMade: true,
+      providerResponseReceived: false,
+      httpStatus: null,
+      errorStatus: null,
+    }
   } finally {
     clearTimeout(timeout)
   }
 }
 
-const conclusionResponseSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    conclusion: { type: "string", description: "한국어 상담 결론 2~3문장" },
-  },
-  required: ["conclusion"],
-} as const
+function providerCodeFromHttpStatus(status: number): Exclude<CampfitV3ProviderDiagnosticCode, "ok" | "schema_validation_failed" | "semantic_validation_failed"> {
+  if (status === 400 || status === 422) return "invalid_request"
+  if (status === 401 || status === 403) return "permission_denied"
+  if (status === 404) return "model_not_found"
+  if (status === 429) return "rate_limited"
+  if (status === 499) return "provider_cancelled"
+  if (status === 500) return "provider_internal"
+  if (status === 502 || status === 503 || status === 504) return "provider_unavailable"
+  return "unknown_provider_error"
+}
 
-function conversationResponseJsonSchema(allowedQuestionKeys: readonly string[]): Readonly<Record<string, unknown>> {
-  const suggestedNextQuestionKey = allowedQuestionKeys.length === 0
-    ? { type: "null" }
-    : {
-      anyOf: [
-        { type: "string", enum: [...allowedQuestionKeys] },
-        { type: "null" },
-      ],
-    }
-  return {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      assistantMessage: {
-        type: "string",
-        description: "다음 질문을 포함하지 않는 짧은 한국어 확인 문구",
-      },
-      facts: {
-        type: "array",
-        maxItems: 20,
-        description: "현재 사용자 발화에서 직접 확인되거나 낮은 confidence로 추론된 사실만 포함",
-        items: { anyOf: factKeys.map(factResponseVariant) },
-      },
-      unresolved: {
-        type: "array",
-        maxItems: 20,
-        items: { type: "string", enum: [...factKeys] },
-      },
-      conflicts: {
-        type: "array",
-        maxItems: 20,
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            key: { type: "string", enum: [...factKeys] },
-            reason: { type: "string", description: "민감 건강 상세정보를 포함하지 않는 짧은 충돌 사유" },
-          },
-          required: ["key", "reason"],
-        },
-      },
-      suggestedNextQuestionKey,
-      nextAction: { type: "string", enum: ["ask", "recommend"] },
-      readyForRecommendation: { type: "boolean" },
-    },
-    required: [
-      "assistantMessage",
-      "facts",
-      "unresolved",
-      "conflicts",
-      "suggestedNextQuestionKey",
-      "nextAction",
-      "readyForRecommendation",
-    ],
+async function readProviderErrorStatus(response: Response): Promise<string | null> {
+  try {
+    const body = await response.json() as unknown
+    if (typeof body !== "object" || body === null || !("error" in body)) return null
+    const error = body.error
+    if (typeof error !== "object" || error === null || !("status" in error)) return null
+    return typeof error.status === "string" && /^[A-Z][A-Z0-9_]{0,79}$/.test(error.status)
+      ? error.status
+      : null
+  } catch (error) {
+    if (isAbortError(error)) throw error
+    return null
   }
 }
 
-function factResponseVariant(key: (typeof factKeys)[number]): Readonly<Record<string, unknown>> {
-  const contract = factResponseContracts[key]
-  return {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      key: { type: "string", enum: [key] },
-      subject: { type: "string", enum: [contract.subject] },
-      value: contract.value,
-      source: { type: "string", enum: [...factSources] },
-      confidence: { type: "number", minimum: 0, maximum: 1 },
-      evidence: {
-        type: "string",
-        description: "민감 건강 상세정보를 포함하지 않는 240자 이하의 짧은 근거",
-      },
-    },
-    required: ["key", "subject", "value", "source", "confidence", "evidence"],
-  }
+function isAbortError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "name" in error && error.name === "AbortError"
 }
 
 function diagnosticFromRequest(
@@ -340,5 +327,30 @@ function diagnosticFromRequest(
   requestCount: number,
   elapsedMs: number,
 ): CampfitV3ProviderDiagnostic {
-  return { code: result.code, httpStatus: result.httpStatus, repaired, requestCount, elapsedMs }
+  return {
+    code: result.code,
+    providerResponseReceived: result.providerResponseReceived,
+    httpStatus: result.httpStatus,
+    errorStatus: result.errorStatus,
+    repaired,
+    requestCount,
+    elapsedMs,
+  }
+}
+
+function successfulDiagnostic(
+  result: GeminiRequestResult,
+  repaired: boolean,
+  requestCount: number,
+  elapsedMs: number,
+): CampfitV3ProviderDiagnostic {
+  return {
+    code: "ok",
+    providerResponseReceived: true,
+    httpStatus: result.httpStatus,
+    errorStatus: null,
+    repaired,
+    requestCount,
+    elapsedMs,
+  }
 }

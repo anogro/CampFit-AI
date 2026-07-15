@@ -1,6 +1,6 @@
 import type { ExperienceDirectionKey } from "@/types/campfitV3"
 
-export type V3CatalogSource = "supabase" | "static_fallback" | "unavailable"
+export type V3CatalogSource = "supabase" | "static_fallback" | "demo" | "unavailable"
 
 export type V3ParticipationMode =
   | "parent_required"

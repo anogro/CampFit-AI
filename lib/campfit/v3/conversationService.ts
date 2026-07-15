@@ -63,13 +63,15 @@ export async function processConversationMessage(input: {
   let providerDiagnostic: CampfitV3ProviderDiagnostic | null = null
   const warnings: string[] = []
   const sensitiveHealthDetail = containsSensitiveHealthDetail(input.userMessage)
-  const safeUserMessage = currentQuestion?.key === "special_care_follow_up" || sensitiveHealthDetail
+  const specialCareAnswer = currentQuestion?.key === "special_care_follow_up"
+    && isSpecialCareAnswer(input.userMessage)
+  const safeUserMessage = specialCareAnswer || sensitiveHealthDetail
     ? canonicalizeSpecialCareMessage(input.userMessage)
     : input.userMessage
   const safeTranscript = input.transcript.map((item) => item.role === "user" && (
-    item.questionKey === "special_care_follow_up"
+    (item.questionKey === "special_care_follow_up" && isSpecialCareAnswer(item.content))
     || containsSensitiveHealthDetail(item.content)
-    || (currentQuestion?.key === "special_care_follow_up" && item.content === input.userMessage)
+    || (currentQuestion?.key === "special_care_follow_up" && item.content === input.userMessage && isSpecialCareAnswer(item.content))
   )
     ? { ...item, content: canonicalizeSpecialCareMessage(item.content) }
     : item)
@@ -96,6 +98,7 @@ export async function processConversationMessage(input: {
     const deterministic = markChangedExplicitFactsAsCorrections(
       state,
       privacySafeFacts,
+      isCorrectionLanguage(input.userMessage),
     )
     state = mergeFacts(state, deterministic)
     model = await input.provider.analyzeConversation({
@@ -117,7 +120,7 @@ export async function processConversationMessage(input: {
 
   const updatedBasicInfo = applyBasicInfoFacts(input.basicInfo, state)
   const ready = isReadyForRecommendation(state)
-  const nextQuestion = ready ? null : selectNextQuestion(state)
+  const nextQuestion = ready ? null : selectNextQuestion(state, model?.suggestedNextQuestionKey ?? null)
   if (nextQuestion !== null) state = markQuestionAsked(state, nextQuestion.key)
   else state = { ...state, currentQuestionKey: null }
 
@@ -135,7 +138,7 @@ export async function processConversationMessage(input: {
   const assistantMessage = ready
     ? "필요한 내용을 모두 확인했어요. 지금 조건에 맞는 경험 방향과 도시, 프로그램 후보를 정리해볼게요."
     : currentQuestion !== null && !targetUpdated
-      ? `답변을 ${currentQuestion.title.replace(/[?？]$/, "")} 조건으로 연결하지 못했어요.\n\n${currentQuestion.title}`
+      ? `아직 ${currentQuestion.title.replace(/[?？]$/, "")} 내용을 확인하지 못했어요.\n\n${currentQuestion.title}`
       : `${acknowledgement(model)}\n\n${nextQuestion?.title ?? "확인이 필요한 조건을 다시 살펴보고 있어요."}`
 
   return {
@@ -249,27 +252,37 @@ function buildDiagnostics(
   if (quickReplyKey !== null) return noAiDiagnostics()
   const fallbackReason: CampfitV3FallbackReason = model !== null && !targetUpdated
     ? "target_slot_not_updated"
-    : provider?.code === "quota_limited"
-      ? "rate_limited"
-      : provider?.code === "schema_invalid" && provider.repaired
-        ? "repair_failed"
-        : provider?.code === "schema_invalid"
-          ? "schema_validation_failed"
-          : provider?.code === "network_error" || provider?.code === "http_error"
-            ? "request_failed"
-            : model === null
-              ? "provider_unavailable"
-              : null
+    : model === null
+      ? provider?.code === undefined || provider.code === "ok"
+        ? "provider_unavailable"
+        : provider.code
+      : null
+  const providerRequestCount = provider?.requestCount ?? 0
   return {
-    providerCallAttempted: true,
+    providerCallAttempted: providerRequestCount > 0,
+    providerResponseReceived: provider?.providerResponseReceived ?? false,
     providerResponseValidated: model !== null,
     aiUsed: model !== null,
     fallbackReason,
+    providerHttpStatus: provider?.httpStatus ?? null,
+    providerErrorStatus: provider?.errorStatus ?? null,
+    providerRequestCount,
+    elapsedMs: provider?.elapsedMs ?? 0,
   }
 }
 
 function noAiDiagnostics(): CampfitV3AiDiagnostics {
-  return { providerCallAttempted: false, providerResponseValidated: false, aiUsed: false, fallbackReason: null }
+  return {
+    providerCallAttempted: false,
+    providerResponseReceived: false,
+    providerResponseValidated: false,
+    aiUsed: false,
+    fallbackReason: null,
+    providerHttpStatus: null,
+    providerErrorStatus: null,
+    providerRequestCount: 0,
+    elapsedMs: 0,
+  }
 }
 
 function warningForDiagnostics(diagnostics: CampfitV3AiDiagnostics, targetUpdated: boolean): string | null {
@@ -278,10 +291,19 @@ function warningForDiagnostics(diagnostics: CampfitV3AiDiagnostics, targetUpdate
   }
   switch (diagnostics.fallbackReason) {
     case "provider_unavailable": return "AI 자유입력 분석을 사용할 수 없어 확인되지 않은 질문을 다시 표시합니다."
-    case "request_failed": return "AI 분석 요청이 완료되지 않아 같은 질문을 다시 확인합니다."
+    case "timeout": return "AI 응답 시간이 초과되어 입력 문장에서 확인 가능한 내용만 반영했습니다."
     case "rate_limited": return "AI 사용량 제한으로 답변을 분석하지 못해 같은 질문을 다시 확인합니다."
+    case "network_error":
+    case "invalid_request":
+    case "permission_denied":
+    case "model_not_found":
+    case "provider_cancelled":
+    case "provider_internal":
+    case "unknown_provider_error": return "AI 분석 요청이 완료되지 않아 입력 문장에서 확인 가능한 내용만 반영했습니다."
+    case "empty_response":
+    case "json_parse_failed":
     case "schema_validation_failed":
-    case "repair_failed": return "AI 응답 형식을 확인하지 못해 같은 질문을 다시 확인합니다."
+    case "semantic_validation_failed": return "AI 응답 형식을 확인하지 못해 입력 문장에서 확인 가능한 내용만 반영했습니다."
     case "target_slot_not_updated": return "답변에서 현재 질문의 조건을 확인하지 못했습니다."
     case null: return null
   }
@@ -294,7 +316,12 @@ function acknowledgement(model: CampfitV3ModelResponse | null): string {
 }
 
 function isCorrectionLanguage(message: string): boolean {
-  return /(아니라|아니고|바꿀|정정|수정|대신|이제는|잘못 말)/.test(message)
+  return /(아니라|아니고|바꿀|정정|수정|대신|이제는|잘못 말|아까|항공권 생각하면|다시 정리|정리할게)/.test(message)
+}
+
+function isSpecialCareAnswer(message: string): boolean {
+  return extractDeterministicFacts(message, undefined, "special_care_follow_up")
+    .some((fact) => fact.key === "specialCareFollowUp")
 }
 
 function isBudgetRange(value: unknown): value is { readonly min: number; readonly max: number } {
