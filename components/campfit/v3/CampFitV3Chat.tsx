@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { CampFitV3Frame } from "@/components/campfit/v3/CampFitV3Frame"
 import { V3Header } from "@/components/campfit/v3/CampFitV3Flow"
 import { isChatNearBottom, shouldSendChatMessage } from "@/components/campfit/v3/chatUi"
+import { TypingIndicator } from "@/components/campfit/v3/TypingIndicator"
 import type { CampfitV3BasicInfo, CampfitV3ConversationResponse, CampfitV3TranscriptMessage } from "@/types/campfitV3"
 
 type Props = {
@@ -33,7 +34,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
     })
 
     return () => window.cancelAnimationFrame(frame)
-  }, [transcript])
+  }, [sending, transcript])
 
   async function answer(content: string, quickReplyKey: string | null): Promise<void> {
     const trimmedContent = content.trim()
@@ -41,9 +42,10 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
 
     sendLockRef.current = true
     setSending(true)
+    setMessage("")
     try {
       const accepted = await onAnswer(trimmedContent, quickReplyKey)
-      if (accepted) setMessage("")
+      if (!accepted) return
     } finally {
       sendLockRef.current = false
       setSending(false)
@@ -126,6 +128,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
                 </div>
               </div>
             ))}
+            {sending ? <TypingIndicator /> : null}
           </div>
 
           <div className="shrink-0 border-t border-[var(--border-default)] bg-white/80 px-4 py-3 sm:px-7 sm:py-4">

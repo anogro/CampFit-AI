@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { CampfitStartHero } from "@/components/campfit/CampfitStartHero"
 import { CampFitV3Chat } from "@/components/campfit/v3/CampFitV3Chat"
@@ -8,6 +9,7 @@ import { CampFitV3Intake } from "@/components/campfit/v3/CampFitV3Intake"
 import { CampFitV3Result } from "@/components/campfit/v3/CampFitV3Result"
 import { useCampFitShellMode } from "@/components/campfit/v3/CampFitShell"
 import { sanitizeConversationInput } from "@/components/campfit/v3/conversationInput"
+import { appendOptimisticUserMessage } from "@/components/campfit/v3/chatUi"
 import { shouldDiscardStoredCampfitV3Session } from "@/components/campfit/v3/sessionMode"
 import {
   emptyCampfitV3IntakeDraft,
@@ -129,10 +131,8 @@ export function CampFitV3Flow() {
     const safeMessage = quickReplyKey === null
       ? sanitizeConversationInput(message, sensitiveQuestion).safeMessage
       : message
-    const userMessage: CampfitV3TranscriptMessage = conversation.questionKey
-      ? { role: "user", content: safeMessage, questionKey: conversation.questionKey }
-      : { role: "user", content: safeMessage }
-    const nextTranscript = [...transcript, userMessage]
+    const nextTranscript = appendOptimisticUserMessage(transcript, safeMessage, conversation.questionKey)
+    setTranscript(nextTranscript)
     try {
       const response = await postJson<CampfitV3ConversationResponse>("/api/campfit/v3/conversation/message", {
         transcript: nextTranscript,

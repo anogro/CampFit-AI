@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import { useMemo, useState, type ReactNode } from "react"
 import { CampFitV3Frame } from "@/components/campfit/v3/CampFitV3Frame"
 import { V3Header } from "@/components/campfit/v3/CampFitV3Flow"
@@ -110,7 +111,7 @@ export function CampFitV3Intake({ draft, onDraftChange, onBack, onSubmit }: Prop
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="grid gap-x-8 gap-y-4 px-1 py-4 sm:px-0 lg:grid-cols-2">
+            <div className="grid gap-x-8 gap-y-4 px-2 py-4 sm:px-1 lg:grid-cols-2">
             <Field id="child-ages" title="1. 아이 나이" helper="캠프에 참석하는 자녀의 만나이를 입력해주세요. (캠프 시작시점 기준)">
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
                 <div className="grid min-w-0 gap-2 sm:grid-cols-2">
@@ -285,7 +286,7 @@ export function CampFitV3Intake({ draft, onDraftChange, onBack, onSubmit }: Prop
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--border-default)] px-1 py-3 sm:px-0">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t border-[var(--border-default)] px-2 pb-4 pt-3 sm:px-1 lg:px-0">
             <button className="glass-button-muted min-h-12 rounded-full px-5 text-sm font-bold" type="button" onClick={onBack}>이전</button>
             <div className="flex min-w-0 items-center gap-3">
               <p className="hidden text-right text-xs font-semibold text-[var(--text-tertiary)] sm:block">필수 항목을 모두 확인하면 채팅을 시작할 수 있어요.</p>

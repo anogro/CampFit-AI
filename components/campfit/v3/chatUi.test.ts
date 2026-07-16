@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { isChatNearBottom, shouldSendChatMessage } from "@/components/campfit/v3/chatUi"
+import { appendOptimisticUserMessage, isChatNearBottom, shouldSendChatMessage } from "@/components/campfit/v3/chatUi"
 
 describe("CampFit v3 chat UI helpers", () => {
   it("sends a plain Enter key", () => {
@@ -27,5 +27,14 @@ describe("CampFit v3 chat UI helpers", () => {
 
   it("does not treat an older message position as near the bottom", () => {
     expect(isChatNearBottom({ scrollHeight: 1_200, scrollTop: 400, clientHeight: 500 })).toBe(false)
+  })
+
+  it("appends exactly one serializable user message for optimistic rendering", () => {
+    const transcript = [{ role: "assistant" as const, content: "질문", questionKey: "child_english_level" }]
+    const next = appendOptimisticUserMessage(transcript, "영어는 초급이에요", "child_english_level")
+
+    expect(next).toHaveLength(2)
+    expect(next[1]).toEqual({ role: "user", content: "영어는 초급이에요", questionKey: "child_english_level" })
+    expect(JSON.stringify(next)).not.toContain("typing")
   })
 })
