@@ -7,22 +7,30 @@ export const campfitV3BudgetOptions = [
   { key: "preset-3", label: "1,200만~2,000만 원", min: 12_000_000, max: 20_000_000 },
 ] as const
 
+export const CAMPFIT_V3_MAX_DURATION_WEEKS = 52
+export const CAMPFIT_V3_MAX_TRAVEL_CHILDREN = 8
+
 export type CampfitV3BudgetMode = "" | (typeof campfitV3BudgetOptions)[number]["key"] | "custom"
+export type CampfitV3DurationMode = "preset" | "custom"
 
 export type CampfitV3IntakeDraft = {
   readonly childAges: readonly string[]
   readonly departureWindow: string
   readonly durationWeeks: number | null
+  readonly durationMode: CampfitV3DurationMode
+  readonly durationCustomWeeks: string
   readonly budgetMode: CampfitV3BudgetMode
   readonly budgetMinManwon: string
   readonly budgetMaxManwon: string
   readonly adultCount: number | null
+  readonly childCount: number
 }
 
 export type CampfitV3IntakeErrors = {
   readonly childAges: readonly (string | null)[]
   readonly departureWindow: string | null
   readonly durationWeeks: string | null
+  readonly childCount: string | null
   readonly budget: string | null
   readonly adultCount: string | null
 }
@@ -36,26 +44,38 @@ export const emptyCampfitV3IntakeDraft: CampfitV3IntakeDraft = {
   childAges: [""],
   departureWindow: "",
   durationWeeks: null,
+  durationMode: "preset",
+  durationCustomWeeks: "",
   budgetMode: "",
   budgetMinManwon: "",
   budgetMaxManwon: "",
-  adultCount: null,
+  adultCount: 1,
+  childCount: 0,
 }
 
 export function validateCampfitV3IntakeDraft(draft: CampfitV3IntakeDraft): CampfitV3IntakeValidation {
   const parsedAges = draft.childAges.map(parseAge)
   const childAges = draft.childAges.map((input, index) => ageError(input, parsedAges[index] ?? null))
   const departureWindow = departureError(draft.departureWindow)
-  const durationWeeks = draft.durationWeeks === null
+  const durationValue = selectedDurationWeeks(draft)
+  const durationWeeks = durationValue === null
     ? "가능한 기간을 선택해 주세요."
-    : Number.isInteger(draft.durationWeeks) && draft.durationWeeks >= 1 && draft.durationWeeks <= 4
+    : Number.isInteger(durationValue) && durationValue >= 1 && durationValue <= CAMPFIT_V3_MAX_DURATION_WEEKS
       ? null
-      : "기간은 1주부터 4주까지 선택할 수 있어요."
+      : `기간은 1주부터 ${CAMPFIT_V3_MAX_DURATION_WEEKS}주까지 입력할 수 있어요.`
   const adultCount = draft.adultCount === null
     ? "함께 이동하는 성인 수를 선택해 주세요."
-    : Number.isInteger(draft.adultCount) && draft.adultCount >= 1 && draft.adultCount <= 8
+      : Number.isInteger(draft.adultCount) && draft.adultCount >= 1 && draft.adultCount <= 8
       ? null
       : "성인 수는 1명부터 8명까지 선택할 수 있어요."
+  const completedChildCount = countCompletedChildRows(draft)
+  const childCount = !Number.isInteger(draft.childCount) || draft.childCount < 1
+    ? "함께 이동하는 아이 수를 1명 이상 입력해 주세요."
+    : draft.childCount < completedChildCount
+      ? `입력한 캠프 참가 아이 ${completedChildCount}명보다 적을 수 없어요.`
+      : draft.childCount > CAMPFIT_V3_MAX_TRAVEL_CHILDREN
+        ? `이동하는 아이 수는 ${CAMPFIT_V3_MAX_TRAVEL_CHILDREN}명까지 입력할 수 있어요.`
+        : null
   const budget = budgetValue(draft)
 
   const errors: CampfitV3IntakeErrors = {
@@ -64,14 +84,16 @@ export function validateCampfitV3IntakeDraft(draft: CampfitV3IntakeDraft): Campf
     durationWeeks,
     budget: budget.error,
     adultCount,
+    childCount,
   }
   const hasError = childAges.some((error) => error !== null)
     || departureWindow !== null
     || durationWeeks !== null
     || budget.error !== null
     || adultCount !== null
+    || childCount !== null
 
-  if (hasError || parsedAges.some((age) => age === null) || draft.durationWeeks === null || draft.adultCount === null || budget.value === null) {
+  if (hasError || parsedAges.some((age) => age === null) || durationValue === null || draft.adultCount === null || budget.value === null) {
     return { value: null, errors }
   }
 
@@ -79,11 +101,11 @@ export function validateCampfitV3IntakeDraft(draft: CampfitV3IntakeDraft): Campf
     value: {
       childAges: parsedAges as number[],
       departureWindow: draft.departureWindow.trim(),
-      durationWeeks: draft.durationWeeks,
+      durationWeeks: durationValue,
       budgetMinKrw: budget.value.min,
       budgetMaxKrw: budget.value.max,
       adultCount: draft.adultCount,
-      childCount: parsedAges.length,
+      childCount: draft.childCount,
       guardianStaysNearby: true,
     },
     errors,
@@ -102,11 +124,14 @@ export function intakeDraftFromBasicInfo(value: CampfitV3BasicInfo): CampfitV3In
   return {
     childAges: value.childAges.map(String),
     departureWindow: value.departureWindow,
-    durationWeeks: value.durationWeeks,
+    durationWeeks: value.durationWeeks <= 4 ? value.durationWeeks : null,
+    durationMode: value.durationWeeks <= 4 ? "preset" : "custom",
+    durationCustomWeeks: value.durationWeeks <= 4 ? "" : String(value.durationWeeks),
     budgetMode: preset?.key ?? "custom",
     budgetMinManwon: formatManwon(value.budgetMinKrw),
     budgetMaxManwon: formatManwon(value.budgetMaxKrw),
     adultCount: value.adultCount,
+    childCount: value.childCount,
   }
 }
 
@@ -115,28 +140,57 @@ export function parseStoredIntakeDraft(value: unknown): CampfitV3IntakeDraft | n
   const childAges = value["childAges"]
   const departureWindow = value["departureWindow"]
   const durationWeeks = value["durationWeeks"]
+  const durationMode = value["durationMode"]
+  const durationCustomWeeks = value["durationCustomWeeks"]
   const budgetMode = value["budgetMode"]
   const budgetMinManwon = value["budgetMinManwon"]
   const budgetMaxManwon = value["budgetMaxManwon"]
   const adultCount = value["adultCount"]
+  const childCount = value["childCount"]
 
   if (!Array.isArray(childAges) || childAges.length < 1 || childAges.length > 5 || !childAges.every((item) => typeof item === "string" && item.length <= 10)) return null
   if (typeof departureWindow !== "string" || departureWindow.length > 200) return null
-  if (durationWeeks !== null && (!Number.isInteger(durationWeeks) || Number(durationWeeks) < 1 || Number(durationWeeks) > 4)) return null
+  if (durationWeeks !== null && (!Number.isInteger(durationWeeks) || Number(durationWeeks) < 1 || Number(durationWeeks) > CAMPFIT_V3_MAX_DURATION_WEEKS)) return null
+  if (durationMode !== undefined && durationMode !== "preset" && durationMode !== "custom") return null
+  if (durationCustomWeeks !== undefined && (typeof durationCustomWeeks !== "string" || durationCustomWeeks.length > 3)) return null
   if (!isBudgetMode(budgetMode)) return null
   if (typeof budgetMinManwon !== "string" || budgetMinManwon.length > 20) return null
   if (typeof budgetMaxManwon !== "string" || budgetMaxManwon.length > 20) return null
   if (adultCount !== null && (!Number.isInteger(adultCount) || Number(adultCount) < 1 || Number(adultCount) > 8)) return null
+  if (childCount !== undefined && childCount !== null && (!Number.isInteger(childCount) || Number(childCount) < 0 || Number(childCount) > CAMPFIT_V3_MAX_TRAVEL_CHILDREN)) return null
 
   return {
     childAges,
     departureWindow,
     durationWeeks: durationWeeks === null ? null : Number(durationWeeks),
+    durationMode: durationMode === "custom" || (durationMode === undefined && typeof durationWeeks === "number" && durationWeeks > 4) ? "custom" : "preset",
+    durationCustomWeeks: typeof durationCustomWeeks === "string" ? durationCustomWeeks : typeof durationWeeks === "number" && durationWeeks > 4 ? String(durationWeeks) : "",
     budgetMode,
     budgetMinManwon,
     budgetMaxManwon,
-    adultCount: adultCount === null ? null : Number(adultCount),
+    adultCount: adultCount === null ? 1 : Number(adultCount),
+    childCount: typeof childCount === "number" ? childCount : countCompletedChildRows({
+      childAges,
+      departureWindow,
+      durationWeeks: durationWeeks === null ? null : Number(durationWeeks),
+      durationMode: durationMode === "custom" ? "custom" : "preset",
+      durationCustomWeeks: typeof durationCustomWeeks === "string" ? durationCustomWeeks : "",
+      budgetMode,
+      budgetMinManwon,
+      budgetMaxManwon,
+      adultCount: adultCount === null ? 1 : Number(adultCount),
+      childCount: 0,
+    }),
   }
+}
+
+function selectedDurationWeeks(draft: CampfitV3IntakeDraft): number | null {
+  if (draft.durationMode === "custom") {
+    if (draft.durationCustomWeeks.trim() === "") return null
+    const parsed = Number(draft.durationCustomWeeks)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return draft.durationWeeks
 }
 
 function parseAge(input: string): number | null {

@@ -1,9 +1,12 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { CampfitStartHero } from "@/components/campfit/CampfitStartHero"
 import { CampFitV3Chat } from "@/components/campfit/v3/CampFitV3Chat"
+import { CampFitV3Frame } from "@/components/campfit/v3/CampFitV3Frame"
 import { CampFitV3Intake } from "@/components/campfit/v3/CampFitV3Intake"
 import { CampFitV3Result } from "@/components/campfit/v3/CampFitV3Result"
+import { useCampFitShellMode } from "@/components/campfit/v3/CampFitShell"
 import { sanitizeConversationInput } from "@/components/campfit/v3/conversationInput"
 import { shouldDiscardStoredCampfitV3Session } from "@/components/campfit/v3/sessionMode"
 import {
@@ -40,6 +43,7 @@ type StoredSession = {
 const storageKey = "campfit-v3-conversational-mvp"
 
 export function CampFitV3Flow() {
+  const mode = useCampFitShellMode()
   const [stage, setStage] = useState<Stage>("start")
   const [intakeDraft, setIntakeDraft] = useState<CampfitV3IntakeDraft>(emptyCampfitV3IntakeDraft)
   const [basicInfo, setBasicInfo] = useState<CampfitV3BasicInfo | null>(null)
@@ -204,7 +208,11 @@ export function CampFitV3Flow() {
   }, [basicInfo, conversation, demoMode, intakeDraft, result, stage, transcript])
 
   return (
-    <div className={`${stage === "chat" ? "h-dvh overflow-hidden" : "min-h-dvh overflow-x-hidden"} bg-[var(--surface-secondary)] text-[var(--text-primary)]`}>
+    <div
+      data-campfit-flow="true"
+      data-campfit-mode={mode}
+      className={`${stage === "chat" ? "h-dvh overflow-hidden" : "min-h-dvh overflow-x-hidden"} ${mode === "embedded" ? "bg-transparent" : "bg-[var(--surface-secondary)]"} text-[var(--text-primary)]`}
+    >
       {content}
       {error ? <div className="fixed bottom-4 left-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 rounded-2xl border border-[var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-[var(--status-error)] shadow-lg" role="alert">{error}</div> : null}
     </div>
@@ -213,30 +221,14 @@ export function CampFitV3Flow() {
 
 function StartScreen({ demoMode, onStart }: { readonly demoMode: boolean; readonly onStart: () => void }) {
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[1280px] flex-col px-4 py-3 sm:px-6 sm:py-5 lg:px-10">
-      <V3Header />
-      <section className="grid flex-1 items-center gap-6 py-6 sm:gap-8 sm:py-10 lg:grid-cols-[1.02fr_.98fr] lg:gap-12 lg:py-12">
-        <div className="order-1">
-          <div className="mb-4 flex flex-wrap gap-2 sm:mb-5" aria-label="주요 경험 방향">
-            {["스쿨링", "방학캠프", "문화체험", "영어몰입"].map((item) => <span className="rounded-full border border-[var(--cta-glass-border)] bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-primary)]" key={item}>{item}</span>)}
-          </div>
-          <h1 className="max-w-[720px] text-[2rem] font-bold leading-[1.08] tracking-[-.035em] [word-break:keep-all] sm:text-[3rem] lg:text-[3.5rem]">
-            우리 가족에게 맞는 해외 캠프와 도시를<br />AI 상담으로 찾아보세요
-          </h1>
-          <p className="mt-4 max-w-[620px] text-base font-medium leading-7 text-[var(--text-secondary)] [word-break:keep-all] sm:mt-6 sm:text-lg sm:leading-8">
-            아이에게 맞는 해외 캠프뿐 아니라 부모가 함께 머물기 좋은 도시까지, 대화로 찾아드립니다. 아이의 영어 수준과 성향, 원하는 경험, 부모의 체류 조건을 함께 살펴 후보를 비교해드려요.
-          </p>
-          <button className="glass-cta mt-6 inline-flex min-h-14 items-center justify-center rounded-full px-7 text-base font-extrabold transition hover:-translate-y-0.5 sm:mt-8" type="button" onClick={onStart}>
-            AI 상담 시작하기 <span className="ml-2" aria-hidden>→</span>
-          </button>
-          {demoMode ? <p className="mt-3 inline-flex rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-primary)]">시연용 예시 카탈로그</p> : null}
-          <p className="mt-3 text-sm text-[var(--text-tertiary)] sm:mt-4">일반적으로 5~8개, 복합 조건은 최대 10개의 짧은 질문 · 입력 내용은 현재 브라우저 세션에만 보관</p>
-        </div>
-        <div className="order-2 mx-auto w-full max-w-[320px] sm:max-w-[480px] lg:max-w-[560px]">
-          <img className="h-auto w-full object-contain" src="/images/campfit image.png" alt="노트북으로 해외 교육 경험을 준비하는 부모와 아이" />
-        </div>
-      </section>
-    </main>
+    <div className="relative">
+      <CampfitStartHero onStart={onStart} />
+      {demoMode ? (
+        <p className="absolute left-1/2 top-24 -translate-x-1/2 rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-primary)]">
+          시연용 예시 카탈로그
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -254,14 +246,14 @@ export function V3Header() {
 
 function LoadingScreen() {
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-[1120px] flex-col px-4 py-5 sm:px-6">
+    <CampFitV3Frame>
       <V3Header />
       <section className="flex flex-1 flex-col items-center justify-center py-12 text-center">
         <div className="grid h-24 w-24 place-items-center rounded-[32px] bg-[var(--accent-soft)] text-3xl font-black text-[var(--accent-primary)] motion-safe:animate-pulse">CF</div>
         <h1 className="mt-7 text-2xl font-bold tracking-[-.03em] sm:text-3xl">상담 내용을 정리하고 있어요</h1>
         <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--text-secondary)] sm:text-base">경험 방향, 도시 현실성, 실제 프로그램 후보와 마지막 확인사항을 함께 비교합니다.</p>
       </section>
-    </main>
+    </CampFitV3Frame>
   )
 }
 

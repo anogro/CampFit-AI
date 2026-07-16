@@ -5,16 +5,16 @@ export const CampfitV3BasicInfoSchema = z
   .object({
     childAges: z.array(z.number().int().min(5).max(12)).min(1).max(5),
     departureWindow: z.string().trim().min(2).max(80),
-    durationWeeks: z.number().int().min(1).max(4),
+    durationWeeks: z.number().int().min(1).max(52),
     budgetMinKrw: z.number().int().nonnegative(),
     budgetMaxKrw: z.number().int().positive(),
     adultCount: z.number().int().min(1).max(8),
-    childCount: z.number().int().min(1).max(5),
+    childCount: z.number().int().min(1).max(8),
     guardianStaysNearby: z.literal(true),
   })
   .superRefine((value, context) => {
-    if (value.childCount !== value.childAges.length) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["childCount"], message: "아이 수와 나이 입력 수가 같아야 합니다." })
+    if (value.childCount < value.childAges.length) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["childCount"], message: "이동하는 아이 수는 캠프 참가 아이 수보다 적을 수 없습니다." })
     }
     if (value.budgetMinKrw > value.budgetMaxKrw) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["budgetMaxKrw"], message: "예산 범위를 다시 확인해 주세요." })
@@ -222,7 +222,7 @@ const valueSchemas: Readonly<Record<(typeof campfitV3FactKeys)[number], z.ZodTyp
   budgetRangeKrw: z.object({ min: z.number().int().nonnegative(), max: z.number().int().positive() }).refine((value) => value.min <= value.max),
   budgetIncludesFlight: z.boolean(),
   departureWindow: z.string().trim().min(2).max(80),
-  durationWeeks: z.number().int().min(1).max(4),
+  durationWeeks: z.number().int().min(1).max(52),
 }
 
 function validateFactContract(

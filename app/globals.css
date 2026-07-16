@@ -73,6 +73,10 @@ textarea {
   -webkit-backdrop-filter: blur(24px) saturate(1.04);
 }
 
+.campfit-v3-frame-surface {
+  box-shadow: none;
+}
+
 .apple-glass-soft {
   border: 1px solid var(--border-subtle);
   background: var(--surface-elevated);

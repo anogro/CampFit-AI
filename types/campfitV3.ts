@@ -82,6 +82,7 @@ export type CampfitV3BasicInfo = {
   readonly budgetMinKrw: number
   readonly budgetMaxKrw: number
   readonly adultCount: number
+  /** Total children traveling with the adults, including children not joining the camp. */
   readonly childCount: number
   readonly guardianStaysNearby: true
 }

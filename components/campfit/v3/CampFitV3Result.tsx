@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react"
 import { CampFitV3DecisionRadar } from "@/components/campfit/v3/CampFitV3DecisionRadar"
+import { CampFitV3Frame } from "@/components/campfit/v3/CampFitV3Frame"
 import { V3Header } from "@/components/campfit/v3/CampFitV3Flow"
 import {
   buildAnogroCityHref,
@@ -41,10 +42,11 @@ export function CampFitV3Result({
   const catalogPresentation = programCatalogPresentation(result.catalogSource)
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-[1280px] px-4 py-4 print:max-w-none print:bg-white print:px-0 print:py-0 sm:px-6 lg:px-10">
+    <CampFitV3Frame className="print:h-auto print:overflow-visible print:bg-white print:px-0 print:py-0" contentClassName="print:h-auto print:overflow-visible print:rounded-none print:border-0 print:bg-white print:px-0 print:py-0 print:shadow-none">
       <V3Header />
-      <div className="mx-auto max-w-[1120px] py-7 print:max-w-none print:py-5 sm:py-10">
-        <section className="apple-glass rounded-[28px] p-5 print:[break-inside:avoid] print:rounded-none print:shadow-none sm:p-8">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-[1120px] py-7 print:max-w-none print:py-5 sm:py-10">
+        <section className="border-b border-[var(--border-default)] pb-6 print:[break-inside:avoid] print:border-0 print:pb-0 sm:pb-8">
           <p className="text-xs font-black tracking-[.12em] text-[var(--accent-primary)]">CAMPFIT AI CONSULTING NOTE</p>
           <h1 className="mt-3 text-3xl font-bold tracking-[-.035em] [word-break:keep-all] sm:text-4xl">이번 가족에게 가장 잘 맞는 방향</h1>
           {primaryDirection ? (
@@ -144,8 +146,9 @@ export function CampFitV3Result({
         </Section>
 
         <ResultActions onBack={onBack} onRestart={onRestart} />
+        </div>
       </div>
-    </main>
+    </CampFitV3Frame>
   )
 }
 

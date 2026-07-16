@@ -17,7 +17,8 @@ describe("CampFit v3 intake draft", () => {
     expect(validation.errors.childAges[0]).toContain("나이")
     expect(validation.errors.durationWeeks).not.toBeNull()
     expect(validation.errors.budget).not.toBeNull()
-    expect(validation.errors.adultCount).not.toBeNull()
+    expect(validation.errors.adultCount).toBeNull()
+    expect(validation.errors.childCount).not.toBeNull()
   })
 
   it("accepts the 5 and 12 year age boundaries", () => {
@@ -50,6 +51,17 @@ describe("CampFit v3 intake draft", () => {
     })
   })
 
+  it("allows additional traveling children beyond the camp age rows", () => {
+    const validation = validateCampfitV3IntakeDraft(completeDraft({ childAges: ["8"], childCount: 2 }))
+    expect(validation.value?.childAges).toEqual([8])
+    expect(validation.value?.childCount).toBe(2)
+  })
+
+  it("accepts a custom stay longer than four weeks", () => {
+    const validation = validateCampfitV3IntakeDraft(completeDraft({ durationWeeks: null, durationMode: "custom", durationCustomWeeks: "6" }))
+    expect(validation.value?.durationWeeks).toBe(6)
+  })
+
   it("round-trips a submitted value back into an editable draft", () => {
     const value = validateCampfitV3IntakeDraft(completeDraft({ childAges: ["6", "10"], budgetMode: "custom", budgetMinManwon: "650", budgetMaxManwon: "900" })).value
     expect(value).not.toBeNull()
@@ -66,14 +78,18 @@ describe("CampFit v3 intake draft", () => {
 })
 
 function completeDraft(overrides: Partial<CampfitV3IntakeDraft> = {}): CampfitV3IntakeDraft {
-  return {
+  const draft: CampfitV3IntakeDraft = {
     childAges: ["8"],
     departureWindow: "다음 여름방학",
     durationWeeks: 2,
+    durationMode: "preset",
+    durationCustomWeeks: "",
     budgetMode: "preset-1",
     budgetMinManwon: "",
     budgetMaxManwon: "",
     adultCount: 1,
+    childCount: 1,
     ...overrides,
   }
+  return { ...draft, childCount: overrides.childCount ?? countCompletedChildRows(draft) }
 }

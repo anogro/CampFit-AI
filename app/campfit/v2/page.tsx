@@ -1,11 +1,10 @@
-import type { Metadata } from "next"
-import { CampFitV2Flow } from "@/components/campfit/v2/CampFitV2Flow"
+import { redirect } from "next/navigation"
+import { campfitRedirectPath, type CampfitRouteSearchParams } from "@/app/campfit/redirectToCampfit"
 
-export const metadata: Metadata = {
-  title: "CampFit AI 상담형 추천 v2",
-  description: "아이의 준비도와 가족 조건을 바탕으로 해외캠프 컨설팅 리포트를 생성합니다.",
+type CampfitV2PageProps = {
+  readonly searchParams?: Promise<CampfitRouteSearchParams>
 }
 
-export default function CampfitV2Page() {
-  return <CampFitV2Flow />
+export default async function CampfitV2Page({ searchParams }: CampfitV2PageProps) {
+  redirect(campfitRedirectPath(await searchParams))
 }

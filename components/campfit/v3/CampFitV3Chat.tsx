@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { CampFitV3Frame } from "@/components/campfit/v3/CampFitV3Frame"
 import { V3Header } from "@/components/campfit/v3/CampFitV3Flow"
 import { isChatNearBottom, shouldSendChatMessage } from "@/components/campfit/v3/chatUi"
 import type { CampfitV3BasicInfo, CampfitV3ConversationResponse, CampfitV3TranscriptMessage } from "@/types/campfitV3"
@@ -62,9 +63,9 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
   )
 
   return (
-    <main className="mx-auto flex h-dvh max-h-dvh w-full max-w-[1280px] flex-col overflow-hidden px-4 py-3 sm:px-6 lg:px-10 lg:py-4">
-      <div className="shrink-0"><V3Header /></div>
-      <section className="mx-auto flex min-h-0 w-full max-w-[1120px] flex-1 flex-col gap-3 overflow-hidden py-3 lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-4 lg:py-5">
+    <CampFitV3Frame>
+      <V3Header />
+      <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3 lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-4 lg:py-5">
         <details className="apple-glass-soft group shrink-0 rounded-2xl lg:hidden">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-4 py-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)] [&::-webkit-details-marker]:hidden">
             <AiAvatar className="h-10 w-10" />
@@ -96,7 +97,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
           <div className="mt-5 border-t border-[var(--border-default)] pt-4">{summary}</div>
         </aside>
 
-        <div className="apple-glass flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[24px] lg:h-full lg:rounded-[28px]">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-[var(--border-default)] bg-white/80 lg:h-full lg:rounded-[28px]">
           <div className="shrink-0 border-b border-[var(--border-default)] px-5 py-3 sm:px-7 sm:py-4">
             <p className="text-xs font-black tracking-[.12em] text-[var(--accent-primary)]">STEP 2 · AI 상담</p>
             <h1 className="mt-1 text-lg font-bold tracking-[-.02em] [word-break:keep-all] sm:text-2xl">대화로 우리 가족의 선택 기준을 정리해요</h1>
@@ -172,7 +173,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
           </div>
         </div>
       </section>
-    </main>
+    </CampFitV3Frame>
   )
 }
 

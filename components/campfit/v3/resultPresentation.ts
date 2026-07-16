@@ -161,7 +161,7 @@ function familyLevel(state: CampfitV3ConversationState, basicInfo: CampfitV3Basi
   const hasStayGoal = Array.isArray(stayGoals) && stayGoals.length > 0
   const hasCompleteBasics = basicInfo.guardianStaysNearby
     && basicInfo.durationWeeks >= 1
-    && basicInfo.durationWeeks <= 4
+    && basicInfo.durationWeeks <= 52
     && basicInfo.budgetMaxKrw >= basicInfo.budgetMinKrw
     && basicInfo.adultCount >= 1
     && basicInfo.childCount >= 1
