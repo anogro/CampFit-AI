@@ -4,6 +4,7 @@ import {
   CampfitV3ConversationMessageRequestSchema,
   CampfitV3ConversationResponseSchema,
 } from "@/lib/campfit/v3/schemas"
+import { resolveAiTimeoutMs } from "@/lib/campfit/v3/providerConfig"
 import { createConversationProvider, resolveAiProvider } from "@/lib/campfit/v3/server/providerFactory"
 import type { CampfitV3ConversationResponse } from "@/types/campfitV3"
 
@@ -80,6 +81,7 @@ function logProviderResult(response: CampfitV3ConversationResponse): void {
     providerHttpStatus: diagnostics.providerHttpStatus,
     providerRequestCount: diagnostics.providerRequestCount,
     providerElapsedMs: diagnostics.elapsedMs,
+    configuredTimeoutMs: resolveAiTimeoutMs(),
     aiUsed: diagnostics.aiUsed,
     fallbackReason: diagnostics.fallbackReason,
     errorName: diagnostics.errorName ?? null,

@@ -29,4 +29,17 @@ describe("CampFit provider factory", () => {
   it("rejects provider values outside the explicit allowlist", () => {
     expect(() => resolveAiProvider("anthropic")).toThrow("Unsupported AI provider")
   })
+
+  it("passes the same resolved environment timeout to OpenAI and Gemini", () => {
+    vi.stubEnv("AI_TIMEOUT_MS", "20000")
+
+    vi.stubEnv("AI_PROVIDER", "openai")
+    const openai = createConversationProvider() as unknown as { readonly timeoutMs: number }
+
+    vi.stubEnv("AI_PROVIDER", "gemini")
+    const gemini = createConversationProvider() as unknown as { readonly timeoutMs: number }
+
+    expect(openai.timeoutMs).toBe(20_000)
+    expect(gemini.timeoutMs).toBe(20_000)
+  })
 })

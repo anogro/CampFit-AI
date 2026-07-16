@@ -3,6 +3,7 @@ import { requestProviderJson } from "@/lib/campfit/v3/providerTransport"
 
 describe("provider transport diagnostics", () => {
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
@@ -40,5 +41,34 @@ describe("provider transport diagnostics", () => {
       },
     })
     expect(JSON.stringify(result)).not.toContain("should-not-be-logged")
+  })
+
+  it("does not abort at 19,999ms and aborts at the exact 20,000ms deadline", async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })))
+    }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    const pending = requestProviderJson({
+      endpoint: "https://api.openai.com/v1/responses",
+      headers: { "Content-Type": "application/json" },
+      body: { input: "test" },
+      timeoutMs: 20_000,
+    })
+    let settled = false
+    void pending.then(() => { settled = true })
+
+    await vi.advanceTimersByTimeAsync(19_999)
+    expect(settled).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(1)
+    await expect(pending).resolves.toMatchObject({
+      code: "timeout",
+      requestMade: true,
+      providerResponseReceived: false,
+      httpStatus: null,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

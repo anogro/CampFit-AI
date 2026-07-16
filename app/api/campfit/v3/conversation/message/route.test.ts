@@ -128,6 +128,13 @@ describe("CampFit v3 conversation message route", () => {
     expect(providerConstructed).toHaveBeenCalledWith({ maxProviderRequests: 1 })
   })
 
+  it("does not override the environment timeout in the route", async () => {
+    vi.stubEnv("AI_TIMEOUT_MS", "20000")
+
+    expect((await POST(request())).status).toBe(200)
+    expect(providerConstructed).toHaveBeenCalledWith({ maxProviderRequests: 1 })
+  })
+
   it("always strips diagnostics from production responses", async () => {
     vi.stubEnv("NODE_ENV", "production")
     vi.stubEnv("CAMPFIT_V3_INCLUDE_DIAGNOSTICS", "true")
@@ -175,6 +182,7 @@ describe("CampFit v3 conversation message route", () => {
     vi.stubEnv("VERCEL_ENV", "preview")
     vi.stubEnv("AI_PROVIDER", "openai")
     vi.stubEnv("OPENAI_MODEL", "preview-model")
+    vi.stubEnv("AI_TIMEOUT_MS", "20000")
     vi.stubEnv("VERCEL_REGION", "icn1")
     resolveAiProvider.mockReturnValue("openai")
     const info = vi.spyOn(console, "info").mockImplementation(() => undefined)
@@ -191,6 +199,7 @@ describe("CampFit v3 conversation message route", () => {
       providerHttpStatus: 200,
       providerRequestCount: 1,
       providerElapsedMs: 5_106,
+      configuredTimeoutMs: 20_000,
       aiUsed: true,
       fallbackReason: null,
       errorName: "TypeError",
