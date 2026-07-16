@@ -7,7 +7,7 @@ import {
   CampfitV3RecommendationResultSchema,
   CampfitV3RecommendRequestSchema,
 } from "@/lib/campfit/v3/schemas"
-import { GeminiCampfitV3Provider } from "@/lib/campfit/v3/server/geminiProvider"
+import { createConversationProvider } from "@/lib/campfit/v3/server/providerFactory"
 
 export async function POST(request: Request) {
   const parsed = CampfitV3RecommendRequestSchema.safeParse(await safeJson(request))
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       catalog,
     })
     const conclusion = process.env["CAMPFIT_V3_AI_RESULT_EXPLANATION"] === "true"
-      ? await new GeminiCampfitV3Provider().explainRecommendation({
+      ? await createConversationProvider().explainRecommendation({
           basicInfo: parsed.data.basicInfo,
           state: parsed.data.finalState,
           deterministicResult,

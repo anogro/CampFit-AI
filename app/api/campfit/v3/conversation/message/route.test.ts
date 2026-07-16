@@ -2,15 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const processConversationMessage = vi.hoisted(() => vi.fn())
 const providerConstructed = vi.hoisted(() => vi.fn())
+const createConversationProvider = vi.hoisted(() => vi.fn((options?: unknown) => {
+  providerConstructed(options)
+  return {}
+}))
 
 vi.mock("@/lib/campfit/v3/conversationService", () => ({ processConversationMessage }))
-vi.mock("@/lib/campfit/v3/server/geminiProvider", () => ({
-  GeminiCampfitV3Provider: class MockGeminiCampfitV3Provider {
-    constructor(options?: unknown) {
-      providerConstructed(options)
-    }
-  },
-}))
+vi.mock("@/lib/campfit/v3/server/providerFactory", () => ({ createConversationProvider }))
 
 import { POST } from "@/app/api/campfit/v3/conversation/message/route"
 
@@ -90,7 +88,7 @@ describe("CampFit v3 conversation message route", () => {
     vi.clearAllMocks()
   })
 
-  it("uses the server Gemini provider for a normal free-text request", async () => {
+  it("uses the selected server provider for a normal free-text request", async () => {
     vi.stubEnv("NODE_ENV", "test")
     const response = await POST(request())
 

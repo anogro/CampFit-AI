@@ -5,16 +5,13 @@ const loadDemoCatalog = vi.hoisted(() => vi.fn())
 const isReadyForRecommendation = vi.hoisted(() => vi.fn())
 const buildRecommendation = vi.hoisted(() => vi.fn())
 const explainRecommendation = vi.hoisted(() => vi.fn())
+const createConversationProvider = vi.hoisted(() => vi.fn(() => ({ explainRecommendation })))
 
 vi.mock("@/lib/campfit/v3/catalogRepository", () => ({ loadV3Catalog }))
 vi.mock("@/lib/campfit/v3/demoCatalog", () => ({ loadDemoCatalog }))
 vi.mock("@/lib/campfit/v3/progress", () => ({ isReadyForRecommendation }))
 vi.mock("@/lib/campfit/v3/recommendationEngine", () => ({ buildRecommendation }))
-vi.mock("@/lib/campfit/v3/server/geminiProvider", () => ({
-  GeminiCampfitV3Provider: class MockGeminiCampfitV3Provider {
-    explainRecommendation = explainRecommendation
-  },
-}))
+vi.mock("@/lib/campfit/v3/server/providerFactory", () => ({ createConversationProvider }))
 
 import { POST } from "@/app/api/campfit/v3/recommend/route"
 

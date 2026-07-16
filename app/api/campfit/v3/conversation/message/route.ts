@@ -4,7 +4,7 @@ import {
   CampfitV3ConversationMessageRequestSchema,
   CampfitV3ConversationResponseSchema,
 } from "@/lib/campfit/v3/schemas"
-import { GeminiCampfitV3Provider } from "@/lib/campfit/v3/server/geminiProvider"
+import { createConversationProvider } from "@/lib/campfit/v3/server/providerFactory"
 import type { CampfitV3ConversationResponse } from "@/types/campfitV3"
 
 export async function POST(request: Request) {
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   try {
     const response = await processConversationMessage({
       ...parsed.data,
-      provider: new GeminiCampfitV3Provider(geminiProviderOptions()),
+      provider: createConversationProvider(providerOptions()),
     })
     const validated = CampfitV3ConversationResponseSchema.parse(response)
     return NextResponse.json(toPublicConversationResponse(validated))
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   }
 }
 
-function geminiProviderOptions(): { readonly maxProviderRequests: 1 } {
+function providerOptions(): { readonly maxProviderRequests: 1 } {
   // The product path must not spend a second provider round-trip repairing a
   // response. Deterministic extraction can continue immediately on any
   // provider timeout, transport failure, or invalid response.

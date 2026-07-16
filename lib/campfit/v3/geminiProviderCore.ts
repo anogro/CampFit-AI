@@ -1,7 +1,8 @@
 import { z } from "zod"
 import { buildConversationPrompt, parseGeminiJson } from "@/lib/campfit/v3/geminiPrompt"
-import { CampfitV3ModelResponseSchema } from "@/lib/campfit/v3/schemas"
-import { isSemanticallyValidModelFact } from "@/lib/campfit/v3/stateEngine"
+import { normalizeCampfitProviderPayload } from "@/lib/campfit/v3/providerNormalization"
+import { resolveAiTimeoutMs } from "@/lib/campfit/v3/providerConfig"
+import { requestProviderJson } from "@/lib/campfit/v3/providerTransport"
 import type {
   AnalyzeConversationInput,
   CampfitV3LLMProvider,
@@ -11,10 +12,6 @@ import type {
 } from "@/lib/campfit/v3/provider"
 
 const defaultModel = "gemini-2.5-flash"
-const DEFAULT_GEMINI_TIMEOUT_MS = 7_000
-const MIN_GEMINI_TIMEOUT_MS = 50
-const MAX_GEMINI_TIMEOUT_MS = 10_000
-
 const GeminiResponseSchema = z.object({
   candidates: z.array(z.object({
     content: z.object({ parts: z.array(z.object({ text: z.string().optional() })).optional() }).optional(),
@@ -52,7 +49,7 @@ export class GeminiCampfitV3ProviderCore implements CampfitV3LLMProvider {
 
   constructor(options: GeminiProviderOptions = {}) {
     this.maxProviderRequests = options.maxProviderRequests ?? 2
-    this.timeoutMs = normalizeTimeoutMs(options.timeoutMs)
+    this.timeoutMs = resolveAiTimeoutMs(options.timeoutMs)
   }
 
   getLastDiagnostic(): CampfitV3ProviderDiagnostic | null {
@@ -146,56 +143,7 @@ export class GeminiCampfitV3ProviderCore implements CampfitV3LLMProvider {
 export function parseGeminiStructuredResponse(text: string, allowedQuestionKeys: readonly string[]): StructuredParseResult {
   const result = parseGeminiJson(text)
   if (!result.success) return { model: null, error: "json_parse_failed" }
-  const json = normalizeSuggestedNextQuestion(result.value)
-  const parsed = CampfitV3ModelResponseSchema.safeParse(json)
-  if (!parsed.success) return { model: null, error: "schema_validation_failed" }
-  if (new Set(parsed.data.facts.map((fact) => fact.key)).size !== parsed.data.facts.length) {
-    return { model: null, error: "semantic_validation_failed" }
-  }
-  if (parsed.data.suggestedNextQuestionKey !== null
-    && !allowedQuestionKeys.includes(parsed.data.suggestedNextQuestionKey)) {
-    return { model: null, error: "semantic_validation_failed" }
-  }
-  if (!isSafeUserFacingMessage(parsed.data.assistantMessage)
-    || parsed.data.assistantMessage.split(/[?？]/u).length - 1 > 1
-    || parsed.data.facts.some((fact) => containsDetailedHealthDisclosure(fact.evidence))
-    || parsed.data.facts.some((fact) => fact.source === "explicit_user_statement" && fact.confidence < 0.85)) {
-    return { model: null, error: "semantic_validation_failed" }
-  }
-  if (!parsed.data.facts.every(isSemanticallyValidModelFact)) {
-    return { model: null, error: "semantic_validation_failed" }
-  }
-  return { model: parsed.data, error: null }
-}
-
-const internalCounselorTerms = [
-  "slot",
-  "target",
-  "schema",
-  "validation",
-  "confidence score",
-  "fallback",
-  "parser",
-  "state merge",
-  "조건으로 연결하지 못했어요",
-] as const
-
-function isSafeUserFacingMessage(message: string): boolean {
-  const normalized = message.toLocaleLowerCase()
-  return !internalCounselorTerms.some((term) => normalized.includes(term.toLocaleLowerCase()))
-    && !containsDetailedHealthDisclosure(message)
-}
-
-function containsDetailedHealthDisclosure(value: string): boolean {
-  return /(질환명|진단명|복용약|약\s*이름|약명|복용량|병력|알레르기\s*(항목|이름|명칭)|천식|당뇨|아토피|뇌전증|간질|ADHD|자폐|우울증|공황장애|갑상선|심장병|크론병|셀리악)/iu.test(value)
-}
-
-function normalizeSuggestedNextQuestion(value: unknown): unknown {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return value
-  if (!("suggestedNextQuestionKey" in value) || typeof value.suggestedNextQuestionKey !== "string") return value
-  return value.suggestedNextQuestionKey.trim() === ""
-    ? { ...value, suggestedNextQuestionKey: null }
-    : value
+  return normalizeCampfitProviderPayload(result.value, allowedQuestionKeys)
 }
 
 async function requestGeminiOnce(prompt: string, timeoutMs: number): Promise<GeminiRequestResult> {
@@ -212,143 +160,32 @@ async function requestGeminiOnce(prompt: string, timeoutMs: number): Promise<Gem
   }
 
   const model = process.env["GEMINI_MODEL"] ?? defaultModel
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`
-  const controller = new AbortController()
-  let timedOut = false
-  const request = (async (): Promise<GeminiRequestResult> => {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
+  const transport = await requestProviderJson({
+    endpoint: `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    body: {
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0,
+        maxOutputTokens: 4_096,
       },
-      signal: controller.signal,
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          temperature: 0,
-          maxOutputTokens: 4_096,
-        },
-      }),
-    })
-    if (!response.ok) {
-      return {
-        text: null,
-        code: providerCodeFromHttpStatus(response.status),
-        requestMade: true,
-        providerResponseReceived: true,
-        httpStatus: response.status,
-        errorStatus: await readProviderErrorStatus(response),
-      }
-    }
-    let responseBody: unknown
-    try {
-      responseBody = await response.json()
-    } catch (error) {
-      if (isAbortError(error)) throw error
-      return {
-        text: null,
-        code: "json_parse_failed",
-        requestMade: true,
-        providerResponseReceived: true,
-        httpStatus: response.status,
-        errorStatus: null,
-      }
-    }
-    const parsed = GeminiResponseSchema.safeParse(responseBody)
-    const textParts = parsed.success
-      ? parsed.data.candidates?.[0]?.content?.parts
-        ?.flatMap((part) => part.text === undefined ? [] : [part.text]) ?? []
-      : []
-    const text = textParts.length === 0 ? null : textParts.join("")
-    return text === null
-      ? {
-        text: null,
-        code: "empty_response",
-        requestMade: true,
-        providerResponseReceived: true,
-        httpStatus: response.status,
-        errorStatus: null,
-      }
-      : {
-        text,
-        code: "ok",
-        requestMade: true,
-        providerResponseReceived: true,
-        httpStatus: response.status,
-        errorStatus: null,
-      }
-  })()
-  let timeout: ReturnType<typeof setTimeout> | undefined
-  const timeoutSignal = new Promise<GeminiRequestResult>((_, reject) => {
-    timeout = setTimeout(() => {
-      timedOut = true
-      controller.abort()
-      reject(new GeminiProviderTimeoutError())
-    }, timeoutMs)
+    },
+    timeoutMs,
   })
-  try {
-    return await Promise.race([request, timeoutSignal])
-  } catch (error) {
-    return {
-      text: null,
-      code: error instanceof GeminiProviderTimeoutError || (isAbortError(error) && timedOut)
-        ? "timeout"
-        : isAbortError(error) ? "provider_cancelled" : "network_error",
-      requestMade: true,
-      providerResponseReceived: false,
-      httpStatus: null,
-      errorStatus: null,
-    }
-  } finally {
-    if (timeout !== undefined) clearTimeout(timeout)
-    // Abort is best-effort. Observe a late rejection so a slow transport cannot
-    // create an unhandled rejection after deterministic fallback has returned.
-    void request.catch(() => undefined)
+  const parsed = transport.code === "ok" ? GeminiResponseSchema.safeParse(transport.body) : null
+  const textParts = parsed?.success
+    ? parsed.data.candidates?.[0]?.content?.parts
+      ?.flatMap((part) => part.text === undefined ? [] : [part.text]) ?? []
+    : []
+  return {
+    text: textParts.length > 0 ? textParts.join("") : null,
+    code: transport.code === "ok" && textParts.length === 0 ? "empty_response" : transport.code,
+    requestMade: transport.requestMade,
+    providerResponseReceived: transport.providerResponseReceived,
+    httpStatus: transport.httpStatus,
+    errorStatus: transport.errorStatus,
   }
-}
-
-class GeminiProviderTimeoutError extends Error {
-  constructor() {
-    super("Gemini provider request timed out")
-    this.name = "GeminiProviderTimeoutError"
-  }
-}
-
-function normalizeTimeoutMs(value: number | undefined): number {
-  if (value === undefined || !Number.isFinite(value)) return DEFAULT_GEMINI_TIMEOUT_MS
-  return Math.min(MAX_GEMINI_TIMEOUT_MS, Math.max(MIN_GEMINI_TIMEOUT_MS, Math.round(value)))
-}
-
-function providerCodeFromHttpStatus(status: number): Exclude<CampfitV3ProviderDiagnosticCode, "ok" | "schema_validation_failed" | "semantic_validation_failed"> {
-  if (status === 400 || status === 422) return "invalid_request"
-  if (status === 401 || status === 403) return "permission_denied"
-  if (status === 404) return "model_not_found"
-  if (status === 429) return "rate_limited"
-  if (status === 499) return "provider_cancelled"
-  if (status === 500) return "provider_internal"
-  if (status === 502 || status === 503 || status === 504) return "provider_unavailable"
-  return "unknown_provider_error"
-}
-
-async function readProviderErrorStatus(response: Response): Promise<string | null> {
-  try {
-    const body = await response.json() as unknown
-    if (typeof body !== "object" || body === null || !("error" in body)) return null
-    const error = body.error
-    if (typeof error !== "object" || error === null || !("status" in error)) return null
-    return typeof error.status === "string" && /^[A-Z][A-Z0-9_]{0,79}$/.test(error.status)
-      ? error.status
-      : null
-  } catch (error) {
-    if (isAbortError(error)) throw error
-    return null
-  }
-}
-
-function isAbortError(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "name" in error && error.name === "AbortError"
 }
 
 function diagnosticFromRequest(
