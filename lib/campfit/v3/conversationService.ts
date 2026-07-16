@@ -62,6 +62,7 @@ export async function processConversationMessage(input: {
   let state = input.currentState
   let model: CampfitV3ModelResponse | null = null
   let providerDiagnostic: CampfitV3ProviderDiagnostic | null = null
+  let deterministicFacts: readonly CampfitV3Fact[] = []
   const warnings: string[] = []
   const sensitiveHealthDetail = containsSensitiveHealthDetail(input.userMessage)
   const specialCareAnswer = currentQuestion?.key === "special_care_follow_up"
@@ -96,9 +97,10 @@ export async function processConversationMessage(input: {
         evidence: "특별관리 후속 확인이 필요하다고 답함",
       })]
       : extractedFacts
+    deterministicFacts = privacySafeFacts
     const deterministic = markChangedExplicitFactsAsCorrections(
       state,
-      privacySafeFacts,
+      deterministicFacts,
       isCorrectionLanguage(input.userMessage),
     )
     state = mergeFacts(state, deterministic)
@@ -113,10 +115,13 @@ export async function processConversationMessage(input: {
     if (model !== null) state = mergeModelResponse(state, model, safeUserMessage)
   }
 
+  const partialUnderstanding = deterministicFacts.length > 0 || (model?.facts.length ?? 0) > 0
   if (currentQuestion !== null) {
     state = isQuestionCompleted(currentQuestion, state)
       ? markQuestionCompleted(state, currentQuestion.key)
-      : markQuestionFailed(state, currentQuestion.key)
+      : partialUnderstanding
+        ? keepQuestionPending(state, currentQuestion.key)
+        : markQuestionFailed(state, currentQuestion.key)
   }
 
   const updatedBasicInfo = applyBasicInfoFacts(input.basicInfo, state)
@@ -131,16 +136,21 @@ export async function processConversationMessage(input: {
 
   const targetUpdated = currentQuestion === null || state.completedQuestionKeys.includes(currentQuestion.key)
   const diagnostics = buildDiagnostics(input.quickReplyKey, model, providerDiagnostic, targetUpdated)
-  const diagnosticWarning = warningForDiagnostics(diagnostics, targetUpdated)
+  const diagnosticWarning = warningForDiagnostics(diagnostics, targetUpdated, partialUnderstanding)
   if (diagnosticWarning !== null) warnings.push(diagnosticWarning)
   const maxReached = !ready && nextQuestion === null && state.questionCount >= 10
   if (maxReached) warnings.push("최대 질문 수에 도달했지만 필수 조건이 남아 있어 결과를 만들지 않았습니다.")
 
+  const nextQuestionText = currentQuestion === null || targetUpdated
+    ? nextQuestion?.title ?? "확인이 필요한 조건을 다시 살펴보고 있어요."
+    : followUpQuestionText(currentQuestion, input.transcript)
   const assistantMessage = ready
     ? "필요한 내용을 모두 확인했어요. 지금 조건에 맞는 경험 방향과 도시, 프로그램 후보를 정리해볼게요."
-    : currentQuestion !== null && !targetUpdated
-      ? `아직 ${currentQuestion.title.replace(/[?？]$/, "")} 내용을 확인하지 못했어요.\n\n${currentQuestion.title}`
-      : `${acknowledgement(model)}\n\n${nextQuestion?.title ?? "확인이 필요한 조건을 다시 살펴보고 있어요."}`
+      : currentQuestion !== null && !targetUpdated
+      ? partialUnderstanding
+        ? `${acknowledgement(model, deterministicFacts, input.userMessage, input.transcript)}\n\n${nextQuestionText}`
+        : `아직 답변을 충분히 파악하지 못했어요.\n\n${nextQuestionText}`
+      : `${acknowledgement(model, deterministicFacts, input.userMessage, input.transcript)}\n\n${nextQuestionText}`
 
   return {
     assistantMessage,
@@ -244,6 +254,15 @@ function markQuestionFailed(state: CampfitV3ConversationState, questionKey: stri
   }
 }
 
+function keepQuestionPending(state: CampfitV3ConversationState, questionKey: string): CampfitV3ConversationState {
+  return {
+    ...state,
+    completedQuestionKeys: state.completedQuestionKeys.filter((key) => key !== questionKey),
+    failedQuestionKeys: state.failedQuestionKeys.filter((key) => key !== questionKey),
+    currentQuestionKey: questionKey,
+  }
+}
+
 function buildDiagnostics(
   quickReplyKey: string | null,
   model: CampfitV3ModelResponse | null,
@@ -286,7 +305,8 @@ function noAiDiagnostics(): CampfitV3AiDiagnostics {
   }
 }
 
-function warningForDiagnostics(diagnostics: CampfitV3AiDiagnostics, targetUpdated: boolean): string | null {
+function warningForDiagnostics(diagnostics: CampfitV3AiDiagnostics, targetUpdated: boolean, partialUnderstanding: boolean): string | null {
+  if (partialUnderstanding && diagnostics.fallbackReason !== null) return "말씀해주신 내용을 기준으로 상담을 이어갈게요."
   if (targetUpdated && diagnostics.fallbackReason !== null) {
     return "AI 분석을 사용할 수 없어 입력 문장에서 확인 가능한 내용만 반영했습니다."
   }
@@ -310,10 +330,61 @@ function warningForDiagnostics(diagnostics: CampfitV3AiDiagnostics, targetUpdate
   }
 }
 
-function acknowledgement(model: CampfitV3ModelResponse | null): string {
-  if (model === null) return "답변을 확인했어요."
-  if (model.facts.some((fact) => fact.key === "specialCareFollowUp")) return "별도로 확인할 사항의 존재 여부만 반영했어요. 상세 내용은 프로그램 상담 단계에서 확인해 주세요."
-  return model.assistantMessage
+function acknowledgement(
+  model: CampfitV3ModelResponse | null,
+  deterministicFacts: readonly CampfitV3Fact[],
+  userMessage: string,
+  transcript: readonly CampfitV3TranscriptMessage[],
+): string {
+  const candidate = model === null
+    ? fallbackAcknowledgement(deterministicFacts, userMessage)
+    : model.facts.some((fact) => fact.key === "specialCareFollowUp")
+      ? "별도로 확인할 사항의 존재 여부만 반영했어요. 상세 내용은 프로그램 상담 단계에서 확인해 주세요."
+      : model.assistantMessage
+  const previousAssistant = [...transcript].reverse().find((item) => item.role === "assistant")?.content
+  if (model !== null && previousAssistant !== undefined && normalizeMessage(candidate).includes(normalizeMessage(previousAssistant))) {
+    return fallbackAcknowledgement(deterministicFacts, userMessage)
+  }
+  return dedupeMessage(candidate)
+}
+
+function fallbackAcknowledgement(facts: readonly CampfitV3Fact[], userMessage: string): string {
+  const parts: string[] = []
+  const desiredOutcomes = stringArrayValue(facts.find((fact) => fact.key === "desiredOutcomes")?.value)
+  const stayGoals = stringArrayValue(facts.find((fact) => fact.key === "parentStayGoals")?.value)
+  if (desiredOutcomes.includes("english_exposure")) parts.push("영어 환경 경험과 앞으로의 영어 노출 계획")
+  if (/(보호자|엄마|아빠|부모).{0,20}(같이|동행|함께|머물|갈)/u.test(userMessage)) parts.push("보호자 동반")
+  if (stayGoals.includes("remoteWork")) parts.push("현지 원격근무 계획")
+  if (parts.length === 0 && facts.length > 0) return "말씀해주신 내용을 확인했어요."
+  if (parts.length === 0) return "답변을 확인했어요."
+  return `${joinKorean(parts)}을 확인했어요.`
+}
+
+function followUpQuestionText(question: ReturnType<typeof getQuestion>, transcript: readonly CampfitV3TranscriptMessage[]): string {
+  if (question === null) return "확인이 필요한 조건을 다시 살펴보고 있어요."
+  const previousAssistant = [...transcript].reverse().find((item) => item.role === "assistant")?.content
+  if (previousAssistant !== undefined && normalizeMessage(previousAssistant) === normalizeMessage(question.title)) {
+    return question.followUpTitle ?? "이 조건을 조금 더 구체적으로 알려주실 수 있을까요?"
+  }
+  return question.followUpTitle ?? question.title
+}
+
+function dedupeMessage(message: string): string {
+  const paragraphs = message.split(/\n{2,}/u).map((paragraph) => paragraph.trim()).filter(Boolean)
+  return Array.from(new Set(paragraphs)).join("\n\n")
+}
+
+function normalizeMessage(message: string): string {
+  return message.replace(/\s+/gu, " ").trim()
+}
+
+function stringArrayValue(value: unknown): readonly string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string") ? value : []
+}
+
+function joinKorean(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? "말씀해주신 내용"
+  return `${items.slice(0, -1).join(", ")}과 ${items[items.length - 1]}`
 }
 
 function isCorrectionLanguage(message: string): boolean {

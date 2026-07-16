@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { processConversationMessage, startConversation } from "@/lib/campfit/v3/conversationService"
 import { selectNextQuestion } from "@/lib/campfit/v3/questionBank"
+import { calculateProgress } from "@/lib/campfit/v3/progress"
 import { createFact, createInitialConversationState, extractDeterministicFacts, mergeFacts } from "@/lib/campfit/v3/stateEngine"
 import type { CampfitV3BasicInfo } from "@/types/campfitV3"
 import type { CampfitV3LLMProvider } from "@/lib/campfit/v3/provider"
@@ -44,6 +45,20 @@ describe("CampFit v3 conversational counselor flow", () => {
     expect(facts.find((fact) => fact.key === "parentEnglishCommunication")?.value).toBe("possible")
     expect(facts.some((fact) => fact.key === "desiredOutcomes")).toBe(false)
     expect(facts.some((fact) => fact.key === "koreanSupportNeed")).toBe(false)
+  })
+
+  it("treats an English-kindergarten mention as experience, not a current level", () => {
+    const facts = extractDeterministicFacts("영어유치원을 다녔어요.")
+    expect(facts.find((fact) => fact.key === "childEnglishLevel")).toBeUndefined()
+    expect(facts.find((fact) => fact.key === "experienceGoals")?.value).toMatchObject({ englishIntensive: "primary" })
+    expect(facts.find((fact) => fact.key === "desiredOutcomes")?.value).toEqual(expect.arrayContaining(["english_exposure"]))
+  })
+
+  it("recognizes general English exposure goals without inventing a current level", () => {
+    const facts = extractDeterministicFacts("영어를 계속 접하게 해주고 영어 감을 유지했으면 해요.")
+    expect(facts.find((fact) => fact.key === "childEnglishLevel")).toBeUndefined()
+    expect(facts.find((fact) => fact.key === "experienceGoals")?.value).toMatchObject({ englishIntensive: "primary" })
+    expect(facts.find((fact) => fact.key === "desiredOutcomes")?.value).toEqual(expect.arrayContaining(["english_exposure"]))
   })
 
   it("keeps a project preference ahead of contrasted general-experience wording", () => {
@@ -121,6 +136,112 @@ describe("CampFit v3 conversational counselor flow", () => {
     expect(response.updatedState.facts.parentEnglishCommunication?.value).toBe("possible")
     expect(response.updatedState.facts.destinationPreference?.value).toEqual(["New Zealand"])
     expect(response.questionKey).not.toBe("child_english_level")
+  })
+
+  it("keeps partial multi-fact understanding instead of failing the opening question", async () => {
+    const start = startConversation(basicInfo)
+    const opening = [{
+      role: "assistant" as const,
+      content: start.assistantMessage,
+      questionKey: start.questionKey ?? undefined,
+    }]
+    const userMessage = "영어유치원을 다녀서 영어를 자연스럽게 습득한 아이입니다. 초등입학 이후 영어 사용 기회가 적어서 방학을 맞아 캠프 가려고 해요. 보호자가 1명 같이 갈거고 현지에서 원격근무할 예정입니다."
+    const response = await processConversationMessage({
+      transcript: opening,
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage,
+      quickReplyKey: null,
+      provider: fallbackProvider,
+    })
+
+    expect(extractDeterministicFacts(userMessage).length).toBeGreaterThanOrEqual(3)
+    expect(response.updatedState.facts.experienceGoals?.value).toMatchObject({ englishIntensive: "primary" })
+    expect(response.updatedState.facts.desiredOutcomes?.value).toEqual(expect.arrayContaining(["english_exposure"]))
+    expect(response.updatedState.facts.parentStayGoals?.value).toEqual(expect.arrayContaining(["remoteWork"]))
+    expect(response.updatedState.facts.childEnglishLevel).toBeUndefined()
+    expect(response.updatedBasicInfo.guardianStaysNearby).toBe(true)
+    expect(response.updatedBasicInfo.adultCount).toBe(1)
+    expect(response.updatedState.failedQuestionKeys).not.toContain("child_english_level")
+    expect(response.updatedState.currentQuestionKey).toBe("child_english_level")
+    expect(response.questionKey).toBe("child_english_level")
+    expect(response.quickReplies.map((reply) => reply.key)).toEqual(["beginner", "basic", "intermediate", "advanced"])
+    expect(response.assistantMessage).toContain("영어")
+    expect(response.assistantMessage).not.toContain("내용을 확인하지 못했어요")
+    expect(response.assistantMessage).not.toContain(start.assistantMessage)
+    expect(response.assistantMessage.split("\n\n").length).toBe(2)
+    expect(response.progress).toBe(calculateProgress(response.updatedBasicInfo, response.updatedState))
+  })
+
+  it("does not infer current English level from English-kindergarten experience alone", async () => {
+    const start = startConversation(basicInfo)
+    const response = await processConversationMessage({
+      transcript: [{ role: "assistant", content: start.assistantMessage, questionKey: start.questionKey ?? undefined }],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "영어유치원은 다녔지만 지금 회화 수준은 잘 모르겠어요. 엄마가 같이 가서 일할 예정이에요.",
+      quickReplyKey: null,
+      provider: fallbackProvider,
+    })
+
+    expect(response.updatedState.facts.childEnglishLevel).toBeUndefined()
+    expect(response.updatedState.facts.experienceGoals?.value).toMatchObject({ englishIntensive: "primary" })
+    expect(response.updatedState.facts.parentStayGoals?.value).toEqual(expect.arrayContaining(["remoteWork"]))
+    expect(response.updatedState.failedQuestionKeys).not.toContain("child_english_level")
+    expect(response.questionKey).toBe("child_english_level")
+    expect(response.assistantMessage).not.toContain("내용을 확인하지 못했어요")
+    expect(response.assistantMessage).not.toContain(start.assistantMessage)
+  })
+
+  it("keeps a genuinely unknown answer as one failed follow-up without duplicating the opening", async () => {
+    const start = startConversation(basicInfo)
+    const response = await processConversationMessage({
+      transcript: [{ role: "assistant", content: start.assistantMessage, questionKey: start.questionKey ?? undefined }],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "그냥 잘 모르겠어요.",
+      quickReplyKey: null,
+      provider: fallbackProvider,
+    })
+
+    expect(response.updatedState.failedQuestionKeys).toContain("child_english_level")
+    expect(response.questionKey).toBe("child_english_level")
+    expect(response.assistantMessage).toContain("아직 답변을 충분히 파악하지 못했어요.")
+    expect(response.assistantMessage).toContain("현재 아이가 영어로 어느 정도 소통할 수 있는지만")
+    expect(response.assistantMessage).not.toContain(start.assistantMessage)
+    expect(response.assistantMessage.split("\n\n")).toHaveLength(2)
+  })
+
+  it("uses the same partial response when the provider times out", async () => {
+    const timeoutProvider: CampfitV3LLMProvider = {
+      ...fallbackProvider,
+      getLastDiagnostic: () => ({
+        code: "timeout",
+        providerResponseReceived: false,
+        httpStatus: null,
+        errorStatus: null,
+        repaired: false,
+        requestCount: 1,
+        elapsedMs: 7_000,
+      }),
+    }
+    const start = startConversation(basicInfo)
+    const response = await processConversationMessage({
+      transcript: [{ role: "assistant", content: start.assistantMessage, questionKey: start.questionKey ?? undefined }],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "영어유치원을 다녀서 영어를 자연스럽게 습득한 아이입니다. 보호자가 같이 가서 현지에서 원격근무할 예정입니다.",
+      quickReplyKey: null,
+      provider: timeoutProvider,
+    })
+
+    expect(response.aiUsed).toBe(false)
+    expect(response.diagnostics?.fallbackReason).toBe("timeout")
+    expect(response.warnings).toContain("말씀해주신 내용을 기준으로 상담을 이어갈게요.")
+    expect(response.updatedState.facts.desiredOutcomes?.value).toEqual(expect.arrayContaining(["english_exposure"]))
+    expect(response.updatedState.failedQuestionKeys).not.toContain("child_english_level")
+    expect(response.assistantMessage).not.toContain("내용을 확인하지 못했어요")
+    expect(response.assistantMessage).not.toContain(start.assistantMessage)
   })
 
   it("retains the four-turn counselor context without re-asking completed facts", async () => {

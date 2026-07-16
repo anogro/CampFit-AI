@@ -255,11 +255,13 @@ export function extractDeterministicFacts(
   if (/(첫 경험이 아니|해외.*경험.*있)/.test(text)) push("isFirstOverseasEducationExperience", "child", false)
 
   const goals: Partial<Record<ExperienceDirectionKey, ExperienceGoalStrength>> = {}
+  const englishExposureContext = /(영어유치원|영어\s*환경|영어를?\s*(?:자연스럽게|계속|자주)\s*(?:접|배우)|영어\s*노출|영어\s*사용\s*기회|영어\s*경험|영어\s*감|영어.{0,12}(?:유지|확대|늘리))/iu.test(text)
   if (/(국제학교|현지학교|학교 분위기|학교 프로그램|학교 수업|스쿨링|학교처럼|시간표|수업 시간|학교식)/.test(text)) goals.schoolSchooling = "primary"
   if (/(영어 실력|영어 자신감|영어 집중|영어.*늘)/.test(text)) goals.englishIntensive = goals.schoolSchooling ? "secondary" : "primary"
+  if (englishExposureContext) goals.englishIntensive = goals.schoolSchooling ? "secondary" : "primary"
   if (/(STEM|코딩|로봇|프로젝트|미술|스포츠|관심 분야)/i.test(text)) goals.subjectProject = "primary"
   const projectPreferredOverGeneralExperience = /(?:문화|활동|체험).{0,16}(?:보다|보다는|말고).{0,24}(?:STEM|코딩|로봇|프로젝트|과학|결과물)/i.test(text)
-  if (!projectPreferredOverGeneralExperience && /(문화|활동|체험|즐거운|자연스럽게)/.test(text)) goals.cultureActivity = "primary"
+  if (!projectPreferredOverGeneralExperience && /(문화|활동|체험|즐거운)/.test(text)) goals.cultureActivity = "primary"
   if (Object.keys(goals).length) push("experienceGoals", "preference", completeGoals(goals))
   if (/(공부만|학업만|수업만).{0,8}(싫|피하)/.test(text)) push("studyOnlyAvoidance", "preference", true)
 
@@ -286,6 +288,7 @@ export function extractDeterministicFacts(
   if (preferredActivities.length) push("preferredActivities", "preference", Array.from(new Set(preferredActivities)))
 
   const desiredOutcomes: string[] = []
+  if (englishExposureContext) desiredOutcomes.push("english_exposure")
   if (/(영어.*(늘|성장|자신감)|영어를? 배우)/.test(text)) desiredOutcomes.push("english_confidence")
   if (/(적응|독립심|자신감|성장|새로운 경험)/.test(text)) desiredOutcomes.push("confidence_and_adaptation")
   if (/(친구|또래|사람을? 만나는)/.test(text)) desiredOutcomes.push("peer_connection")
@@ -317,7 +320,7 @@ export function extractDeterministicFacts(
   if (parentStayContext && /(카페|식당|맛집)/.test(text)) stayGoals.push("cafeDining")
   if (parentStayContext && /(관광|문화)/.test(text)) stayGoals.push("tourismCulture")
   if (parentStayContext && /(자연|해변|바다)/.test(text)) stayGoals.push("natureBeach")
-  if (parentStayContext && /(원격근무|재택|일해야|카페.{0,8}일)/.test(text)) stayGoals.push("remoteWork")
+  if (parentStayContext && /(원격근무|재택|일해야|일할 예정|일할 거|카페.{0,8}일)/.test(text)) stayGoals.push("remoteWork")
   if (stayGoals.length) push("parentStayGoals", "parent", Array.from(new Set(stayGoals)))
 
   const regions: string[] = []

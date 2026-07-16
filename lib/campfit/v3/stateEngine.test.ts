@@ -176,7 +176,7 @@ describe("CampFit v3 state and question engine", () => {
     expect(response.aiUsed).toBe(false)
     expect(response.questionKey).toBe("special_care_follow_up")
     expect(response.updatedState.facts.childEnglishLevel?.value).toBe("beginner")
-    expect(response.warnings).toContain("AI 분석을 사용할 수 없어 입력 문장에서 확인 가능한 내용만 반영했습니다.")
+    expect(response.warnings).toContain("말씀해주신 내용을 기준으로 상담을 이어갈게요.")
     expect(response.warnings.join(" ")).not.toContain("같은 질문")
   })
 
