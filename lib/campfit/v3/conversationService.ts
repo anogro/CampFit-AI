@@ -288,6 +288,16 @@ function buildDiagnostics(
     providerErrorStatus: provider?.errorStatus ?? null,
     providerRequestCount,
     elapsedMs: provider?.elapsedMs ?? 0,
+    ...(provider?.errorName === undefined ? {} : {
+      errorName: provider.errorName ?? null,
+      errorMessage: provider.errorMessage ?? null,
+      causeName: provider.causeName ?? null,
+      causeCode: provider.causeCode ?? null,
+      causeErrno: provider.causeErrno ?? null,
+      causeSyscall: provider.causeSyscall ?? null,
+      causeHostname: provider.causeHostname ?? null,
+      causeMessage: provider.causeMessage ?? null,
+    }),
   }
 }
 

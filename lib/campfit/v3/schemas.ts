@@ -121,6 +121,14 @@ export const CampfitV3ConversationResponseSchema = z.object({
     providerErrorStatus: z.string().regex(/^[A-Z][A-Z0-9_]{0,79}$/).nullable(),
     providerRequestCount: z.number().int().min(0).max(2),
     elapsedMs: z.number().int().nonnegative(),
+    errorName: z.string().max(120).nullable().optional(),
+    errorMessage: z.string().max(240).nullable().optional(),
+    causeName: z.string().max(120).nullable().optional(),
+    causeCode: z.string().max(100).nullable().optional(),
+    causeErrno: z.union([z.string().max(100), z.number().finite()]).nullable().optional(),
+    causeSyscall: z.string().max(120).nullable().optional(),
+    causeHostname: z.string().max(253).nullable().optional(),
+    causeMessage: z.string().max(240).nullable().optional(),
   }).optional(),
 })
 

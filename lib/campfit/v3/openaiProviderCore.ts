@@ -9,6 +9,7 @@ import type {
   CampfitV3ModelResponse,
   CampfitV3ProviderDiagnostic,
   CampfitV3ProviderDiagnosticCode,
+  CampfitV3ProviderErrorMetadata,
 } from "@/lib/campfit/v3/provider"
 import { campfitV3FactKeys, campfitV3FactSubjects } from "@/types/campfitV3"
 
@@ -123,6 +124,7 @@ type OpenAIRequestResult = {
   readonly providerResponseReceived: boolean
   readonly httpStatus: number | null
   readonly errorStatus: string | null
+  readonly error: CampfitV3ProviderErrorMetadata | null
 }
 
 type ParsedResponseText = { readonly text: string | null; readonly envelopeValid: boolean }
@@ -240,6 +242,7 @@ export class OpenAICampfitV3ProviderCore implements CampfitV3LLMProvider {
         providerResponseReceived: false,
         httpStatus: null,
         errorStatus: null,
+        error: null,
       }
     }
     const transport = await requestProviderJson({
@@ -268,6 +271,7 @@ export class OpenAICampfitV3ProviderCore implements CampfitV3LLMProvider {
       providerResponseReceived: transport.providerResponseReceived,
       httpStatus: transport.httpStatus,
       errorStatus: transport.errorStatus,
+      error: transport.error,
     }
   }
 }
@@ -300,6 +304,7 @@ function diagnosticFromTransport(
     repaired,
     requestCount,
     elapsedMs,
+    ...result.error,
   }
 }
 
@@ -317,6 +322,7 @@ function successfulDiagnostic(
     repaired,
     requestCount,
     elapsedMs,
+    ...result.error,
   }
 }
 

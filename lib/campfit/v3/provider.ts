@@ -26,6 +26,21 @@ export type CampfitV3ProviderDiagnosticCode =
   | "semantic_validation_failed"
   | "unknown_provider_error"
 
+/**
+ * Non-sensitive metadata retained from a failed provider transport. These
+ * values are only emitted by the preview-gated diagnostics logger.
+ */
+export type CampfitV3ProviderErrorMetadata = {
+  readonly errorName: string | null
+  readonly errorMessage: string | null
+  readonly causeName: string | null
+  readonly causeCode: string | null
+  readonly causeErrno: string | number | null
+  readonly causeSyscall: string | null
+  readonly causeHostname: string | null
+  readonly causeMessage: string | null
+}
+
 export type CampfitV3ProviderDiagnostic = {
   readonly code: CampfitV3ProviderDiagnosticCode
   readonly providerResponseReceived: boolean
@@ -34,6 +49,14 @@ export type CampfitV3ProviderDiagnostic = {
   readonly repaired: boolean
   readonly requestCount: number
   readonly elapsedMs: number
+  readonly errorName?: string | null
+  readonly errorMessage?: string | null
+  readonly causeName?: string | null
+  readonly causeCode?: string | null
+  readonly causeErrno?: string | number | null
+  readonly causeSyscall?: string | null
+  readonly causeHostname?: string | null
+  readonly causeMessage?: string | null
 }
 
 export type AnalyzeConversationInput = {

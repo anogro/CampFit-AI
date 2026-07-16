@@ -4,7 +4,7 @@ import {
   CampfitV3ConversationMessageRequestSchema,
   CampfitV3ConversationResponseSchema,
 } from "@/lib/campfit/v3/schemas"
-import { createConversationProvider } from "@/lib/campfit/v3/server/providerFactory"
+import { createConversationProvider, resolveAiProvider } from "@/lib/campfit/v3/server/providerFactory"
 import type { CampfitV3ConversationResponse } from "@/types/campfitV3"
 
 export async function POST(request: Request) {
@@ -19,6 +19,7 @@ export async function POST(request: Request) {
       provider: createConversationProvider(providerOptions()),
     })
     const validated = CampfitV3ConversationResponseSchema.parse(response)
+    logProviderResult(validated)
     return NextResponse.json(toPublicConversationResponse(validated))
   } catch {
     return NextResponse.json(
@@ -61,6 +62,42 @@ function toPublicConversationResponse(
 function shouldExposeDiagnostics(): boolean {
   return process.env["NODE_ENV"] !== "production"
     && process.env["CAMPFIT_V3_INCLUDE_DIAGNOSTICS"] === "true"
+}
+
+function logProviderResult(response: CampfitV3ConversationResponse): void {
+  if (!shouldLogProviderResult() || response.diagnostics === undefined) return
+
+  const selectedProvider = resolveAiProvider()
+  const selectedModel = (selectedProvider === "openai" ? process.env["OPENAI_MODEL"] : process.env["GEMINI_MODEL"])?.trim() || null
+  const diagnostics = response.diagnostics
+  console.info(JSON.stringify({
+    event: "campfit_v3_provider_result",
+    selectedProvider,
+    selectedModel,
+    providerCallAttempted: diagnostics.providerCallAttempted,
+    providerResponseReceived: diagnostics.providerResponseReceived,
+    providerResponseValidated: diagnostics.providerResponseValidated,
+    providerHttpStatus: diagnostics.providerHttpStatus,
+    providerRequestCount: diagnostics.providerRequestCount,
+    providerElapsedMs: diagnostics.elapsedMs,
+    aiUsed: diagnostics.aiUsed,
+    fallbackReason: diagnostics.fallbackReason,
+    errorName: diagnostics.errorName ?? null,
+    errorMessage: diagnostics.errorMessage ?? null,
+    causeName: diagnostics.causeName ?? null,
+    causeCode: diagnostics.causeCode ?? null,
+    causeErrno: diagnostics.causeErrno ?? null,
+    causeSyscall: diagnostics.causeSyscall ?? null,
+    causeHostname: diagnostics.causeHostname ?? null,
+    causeMessage: diagnostics.causeMessage ?? null,
+    runtime: process.version,
+    vercelRegion: process.env["VERCEL_REGION"] ?? null,
+  }))
+}
+
+function shouldLogProviderResult(): boolean {
+  return process.env["VERCEL_ENV"] === "preview"
+    || (process.env["NODE_ENV"] !== "production" && process.env["CAMPFIT_V3_INCLUDE_DIAGNOSTICS"] === "true")
 }
 
 async function safeJson(request: Request): Promise<unknown> {

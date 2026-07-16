@@ -2,13 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const processConversationMessage = vi.hoisted(() => vi.fn())
 const providerConstructed = vi.hoisted(() => vi.fn())
+const resolveAiProvider = vi.hoisted(() => vi.fn(() => "gemini"))
 const createConversationProvider = vi.hoisted(() => vi.fn((options?: unknown) => {
   providerConstructed(options)
   return {}
 }))
 
 vi.mock("@/lib/campfit/v3/conversationService", () => ({ processConversationMessage }))
-vi.mock("@/lib/campfit/v3/server/providerFactory", () => ({ createConversationProvider }))
+vi.mock("@/lib/campfit/v3/server/providerFactory", () => ({ createConversationProvider, resolveAiProvider }))
 
 import { POST } from "@/app/api/campfit/v3/conversation/message/route"
 
@@ -57,6 +58,14 @@ const serviceResponse = {
     providerErrorStatus: null,
     providerRequestCount: 1,
     elapsedMs: 5_106,
+    errorName: "TypeError",
+    errorMessage: "fetch failed",
+    causeName: "Error",
+    causeCode: "ECONNRESET",
+    causeErrno: -104,
+    causeSyscall: "connect",
+    causeHostname: "api.openai.com",
+    causeMessage: "socket hang up",
     rawPrompt: "must never leave the server",
     rawProviderBody: "must also never leave the server",
     apiKey: "secret-key",
@@ -86,6 +95,7 @@ describe("CampFit v3 conversation message route", () => {
   afterEach(() => {
     vi.unstubAllEnvs()
     vi.clearAllMocks()
+    vi.restoreAllMocks()
   })
 
   it("uses the selected server provider for a normal free-text request", async () => {
@@ -159,6 +169,51 @@ describe("CampFit v3 conversation message route", () => {
     const payload = await (await POST(request())).json() as Record<string, unknown>
 
     expect(payload).not.toHaveProperty("diagnostics")
+  })
+
+  it("writes one safe provider result log for preview runtime diagnostics", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview")
+    vi.stubEnv("AI_PROVIDER", "openai")
+    vi.stubEnv("OPENAI_MODEL", "preview-model")
+    vi.stubEnv("VERCEL_REGION", "icn1")
+    resolveAiProvider.mockReturnValue("openai")
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined)
+
+    expect((await POST(request())).status).toBe(200)
+    expect(info).toHaveBeenCalledTimes(1)
+    expect(JSON.parse(String(info.mock.calls[0]?.[0]))).toEqual({
+      event: "campfit_v3_provider_result",
+      selectedProvider: "openai",
+      selectedModel: "preview-model",
+      providerCallAttempted: true,
+      providerResponseReceived: true,
+      providerResponseValidated: true,
+      providerHttpStatus: 200,
+      providerRequestCount: 1,
+      providerElapsedMs: 5_106,
+      aiUsed: true,
+      fallbackReason: null,
+      errorName: "TypeError",
+      errorMessage: "fetch failed",
+      causeName: "Error",
+      causeCode: "ECONNRESET",
+      causeErrno: -104,
+      causeSyscall: "connect",
+      causeHostname: "api.openai.com",
+      causeMessage: "socket hang up",
+      runtime: process.version,
+      vercelRegion: "icn1",
+    })
+  })
+
+  it("does not write provider result logs in production", async () => {
+    vi.stubEnv("NODE_ENV", "production")
+    vi.stubEnv("VERCEL_ENV", "production")
+    vi.stubEnv("CAMPFIT_V3_INCLUDE_DIAGNOSTICS", "true")
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined)
+
+    expect((await POST(request())).status).toBe(200)
+    expect(info).not.toHaveBeenCalled()
   })
 
   it("does not claim a failed answer was saved", async () => {

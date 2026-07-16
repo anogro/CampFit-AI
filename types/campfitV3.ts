@@ -123,6 +123,14 @@ export type CampfitV3AiDiagnostics = {
   readonly providerErrorStatus: string | null
   readonly providerRequestCount: number
   readonly elapsedMs: number
+  readonly errorName?: string | null | undefined
+  readonly errorMessage?: string | null | undefined
+  readonly causeName?: string | null | undefined
+  readonly causeCode?: string | null | undefined
+  readonly causeErrno?: string | number | null | undefined
+  readonly causeSyscall?: string | null | undefined
+  readonly causeHostname?: string | null | undefined
+  readonly causeMessage?: string | null | undefined
 }
 
 export type CampfitV3ConversationResponse = {

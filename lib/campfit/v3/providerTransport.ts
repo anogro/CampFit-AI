@@ -1,4 +1,7 @@
-import type { CampfitV3ProviderDiagnosticCode } from "@/lib/campfit/v3/provider"
+import type {
+  CampfitV3ProviderDiagnosticCode,
+  CampfitV3ProviderErrorMetadata,
+} from "@/lib/campfit/v3/provider"
 
 export type ProviderTransportResult = {
   readonly body: unknown | null
@@ -7,6 +10,7 @@ export type ProviderTransportResult = {
   readonly providerResponseReceived: boolean
   readonly httpStatus: number | null
   readonly errorStatus: string | null
+  readonly error: CampfitV3ProviderErrorMetadata | null
 }
 
 type ProviderTransportInput = {
@@ -42,6 +46,7 @@ export async function requestProviderJson(input: ProviderTransportInput): Promis
         providerResponseReceived: true,
         httpStatus: response.status,
         errorStatus: readProviderErrorStatus(responseBody),
+        error: null,
       }
     }
 
@@ -53,6 +58,7 @@ export async function requestProviderJson(input: ProviderTransportInput): Promis
         providerResponseReceived: true,
         httpStatus: response.status,
         errorStatus: null,
+        error: null,
       }
     }
 
@@ -63,6 +69,7 @@ export async function requestProviderJson(input: ProviderTransportInput): Promis
       providerResponseReceived: true,
       httpStatus: response.status,
       errorStatus: null,
+      error: null,
     }
   })()
 
@@ -87,6 +94,7 @@ export async function requestProviderJson(input: ProviderTransportInput): Promis
       providerResponseReceived: false,
       httpStatus: null,
       errorStatus: null,
+      error: readProviderErrorMetadata(error),
     }
   } finally {
     if (timeout !== undefined) clearTimeout(timeout)
@@ -123,4 +131,61 @@ function readProviderErrorStatus(value: unknown): string | null {
 
 function isAbortError(error: unknown): boolean {
   return typeof error === "object" && error !== null && "name" in error && error.name === "AbortError"
+}
+
+function readProviderErrorMetadata(error: unknown): CampfitV3ProviderErrorMetadata {
+  const cause = readProperty(error, "cause")
+  return {
+    errorName: safeDiagnosticText(readProperty(error, "name")),
+    errorMessage: safeFetchErrorMessage(readProperty(error, "message")),
+    causeName: safeDiagnosticText(readProperty(cause, "name")),
+    causeCode: safeDiagnosticCode(readProperty(cause, "code")),
+    causeErrno: safeDiagnosticErrno(readProperty(cause, "errno")),
+    causeSyscall: safeDiagnosticText(readProperty(cause, "syscall")),
+    causeHostname: safeDiagnosticHostname(readProperty(cause, "hostname")),
+    causeMessage: safeNetworkCauseMessage(readProperty(cause, "message")),
+  }
+}
+
+function readProperty(value: unknown, key: string): unknown {
+  if (typeof value !== "object" || value === null) return undefined
+  return key in value ? (value as Record<string, unknown>)[key] : undefined
+}
+
+function safeDiagnosticText(value: unknown): string | null {
+  if (typeof value !== "string") return null
+  const sanitized = value
+    .replace(/[\u0000-\u001f\u007f]/gu, " ")
+    .replace(/Bearer\s+\S+/giu, "Bearer [redacted]")
+    .trim()
+  return sanitized === "" ? null : sanitized.slice(0, 240)
+}
+
+function safeFetchErrorMessage(value: unknown): string | null {
+  const message = safeDiagnosticText(value)
+  return message !== null && /^(?:fetch failed|AI provider request timed out|The operation was aborted)$/iu.test(message)
+    ? message
+    : null
+}
+
+function safeNetworkCauseMessage(value: unknown): string | null {
+  const message = safeDiagnosticText(value)
+  return message !== null && /(?:UND_ERR_[A-Z0-9_]+|E(?:CONNRESET|CONNREFUSED|TIMEDOUT|NETUNREACH|NOTFOUND|AI_AGAIN)|ETIMEDOUT|CERT_[A-Z0-9_]+|socket hang up)/u.test(message)
+    ? message
+    : null
+}
+
+function safeDiagnosticCode(value: unknown): string | null {
+  if (typeof value !== "string" || !/^[A-Za-z0-9_.-]{1,100}$/u.test(value)) return null
+  return value
+}
+
+function safeDiagnosticErrno(value: unknown): string | number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  return safeDiagnosticCode(value)
+}
+
+function safeDiagnosticHostname(value: unknown): string | null {
+  const hostname = safeDiagnosticText(value)
+  return hostname !== null && hostname.length <= 253 ? hostname : null
 }

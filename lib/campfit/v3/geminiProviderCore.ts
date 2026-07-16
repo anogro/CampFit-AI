@@ -9,6 +9,7 @@ import type {
   CampfitV3ModelResponse,
   CampfitV3ProviderDiagnostic,
   CampfitV3ProviderDiagnosticCode,
+  CampfitV3ProviderErrorMetadata,
 } from "@/lib/campfit/v3/provider"
 
 const defaultModel = "gemini-2.5-flash"
@@ -25,6 +26,7 @@ type GeminiRequestResult = {
   readonly providerResponseReceived: boolean
   readonly httpStatus: number | null
   readonly errorStatus: string | null
+  readonly error: CampfitV3ProviderErrorMetadata | null
 }
 
 type StructuredParseResult =
@@ -156,6 +158,7 @@ async function requestGeminiOnce(prompt: string, timeoutMs: number): Promise<Gem
       providerResponseReceived: false,
       httpStatus: null,
       errorStatus: null,
+      error: null,
     }
   }
 
@@ -185,6 +188,7 @@ async function requestGeminiOnce(prompt: string, timeoutMs: number): Promise<Gem
     providerResponseReceived: transport.providerResponseReceived,
     httpStatus: transport.httpStatus,
     errorStatus: transport.errorStatus,
+    error: transport.error,
   }
 }
 
@@ -202,6 +206,7 @@ function diagnosticFromRequest(
     repaired,
     requestCount,
     elapsedMs,
+    ...result.error,
   }
 }
 
@@ -219,5 +224,6 @@ function successfulDiagnostic(
     repaired,
     requestCount,
     elapsedMs,
+    ...result.error,
   }
 }
