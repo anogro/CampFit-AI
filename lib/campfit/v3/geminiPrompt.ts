@@ -1,3 +1,4 @@
+import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/types/campfitV3"
 import type { AnalyzeConversationInput } from "@/lib/campfit/v3/provider"
 
 export function buildConversationPrompt(input: AnalyzeConversationInput): string {
@@ -59,7 +60,7 @@ export function buildConversationPrompt(input: AnalyzeConversationInput): string
       budgetRangeKrw: { subject: "constraint", shape: { min: "nonnegative integer KRW", max: "positive integer KRW, min <= max" } },
       budgetIncludesFlight: { subject: "constraint", type: "boolean", description: "사용자가 항공료를 전체 예산에 포함한다고 명시했을 때만 true" },
       departureWindow: { subject: "constraint", type: "2~80 character string" },
-      durationWeeks: { subject: "constraint", type: "integer 1~4" },
+      durationWeeks: { subject: "constraint", type: `integer ${CAMPFIT_V3_MIN_DURATION_WEEKS}~${CAMPFIT_V3_MAX_DURATION_WEEKS}` },
     }),
     "설명, Markdown, 코드펜스 없이 다음 필드를 모두 가진 JSON 객체 하나만 반환하세요: assistantMessage(string), facts(array), unresolved(array), conflicts(array), suggestedNextQuestionKey(string), nextAction(ask|recommend), readyForRecommendation(boolean).",
     `응답 JSON 구조 예시: ${JSON.stringify(responseExample)}`,

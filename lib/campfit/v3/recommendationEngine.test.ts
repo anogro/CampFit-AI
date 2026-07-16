@@ -123,6 +123,20 @@ describe("CampFit v3 recommendation engine", () => {
     expect(result.programCandidates[0]?.verify).toContain("가족 구성·기간에 맞는 프로그램 가격")
   })
 
+  it("prices only camp participants when younger traveling children are also present", () => {
+    const result = recommend(
+      "cultureActivity",
+      productionCatalog([program({
+        direction: "cultureActivity",
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 2, currency: "KRW", priceValue: 4_000_000, status: "active" }],
+      })]),
+      {},
+      { childAges: [8], childCount: 2 },
+    )
+
+    expect(result.programCandidates[0]?.priceLabel).not.toBe("가격 확인 필요")
+  })
+
   it("uses only an exact active family price for the budget hard filter", () => {
     const exactTooHigh = program({ id: "too-high", direction: "cultureActivity", price: 9_000_000 })
     const referenceTooHigh = program({

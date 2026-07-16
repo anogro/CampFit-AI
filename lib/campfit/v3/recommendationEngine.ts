@@ -335,7 +335,7 @@ function scoreDestinations(
 
 function toProgramCandidate(item: ScoredProgram, basicInfo: CampfitV3BasicInfo): CampfitV3ProgramCandidate {
   const priceLabel = item.exactPrice?.priceValue !== null && item.exactPrice?.priceValue !== undefined && item.exactPrice.priceValue > 0
-    ? `${formatNumber(item.exactPrice.priceValue)} ${item.exactPrice.currency ?? "통화 미확인"}${item.exactPrice.adultCount === 0 ? ` · 아이 ${basicInfo.childCount}명 프로그램비` : ""}`
+    ? `${formatNumber(item.exactPrice.priceValue)} ${item.exactPrice.currency ?? "통화 미확인"}${item.exactPrice.adultCount === 0 ? ` · 아이 ${basicInfo.childAges.length}명 프로그램비` : ""}`
     : item.program.budgetMinKrw !== null && item.program.budgetMinKrw > 0
       ? `${formatNumber(item.program.budgetMinKrw)}원부터 · 비교용`
       : "가격 확인 필요"
@@ -427,8 +427,9 @@ function estimateCityCost(city: V3CatalogCity, program: V3CatalogProgram | null,
 }
 
 function selectPrice(program: V3CatalogProgram, basicInfo: CampfitV3BasicInfo): V3PriceOption | null {
+  const campParticipantCount = basicInfo.childAges.length
   const matching = program.priceOptions.filter((option) => option.status?.toLowerCase() === "active"
-    && option.childCount === basicInfo.childCount
+    && option.childCount === campParticipantCount
     && option.durationWeeks === basicInfo.durationWeeks)
   const exactFamily = matching.find((option) => option.adultCount === basicInfo.adultCount)
   if (exactFamily) return exactFamily

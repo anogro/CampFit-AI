@@ -5,6 +5,7 @@ import type {
   CampfitV3RecommendationResult,
   ExperienceDirectionKey,
 } from "@/types/campfitV3"
+import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/types/campfitV3"
 
 export type DecisionAxisLevel = "low" | "medium" | "high"
 
@@ -160,8 +161,8 @@ function familyLevel(state: CampfitV3ConversationState, basicInfo: CampfitV3Basi
   const stayGoals = state.facts.parentStayGoals?.value
   const hasStayGoal = Array.isArray(stayGoals) && stayGoals.length > 0
   const hasCompleteBasics = basicInfo.guardianStaysNearby
-    && basicInfo.durationWeeks >= 1
-    && basicInfo.durationWeeks <= 52
+    && basicInfo.durationWeeks >= CAMPFIT_V3_MIN_DURATION_WEEKS
+    && basicInfo.durationWeeks <= CAMPFIT_V3_MAX_DURATION_WEEKS
     && basicInfo.budgetMaxKrw >= basicInfo.budgetMinKrw
     && basicInfo.adultCount >= 1
     && basicInfo.childCount >= 1

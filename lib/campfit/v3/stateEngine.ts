@@ -1,3 +1,4 @@
+import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/types/campfitV3"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationState,
@@ -180,7 +181,7 @@ export function isSemanticallyValidModelFact(input: {
     case "departureWindow":
       return typeof input.value === "string" && input.value.trim().length >= 2 && input.value.trim().length <= 80
     case "durationWeeks":
-      return typeof input.value === "number" && Number.isInteger(input.value) && input.value >= 1 && input.value <= 52
+      return typeof input.value === "number" && Number.isInteger(input.value) && input.value >= CAMPFIT_V3_MIN_DURATION_WEEKS && input.value <= CAMPFIT_V3_MAX_DURATION_WEEKS
   }
 }
 
@@ -453,10 +454,15 @@ function parseDepartureWindow(text: string): string | null {
 function parseDurationWeeks(text: string): number | null {
   if (!/(기간|체류|캠프|주로|주까지|주 정도)/.test(text)) return null
   const range = text.match(/(\d{1,2})\s*[~～-]\s*(\d{1,2})\s*주/)
-  if (range?.[2]) return Number(range[2])
+  if (range?.[2]) {
+    const value = Number(range[2])
+    return value >= CAMPFIT_V3_MIN_DURATION_WEEKS && value <= CAMPFIT_V3_MAX_DURATION_WEEKS ? value : null
+  }
   const matches = [...text.matchAll(/(\d{1,2})\s*주/g)]
   const latest = matches.at(-1)?.[1]
-  return latest === undefined ? null : Number(latest)
+  if (latest === undefined) return null
+  const value = Number(latest)
+  return value >= CAMPFIT_V3_MIN_DURATION_WEEKS && value <= CAMPFIT_V3_MAX_DURATION_WEEKS ? value : null
 }
 
 export function summarizeFacts(state: CampfitV3ConversationState): readonly string[] {

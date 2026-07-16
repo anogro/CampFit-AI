@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { processConversationMessage, startConversation } from "@/lib/campfit/v3/conversationService"
 import { calculateProgress, isReadyForRecommendation } from "@/lib/campfit/v3/progress"
 import { campfitV3QuestionBank, selectNextQuestion } from "@/lib/campfit/v3/questionBank"
+import { CampfitV3BasicInfoSchema } from "@/lib/campfit/v3/schemas"
 import { applyQuickReply, createFact, createInitialConversationState, extractDeterministicFacts, mergeFacts } from "@/lib/campfit/v3/stateEngine"
 import type { CampfitV3LLMProvider } from "@/lib/campfit/v3/provider"
 import type { CampfitV3BasicInfo, CampfitV3ConversationState, CampfitV3FactKey } from "@/types/campfitV3"
@@ -42,6 +43,28 @@ describe("CampFit v3 state and question engine", () => {
     expect(facts.find((fact) => fact.key === "childEnglishLevel")?.value).toBe("beginner")
     expect(facts.find((fact) => fact.key === "parentEnglishCommunication")?.value).toBe("possible")
     expect(facts.find((fact) => fact.key === "koreanSupportNeed")).toBeUndefined()
+  })
+
+  it.each([
+    ["5주 정도 생각하고 있어요.", 5],
+    ["12주까지도 가능해요.", 12],
+  ])("extracts an in-range duration from natural language: %s", (message, expected) => {
+    expect(extractDeterministicFacts(message).find((fact) => fact.key === "durationWeeks")?.value).toBe(expected)
+  })
+
+  it.each(["13주 정도 머물고 싶어요.", "52주 정도 머물고 싶어요.", "반년 정도 머물고 싶어요."]) (
+    "does not confirm an out-of-range duration from %s",
+    (message) => {
+      expect(extractDeterministicFacts(message).find((fact) => fact.key === "durationWeeks")).toBeUndefined()
+    },
+  )
+
+  it.each([1, 4, 5, 12])("accepts %s weeks in the API basic-info schema", (weeks) => {
+    expect(CampfitV3BasicInfoSchema.safeParse({ ...basicInfo, durationWeeks: weeks }).success).toBe(true)
+  })
+
+  it.each([13, 52])("rejects %s weeks in the API basic-info schema", (weeks) => {
+    expect(CampfitV3BasicInfoSchema.safeParse({ ...basicInfo, durationWeeks: weeks }).success).toBe(false)
   })
 
   it("keeps emergency Korean support distinct from daily support", () => {

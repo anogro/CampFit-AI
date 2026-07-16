@@ -62,6 +62,19 @@ describe("CampFit v3 intake draft", () => {
     expect(validation.value?.durationWeeks).toBe(6)
   })
 
+  it.each([1, 4, 5, 12])("accepts a supported duration of %s weeks", (weeks) => {
+    const validation = validateCampfitV3IntakeDraft(completeDraft({ durationWeeks: null, durationMode: "custom", durationCustomWeeks: String(weeks) }))
+    expect(validation.errors.durationWeeks).toBeNull()
+    expect(validation.value?.durationWeeks).toBe(weeks)
+  })
+
+  it.each([13, 52])("rejects a duration of %s weeks outside the service range", (weeks) => {
+    const validation = validateCampfitV3IntakeDraft(completeDraft({ durationWeeks: null, durationMode: "custom", durationCustomWeeks: String(weeks) }))
+    expect(validation.value).toBeNull()
+    expect(validation.errors.durationWeeks).toContain("12주")
+    expect(parseStoredIntakeDraft({ ...completeDraft({ durationWeeks: null, durationMode: "custom", durationCustomWeeks: String(weeks) }) })).toBeNull()
+  })
+
   it("round-trips a submitted value back into an editable draft", () => {
     const value = validateCampfitV3IntakeDraft(completeDraft({ childAges: ["6", "10"], budgetMode: "custom", budgetMinManwon: "650", budgetMaxManwon: "900" })).value
     expect(value).not.toBeNull()

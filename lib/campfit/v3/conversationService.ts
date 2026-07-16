@@ -1,5 +1,6 @@
 import { allowedQuestionKeys, getQuestion, isQuestionCompleted, selectNextQuestion } from "@/lib/campfit/v3/questionBank"
 import { calculateProgress, isReadyForRecommendation, progressMessage } from "@/lib/campfit/v3/progress"
+import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/types/campfitV3"
 import {
   applyQuickReply,
   canonicalizeSpecialCareMessage,
@@ -211,7 +212,7 @@ function applyBasicInfoFacts(basicInfo: CampfitV3BasicInfo, state: CampfitV3Conv
     budgetMinKrw: budgetRange.min,
     budgetMaxKrw: budgetRange.max,
     departureWindow: typeof departure === "string" ? departure : basicInfo.departureWindow,
-    durationWeeks: typeof duration === "number" && Number.isInteger(duration) && duration >= 1 && duration <= 4 ? duration : basicInfo.durationWeeks,
+    durationWeeks: typeof duration === "number" && Number.isInteger(duration) && duration >= CAMPFIT_V3_MIN_DURATION_WEEKS && duration <= CAMPFIT_V3_MAX_DURATION_WEEKS ? duration : basicInfo.durationWeeks,
   }
 }
 

@@ -1,3 +1,6 @@
+export const CAMPFIT_V3_MIN_DURATION_WEEKS = 1
+export const CAMPFIT_V3_MAX_DURATION_WEEKS = 12
+
 export const campfitV3FactSources = [
   "ai_inference",
   "explicit_user_statement",

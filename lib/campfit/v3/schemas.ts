@@ -1,11 +1,11 @@
 import { z } from "zod"
-import { campfitV3FactKeys, campfitV3FactSources, campfitV3FactStatuses, campfitV3FactSubjects } from "@/types/campfitV3"
+import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS, campfitV3FactKeys, campfitV3FactSources, campfitV3FactStatuses, campfitV3FactSubjects } from "@/types/campfitV3"
 
 export const CampfitV3BasicInfoSchema = z
   .object({
     childAges: z.array(z.number().int().min(5).max(12)).min(1).max(5),
     departureWindow: z.string().trim().min(2).max(80),
-    durationWeeks: z.number().int().min(1).max(52),
+    durationWeeks: z.number().int().min(CAMPFIT_V3_MIN_DURATION_WEEKS).max(CAMPFIT_V3_MAX_DURATION_WEEKS),
     budgetMinKrw: z.number().int().nonnegative(),
     budgetMaxKrw: z.number().int().positive(),
     adultCount: z.number().int().min(1).max(8),
@@ -222,7 +222,7 @@ const valueSchemas: Readonly<Record<(typeof campfitV3FactKeys)[number], z.ZodTyp
   budgetRangeKrw: z.object({ min: z.number().int().nonnegative(), max: z.number().int().positive() }).refine((value) => value.min <= value.max),
   budgetIncludesFlight: z.boolean(),
   departureWindow: z.string().trim().min(2).max(80),
-  durationWeeks: z.number().int().min(1).max(52),
+  durationWeeks: z.number().int().min(CAMPFIT_V3_MIN_DURATION_WEEKS).max(CAMPFIT_V3_MAX_DURATION_WEEKS),
 }
 
 function validateFactContract(

@@ -1,4 +1,6 @@
-import type { CampfitV3BasicInfo } from "@/types/campfitV3"
+import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS, type CampfitV3BasicInfo } from "@/types/campfitV3"
+
+export { CAMPFIT_V3_MAX_DURATION_WEEKS } from "@/types/campfitV3"
 
 export const campfitV3BudgetOptions = [
   { key: "preset-0", label: "300만~500만 원", min: 3_000_000, max: 5_000_000 },
@@ -7,7 +9,6 @@ export const campfitV3BudgetOptions = [
   { key: "preset-3", label: "1,200만~2,000만 원", min: 12_000_000, max: 20_000_000 },
 ] as const
 
-export const CAMPFIT_V3_MAX_DURATION_WEEKS = 52
 export const CAMPFIT_V3_MAX_TRAVEL_CHILDREN = 8
 
 export type CampfitV3BudgetMode = "" | (typeof campfitV3BudgetOptions)[number]["key"] | "custom"
@@ -60,7 +61,7 @@ export function validateCampfitV3IntakeDraft(draft: CampfitV3IntakeDraft): Campf
   const durationValue = selectedDurationWeeks(draft)
   const durationWeeks = durationValue === null
     ? "가능한 기간을 선택해 주세요."
-    : Number.isInteger(durationValue) && durationValue >= 1 && durationValue <= CAMPFIT_V3_MAX_DURATION_WEEKS
+    : Number.isInteger(durationValue) && durationValue >= CAMPFIT_V3_MIN_DURATION_WEEKS && durationValue <= CAMPFIT_V3_MAX_DURATION_WEEKS
       ? null
       : `기간은 1주부터 ${CAMPFIT_V3_MAX_DURATION_WEEKS}주까지 입력할 수 있어요.`
   const adultCount = draft.adultCount === null
@@ -150,9 +151,13 @@ export function parseStoredIntakeDraft(value: unknown): CampfitV3IntakeDraft | n
 
   if (!Array.isArray(childAges) || childAges.length < 1 || childAges.length > 5 || !childAges.every((item) => typeof item === "string" && item.length <= 10)) return null
   if (typeof departureWindow !== "string" || departureWindow.length > 200) return null
-  if (durationWeeks !== null && (!Number.isInteger(durationWeeks) || Number(durationWeeks) < 1 || Number(durationWeeks) > CAMPFIT_V3_MAX_DURATION_WEEKS)) return null
+  if (durationWeeks !== null && (!Number.isInteger(durationWeeks) || Number(durationWeeks) < CAMPFIT_V3_MIN_DURATION_WEEKS || Number(durationWeeks) > CAMPFIT_V3_MAX_DURATION_WEEKS)) return null
   if (durationMode !== undefined && durationMode !== "preset" && durationMode !== "custom") return null
   if (durationCustomWeeks !== undefined && (typeof durationCustomWeeks !== "string" || durationCustomWeeks.length > 3)) return null
+  if (typeof durationCustomWeeks === "string" && durationCustomWeeks.trim() !== "") {
+    const parsedCustomWeeks = Number(durationCustomWeeks)
+    if (!Number.isInteger(parsedCustomWeeks) || parsedCustomWeeks < CAMPFIT_V3_MIN_DURATION_WEEKS || parsedCustomWeeks > CAMPFIT_V3_MAX_DURATION_WEEKS) return null
+  }
   if (!isBudgetMode(budgetMode)) return null
   if (typeof budgetMinManwon !== "string" || budgetMinManwon.length > 20) return null
   if (typeof budgetMaxManwon !== "string" || budgetMaxManwon.length > 20) return null
