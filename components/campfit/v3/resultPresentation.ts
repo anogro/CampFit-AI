@@ -85,9 +85,9 @@ export function programCatalogPresentation(
   }
   if (source === "demo") {
     return {
-      sectionTitle: "시연용 예시 프로그램",
-      sectionSubtitle: "가상의 카탈로그로 추천 흐름과 비교 기준을 확인해보세요.",
-      notice: "시연용 예시입니다. 실제 운영·예약·가격 정보가 아니며 업체로 연결되지 않습니다.",
+      sectionTitle: "추천 프로그램 예시",
+      sectionSubtitle: "현재 조건에서 함께 비교할 시연용 후보입니다.",
+      notice: "현재 화면의 프로그램은 추천 흐름을 보여주기 위한 시연용 예시입니다. 실제 운영 일정·가격·모집 여부는 제공기관 확인이 필요합니다.",
       showProgramCards: true,
       unavailableTitle: null,
       unavailableGuidance: null,

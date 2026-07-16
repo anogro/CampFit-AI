@@ -96,7 +96,7 @@ describe("CampFit v3 conversation message route", () => {
 
     expect(response.status).toBe(200)
     expect(providerConstructed).toHaveBeenCalledTimes(1)
-    expect(providerConstructed).toHaveBeenCalledWith({ maxProviderRequests: 2 })
+    expect(providerConstructed).toHaveBeenCalledWith({ maxProviderRequests: 1 })
     expect(processConversationMessage).toHaveBeenCalledWith(expect.objectContaining({
       userMessage: "영어는 초급이에요",
       quickReplyKey: null,
@@ -104,7 +104,7 @@ describe("CampFit v3 conversation message route", () => {
     }))
   })
 
-  it("disables repair only for an explicit non-production evaluation", async () => {
+  it("keeps the product path to one provider request even with evaluation flags", async () => {
     vi.stubEnv("NODE_ENV", "development")
     vi.stubEnv("CAMPFIT_V3_GEMINI_EVALUATION_SINGLE_REQUEST", "true")
 
@@ -112,12 +112,12 @@ describe("CampFit v3 conversation message route", () => {
     expect(providerConstructed).toHaveBeenCalledWith({ maxProviderRequests: 1 })
   })
 
-  it("ignores the evaluation-only single-request flag in production", async () => {
+  it("keeps the product path to one provider request in production", async () => {
     vi.stubEnv("NODE_ENV", "production")
     vi.stubEnv("CAMPFIT_V3_GEMINI_EVALUATION_SINGLE_REQUEST", "true")
 
     expect((await POST(request())).status).toBe(200)
-    expect(providerConstructed).toHaveBeenCalledWith({ maxProviderRequests: 2 })
+    expect(providerConstructed).toHaveBeenCalledWith({ maxProviderRequests: 1 })
   })
 
   it("always strips diagnostics from production responses", async () => {

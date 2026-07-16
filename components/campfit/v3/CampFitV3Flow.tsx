@@ -221,15 +221,15 @@ function StartScreen({ demoMode, onStart }: { readonly demoMode: boolean; readon
             {["스쿨링", "방학캠프", "문화체험", "영어몰입"].map((item) => <span className="rounded-full border border-[var(--cta-glass-border)] bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-primary)]" key={item}>{item}</span>)}
           </div>
           <h1 className="max-w-[720px] text-[2rem] font-bold leading-[1.08] tracking-[-.035em] [word-break:keep-all] sm:text-[3rem] lg:text-[3.5rem]">
-            완벽한 캠프는 없어도,<br />우리 가족의 기준은 있습니다
+            우리 가족에게 맞는 해외 캠프와 도시를<br />AI 상담으로 찾아보세요
           </h1>
           <p className="mt-4 max-w-[620px] text-base font-medium leading-7 text-[var(--text-secondary)] [word-break:keep-all] sm:mt-6 sm:text-lg sm:leading-8">
-            아이의 경험 목표와 가족의 체류 조건을 짧은 대화로 정리해, 비교할 기준을 함께 세워드려요.
+            아이에게 맞는 해외 캠프뿐 아니라 부모가 함께 머물기 좋은 도시까지, 대화로 찾아드립니다. 아이의 영어 수준과 성향, 원하는 경험, 부모의 체류 조건을 함께 살펴 후보를 비교해드려요.
           </p>
           <button className="glass-cta mt-6 inline-flex min-h-14 items-center justify-center rounded-full px-7 text-base font-extrabold transition hover:-translate-y-0.5 sm:mt-8" type="button" onClick={onStart}>
             AI 상담 시작하기 <span className="ml-2" aria-hidden>→</span>
           </button>
-          {demoMode ? <p className="mt-3 inline-flex rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-primary)]">시연용 예시 카탈로그로 보기</p> : null}
+          {demoMode ? <p className="mt-3 inline-flex rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-primary)]">시연용 예시 카탈로그</p> : null}
           <p className="mt-3 text-sm text-[var(--text-tertiary)] sm:mt-4">일반적으로 5~8개, 복합 조건은 최대 10개의 짧은 질문 · 입력 내용은 현재 브라우저 세션에만 보관</p>
         </div>
         <div className="order-2 mx-auto w-full max-w-[320px] sm:max-w-[480px] lg:max-w-[560px]">

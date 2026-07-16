@@ -363,10 +363,10 @@ describe("GeminiCampfitV3Provider", () => {
       init?.signal?.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })))
     }))
     vi.stubGlobal("fetch", fetchMock)
-    const provider = new GeminiCampfitV3Provider()
+    const provider = new GeminiCampfitV3Provider({ maxProviderRequests: 1, timeoutMs: 50 })
     const pending = provider.analyzeConversation(input)
 
-    await vi.advanceTimersByTimeAsync(25_000)
+    await vi.advanceTimersByTimeAsync(50)
     expect(await pending).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(provider.getLastDiagnostic()).toMatchObject({
@@ -375,6 +375,57 @@ describe("GeminiCampfitV3Provider", () => {
       httpStatus: null,
       requestCount: 1,
     })
+    expect(provider.getLastDiagnostic()?.elapsedMs).toBeGreaterThanOrEqual(50)
+    expect(provider.getLastDiagnostic()?.elapsedMs).toBeLessThan(500)
+  })
+
+  it("uses a provider response that resolves before the timeout", async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn(() => new Promise<Response>((resolve) => {
+      setTimeout(() => resolve(geminiResponse(validModelResponse())), 25)
+    }))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider({ maxProviderRequests: 1, timeoutMs: 50 })
+    const pending = provider.analyzeConversation(input)
+
+    await vi.advanceTimersByTimeAsync(25)
+    expect(await pending).not.toBeNull()
+    expect(provider.getLastDiagnostic()).toMatchObject({ code: "ok", requestCount: 1 })
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it("returns the fallback at the timeout even when the transport ignores abort", async () => {
+    vi.useFakeTimers()
+    let resolveFetch: ((response: Response) => void) | undefined
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((resolve) => {
+      resolveFetch = resolve
+      init?.signal?.addEventListener("abort", () => undefined)
+    }))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider({ maxProviderRequests: 1, timeoutMs: 50 })
+    const pending = provider.analyzeConversation(input)
+
+    await vi.advanceTimersByTimeAsync(50)
+    expect(await pending).toBeNull()
+    expect(provider.getLastDiagnostic()).toMatchObject({
+      code: "timeout",
+      providerResponseReceived: false,
+      requestCount: 1,
+    })
+
+    resolveFetch?.(geminiResponse(validModelResponse()))
+    await Promise.resolve()
+    expect(provider.getLastValidatedResponse()).toBeNull()
+  })
+
+  it("cleans up the timeout after a normal provider response", async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn(async () => geminiResponse(validModelResponse()))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider({ maxProviderRequests: 1, timeoutMs: 50 })
+
+    expect(await provider.analyzeConversation(input)).not.toBeNull()
+    expect(vi.getTimerCount()).toBe(0)
   })
 
   it("distinguishes provider cancellation from its own timeout", async () => {

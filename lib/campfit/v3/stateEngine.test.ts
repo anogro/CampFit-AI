@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { processConversationMessage, startConversation } from "@/lib/campfit/v3/conversationService"
 import { calculateProgress, isReadyForRecommendation } from "@/lib/campfit/v3/progress"
-import { selectNextQuestion } from "@/lib/campfit/v3/questionBank"
+import { campfitV3QuestionBank, selectNextQuestion } from "@/lib/campfit/v3/questionBank"
 import { applyQuickReply, createFact, createInitialConversationState, extractDeterministicFacts, mergeFacts } from "@/lib/campfit/v3/stateEngine"
 import type { CampfitV3LLMProvider } from "@/lib/campfit/v3/provider"
 import type { CampfitV3BasicInfo, CampfitV3ConversationState, CampfitV3FactKey } from "@/types/campfitV3"
@@ -24,6 +24,13 @@ const nullProvider: CampfitV3LLMProvider = {
 }
 
 describe("CampFit v3 state and question engine", () => {
+  it("opens with conversation-first guidance instead of a slot-style prompt", () => {
+    const firstQuestion = campfitV3QuestionBank[0]
+    expect(firstQuestion?.title).toContain("아이의 영어 경험과 좋아하는 활동")
+    expect(firstQuestion?.title).toContain("부모가 현지에서 어떻게 지내고 싶은지")
+    expect(firstQuestion?.title).not.toContain("아이 영어 수준은 어느 정도인지도")
+  })
+
   it("starts with the highest priority unanswered question", () => {
     const response = startConversation(basicInfo)
     expect(response.questionKey).toBe("child_english_level")

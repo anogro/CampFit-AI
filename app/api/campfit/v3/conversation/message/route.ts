@@ -28,10 +28,11 @@ export async function POST(request: Request) {
   }
 }
 
-function geminiProviderOptions(): { readonly maxProviderRequests: 1 | 2 } {
-  const evaluationSingleRequest = process.env["NODE_ENV"] !== "production"
-    && process.env["CAMPFIT_V3_GEMINI_EVALUATION_SINGLE_REQUEST"] === "true"
-  return { maxProviderRequests: evaluationSingleRequest ? 1 : 2 }
+function geminiProviderOptions(): { readonly maxProviderRequests: 1 } {
+  // The product path must not spend a second provider round-trip repairing a
+  // response. Deterministic extraction can continue immediately on any
+  // provider timeout, transport failure, or invalid response.
+  return { maxProviderRequests: 1 }
 }
 
 function toPublicConversationResponse(

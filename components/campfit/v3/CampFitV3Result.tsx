@@ -46,10 +46,10 @@ export function CampFitV3Result({
       <div className="mx-auto max-w-[1120px] py-7 print:max-w-none print:py-5 sm:py-10">
         <section className="apple-glass rounded-[28px] p-5 print:[break-inside:avoid] print:rounded-none print:shadow-none sm:p-8">
           <p className="text-xs font-black tracking-[.12em] text-[var(--accent-primary)]">CAMPFIT AI CONSULTING NOTE</p>
-          <h1 className="mt-3 text-3xl font-bold tracking-[-.035em] [word-break:keep-all] sm:text-4xl">오늘의 상담 결론</h1>
+          <h1 className="mt-3 text-3xl font-bold tracking-[-.035em] [word-break:keep-all] sm:text-4xl">이번 가족에게 가장 잘 맞는 방향</h1>
           {primaryDirection ? (
             <p className="mt-4 text-sm font-extrabold text-[var(--accent-primary)]">
-              가장 중요하게 본 방향 · {primaryDirection.label}
+              추천 기준 · {primaryDirection.label}
             </p>
           ) : null}
           <p className="mt-4 max-w-4xl text-base font-medium leading-8 text-[var(--text-secondary)] [word-break:keep-all] sm:text-lg">
@@ -63,8 +63,8 @@ export function CampFitV3Result({
         </section>
 
         <Section
-          title="상담에서 중요하게 본 요소"
-          subtitle="현재 입력을 바탕으로 여섯 가지 판단축의 상대적인 강도를 정리했어요. 정확한 내부 점수는 표시하지 않습니다."
+          title="이렇게 판단했어요"
+          subtitle="아이의 경험과 부모의 체류 조건을 함께 놓고 비교했어요. 정확한 내부 점수는 표시하지 않습니다."
         >
           <div className="apple-glass-soft rounded-[24px] p-4 print:[break-inside:avoid] print:shadow-none sm:p-7">
             <CampFitV3DecisionRadar axes={axes} />
@@ -74,7 +74,7 @@ export function CampFitV3Result({
           </div>
         </Section>
 
-        <Section title="함께 검토할 경험 방향" subtitle="가장 중요한 방향과 함께 비교할 수 있는 선택지를 정리했어요.">
+        <Section title="함께 비교할 경험 방향" subtitle="가장 중요한 방향과 함께 비교할 수 있는 선택지를 정리했어요.">
           <div className="grid gap-3 sm:grid-cols-2">
             {result.experienceDirections.map((direction) => (
               <article className="apple-glass-soft rounded-[22px] p-5 print:[break-inside:avoid] print:shadow-none" key={direction.key}>
@@ -90,8 +90,9 @@ export function CampFitV3Result({
           </div>
         </Section>
 
-        <Section title="추천 도시" subtitle="서로 다른 역할의 도시를 비교해 선택 폭을 보여드려요.">
+        <Section title="추천 도시" subtitle="도시별 강점과 먼저 확인할 조건, 예상 체류비를 비교해보세요.">
           {result.catalogSource === "demo" ? <p className="mb-4 inline-flex rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-primary)]">시연용 도시 예시</p> : null}
+          <p className="mb-4 max-w-3xl text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">도시별 비용은 월평균 비용을 체류기간에 맞춰 환산한 비교용 추정치입니다. 실제 항공·숙소·프로그램 비용은 예약 시점에 달라질 수 있어요.</p>
           {result.destinationRecommendations.length ? (
             <div className="grid gap-4 md:grid-cols-3">
               {result.destinationRecommendations.map((city) => <CityCard city={city} demo={result.catalogSource === "demo"} key={city.cityId} />)}
@@ -288,13 +289,13 @@ function ResultActions({ onBack, onRestart }: { readonly onBack: () => void; rea
       </div>
       <div className="mt-5 flex flex-wrap justify-center gap-3 sm:justify-start">
         <button className="glass-cta min-h-12 rounded-full px-6 text-sm font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" type="button" onClick={() => window.print()}>
-          PDF 저장
+          PDF로 저장하기
         </button>
-        <button className={secondaryButtonClass} type="button" onClick={() => setNotice("이메일로 결과를 보내는 기능은 준비 중입니다. 다음 업데이트에서는 이 상담 결과를 가족과 프로그램 담당자에게 공유할 수 있게 할 예정입니다.")}>
-          이메일로 결과 보내기
+        <button className={secondaryButtonClass} type="button" onClick={() => setNotice("이메일로 결과를 받는 기능은 준비 중입니다.")}>
+          이메일로 받기 · 준비 중
         </button>
-        <button className={secondaryButtonClass} type="button" onClick={onBack}>이전 상담으로</button>
-        <button className={tertiaryButtonClass} type="button" onClick={requestRestart}>다시 상담하기</button>
+        <button className={secondaryButtonClass} type="button" onClick={onBack}>상담 내용 다시 보기</button>
+        <button className={tertiaryButtonClass} type="button" onClick={requestRestart}>조건을 바꿔 다시 상담하기</button>
       </div>
       <p className="mt-4 min-h-6 text-sm font-semibold leading-6 text-[var(--accent-primary)] [word-break:keep-all]" role="status" aria-live="polite">
         {notice}

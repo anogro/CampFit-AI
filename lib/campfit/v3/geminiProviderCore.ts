@@ -11,7 +11,9 @@ import type {
 } from "@/lib/campfit/v3/provider"
 
 const defaultModel = "gemini-2.5-flash"
-const requestTimeoutMs = 25_000
+const DEFAULT_GEMINI_TIMEOUT_MS = 7_000
+const MIN_GEMINI_TIMEOUT_MS = 50
+const MAX_GEMINI_TIMEOUT_MS = 10_000
 
 const GeminiResponseSchema = z.object({
   candidates: z.array(z.object({
@@ -34,6 +36,8 @@ type StructuredParseResult =
 
 export type GeminiProviderOptions = {
   readonly maxProviderRequests?: 1 | 2
+  /** Injectable for deterministic timeout tests; production uses the bounded default. */
+  readonly timeoutMs?: number
 }
 
 /**
@@ -44,9 +48,11 @@ export class GeminiCampfitV3ProviderCore implements CampfitV3LLMProvider {
   private diagnostic: CampfitV3ProviderDiagnostic | null = null
   private validatedResponse: CampfitV3ModelResponse | null = null
   private readonly maxProviderRequests: 1 | 2
+  private readonly timeoutMs: number
 
   constructor(options: GeminiProviderOptions = {}) {
     this.maxProviderRequests = options.maxProviderRequests ?? 2
+    this.timeoutMs = normalizeTimeoutMs(options.timeoutMs)
   }
 
   getLastDiagnostic(): CampfitV3ProviderDiagnostic | null {
@@ -75,7 +81,7 @@ export class GeminiCampfitV3ProviderCore implements CampfitV3LLMProvider {
       JSON.stringify({ basicInfo: input.basicInfo, facts: input.state.facts, result: input.deterministicResult }),
     ].join("\n")
     const started = Date.now()
-    const result = await requestGeminiOnce(prompt)
+    const result = await requestGeminiOnce(prompt, this.timeoutMs)
     this.diagnostic = diagnosticFromRequest(result, false, result.requestMade ? 1 : 0, Date.now() - started)
     if (result.text === null) return null
     const parsed = parseGeminiJson(result.text)
@@ -97,7 +103,7 @@ export class GeminiCampfitV3ProviderCore implements CampfitV3LLMProvider {
   private async requestStructured(prompt: string, allowedQuestionKeys: readonly string[]): Promise<CampfitV3ModelResponse | null> {
     this.validatedResponse = null
     const started = Date.now()
-    const first = await requestGeminiOnce(prompt)
+    const first = await requestGeminiOnce(prompt, this.timeoutMs)
     const firstCount = first.requestMade ? 1 : 0
     if (first.text === null) {
       this.diagnostic = diagnosticFromRequest(first, false, firstCount, Date.now() - started)
@@ -123,7 +129,7 @@ export class GeminiCampfitV3ProviderCore implements CampfitV3LLMProvider {
       prompt,
       "이전 응답은 JSON 또는 fact 의미 계약을 충족하지 못했습니다.",
       "위 계약을 다시 확인하고 설명이나 markdown 없이 올바른 JSON 객체만 한 번 다시 반환하세요.",
-    ].join("\n"))
+    ].join("\n"), this.timeoutMs)
     if (repair.text === null) {
       this.diagnostic = diagnosticFromRequest(repair, true, 2, Date.now() - started)
       return null
@@ -192,7 +198,7 @@ function normalizeSuggestedNextQuestion(value: unknown): unknown {
     : value
 }
 
-async function requestGeminiOnce(prompt: string): Promise<GeminiRequestResult> {
+async function requestGeminiOnce(prompt: string, timeoutMs: number): Promise<GeminiRequestResult> {
   const apiKey = process.env["GEMINI_API_KEY"]
   if (!apiKey) {
     return {
@@ -209,11 +215,7 @@ async function requestGeminiOnce(prompt: string): Promise<GeminiRequestResult> {
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`
   const controller = new AbortController()
   let timedOut = false
-  const timeout = setTimeout(() => {
-    timedOut = true
-    controller.abort()
-  }, requestTimeoutMs)
-  try {
+  const request = (async (): Promise<GeminiRequestResult> => {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: {
@@ -277,18 +279,46 @@ async function requestGeminiOnce(prompt: string): Promise<GeminiRequestResult> {
         httpStatus: response.status,
         errorStatus: null,
       }
+  })()
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  const timeoutSignal = new Promise<GeminiRequestResult>((_, reject) => {
+    timeout = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+      reject(new GeminiProviderTimeoutError())
+    }, timeoutMs)
+  })
+  try {
+    return await Promise.race([request, timeoutSignal])
   } catch (error) {
     return {
       text: null,
-      code: isAbortError(error) ? (timedOut ? "timeout" : "provider_cancelled") : "network_error",
+      code: error instanceof GeminiProviderTimeoutError || (isAbortError(error) && timedOut)
+        ? "timeout"
+        : isAbortError(error) ? "provider_cancelled" : "network_error",
       requestMade: true,
       providerResponseReceived: false,
       httpStatus: null,
       errorStatus: null,
     }
   } finally {
-    clearTimeout(timeout)
+    if (timeout !== undefined) clearTimeout(timeout)
+    // Abort is best-effort. Observe a late rejection so a slow transport cannot
+    // create an unhandled rejection after deterministic fallback has returned.
+    void request.catch(() => undefined)
   }
+}
+
+class GeminiProviderTimeoutError extends Error {
+  constructor() {
+    super("Gemini provider request timed out")
+    this.name = "GeminiProviderTimeoutError"
+  }
+}
+
+function normalizeTimeoutMs(value: number | undefined): number {
+  if (value === undefined || !Number.isFinite(value)) return DEFAULT_GEMINI_TIMEOUT_MS
+  return Math.min(MAX_GEMINI_TIMEOUT_MS, Math.max(MIN_GEMINI_TIMEOUT_MS, Math.round(value)))
 }
 
 function providerCodeFromHttpStatus(status: number): Exclude<CampfitV3ProviderDiagnosticCode, "ok" | "schema_validation_failed" | "semantic_validation_failed"> {

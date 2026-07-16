@@ -70,7 +70,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
             <AiAvatar className="h-10 w-10" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-3 text-xs font-bold">
-                <span className="truncate">CampFit AI · 상담 진행</span>
+                <span className="truncate">CampFit AI · 추천 조건 정리 중</span>
                 <span className="tabular-nums text-[var(--accent-primary)]">{conversation.progress}%</span>
               </div>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${conversation.progress}%` }} /></div>
@@ -89,7 +89,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
             <div><p className="font-extrabold">CampFit AI 컨설턴트</p><p className="mt-1 text-xs font-bold text-[var(--status-success)]">현재 상담 중</p></div>
           </div>
           <div className="mt-4">
-            <div className="flex items-center justify-between text-xs font-bold"><span>상담 진행</span><span className="tabular-nums text-[var(--accent-primary)]">{conversation.progress}%</span></div>
+            <div className="flex items-center justify-between text-xs font-bold"><span>추천 조건 정리 중</span><span className="tabular-nums text-[var(--accent-primary)]">{conversation.progress}%</span></div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${conversation.progress}%` }} /></div>
             <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">{conversation.progressMessage}</p>
           </div>
@@ -99,7 +99,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
         <div className="apple-glass flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[24px] lg:h-full lg:rounded-[28px]">
           <div className="shrink-0 border-b border-[var(--border-default)] px-5 py-3 sm:px-7 sm:py-4">
             <p className="text-xs font-black tracking-[.12em] text-[var(--accent-primary)]">STEP 2 · AI 상담</p>
-            <h1 className="mt-1 text-lg font-bold tracking-[-.02em] [word-break:keep-all] sm:text-2xl">우리 가족의 선택 기준을 함께 정리해요</h1>
+            <h1 className="mt-1 text-lg font-bold tracking-[-.02em] [word-break:keep-all] sm:text-2xl">대화로 우리 가족의 선택 기준을 정리해요</h1>
           </div>
 
           <div
@@ -131,7 +131,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
             {conversation.warnings.map((warning) => <p className="mb-3 rounded-xl bg-[var(--surface-tint-yellow)] px-3 py-2 text-xs leading-5 text-[var(--status-warning)]" key={warning}>{warning}</p>)}
             {conversation.readyForRecommendation ? (
               <div className="flex justify-center py-1">
-                <button className="glass-cta min-h-12 rounded-full px-8 text-base font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" type="button" onClick={onResult}>결과 확인하기 →</button>
+                <button className="glass-cta min-h-12 rounded-full px-8 text-base font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" type="button" onClick={onResult}>추천 결과 보기 →</button>
               </div>
             ) : (
               <>

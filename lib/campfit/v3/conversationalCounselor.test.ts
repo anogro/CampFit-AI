@@ -46,6 +46,13 @@ describe("CampFit v3 conversational counselor flow", () => {
     expect(facts.some((fact) => fact.key === "koreanSupportNeed")).toBe(false)
   })
 
+  it("keeps a project preference ahead of contrasted general-experience wording", () => {
+    const facts = extractDeterministicFacts("단순 체험보다는 마지막에 결과물을 만들어 보는 프로젝트였으면 좋겠어요.")
+    const goals = facts.find((fact) => fact.key === "experienceGoals")?.value as Record<string, unknown> | undefined
+    expect(goals?.["subjectProject"]).toBe("primary")
+    expect(goals?.["cultureActivity"]).not.toBe("primary")
+  })
+
   it("captures four or more facts in one natural fallback turn", async () => {
     const start = startConversation(basicInfo)
     const response = await processConversationMessage({

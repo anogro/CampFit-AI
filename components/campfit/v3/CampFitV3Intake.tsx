@@ -79,9 +79,9 @@ export function CampFitV3Intake({ draft, onDraftChange, onBack, onSubmit }: Prop
             <div>
               <p className="text-xs font-black tracking-[.12em] text-[var(--accent-primary)]">STEP 1 · 기본 조건</p>
               <h1 className="mt-2 text-2xl font-bold tracking-[-.03em] sm:text-3xl">먼저 기본 조건만 알려주세요</h1>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">각 항목을 직접 확인하면 채팅을 시작할 수 있어요. 자세한 기대와 걱정은 다음 대화에서 편하게 말씀해 주세요.</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">프로그램비뿐 아니라 항공·숙소·현지 체류비를 함께 비교하기 위해 가족 기준으로 확인합니다. 자세한 기대와 걱정은 다음 대화에서 편하게 말씀해주세요.</p>
             </div>
-            <p className="mt-3 text-xs font-semibold text-[var(--text-tertiary)] lg:mt-0">부모·보호자가 같은 도시나 인근에 머무는 1~4주 프로그램 기준</p>
+            <p className="mt-3 text-xs font-semibold text-[var(--text-tertiary)] lg:mt-0">부모가 같은 도시나 인근에 머무는 1~4주 프로그램 기준</p>
           </div>
 
           <div className="grid gap-x-8 gap-y-4 px-5 py-4 sm:px-8 lg:grid-cols-2">
