@@ -31,7 +31,9 @@ describe("CampFit v3 result presentation", () => {
   })
 
   it("uses the verified ANOGRO city route and rejects unsafe program URLs", () => {
-    expect(buildAnogroCityHref("Cebu", " https://www.anogro.com/ ")).toBe("https://www.anogro.com/city/Cebu")
+    expect(buildAnogroCityHref("Cebu", "https://www.anogro.com")).toBe("https://www.anogro.com/city/Cebu")
+    expect(buildAnogroCityHref("Chiang Mai", "https://www.anogro.com")).toBe("https://www.anogro.com/city/Chiang%20Mai")
+    expect(buildAnogroCityHref(" Cebu ", " https://www.anogro.com/ ")).toBe("https://www.anogro.com/city/Cebu")
     expect(buildAnogroCityHref("", "https://www.anogro.com")).toBeNull()
     expect(buildAnogroCityHref("세부", "https://www.anogro.com/")).toBe("https://www.anogro.com/city/%EC%84%B8%EB%B6%80")
     expect(buildAnogroCityHref("Cebu", undefined)).toBe("https://www.anogro.com/city/Cebu")

@@ -1,9 +1,9 @@
 "use client"
 
+import * as React from "react"
 import { useMemo, useState, type ReactNode } from "react"
 import { CampFitV3DecisionRadar } from "@/components/campfit/v3/CampFitV3DecisionRadar"
-import { CampFitV3Frame } from "@/components/campfit/v3/CampFitV3Frame"
-import { V3Header } from "@/components/campfit/v3/CampFitV3Flow"
+import { CampFitV3Frame, V3Header } from "@/components/campfit/v3/CampFitV3Frame"
 import {
   buildAnogroCityHref,
   buildDecisionAxes,
@@ -25,6 +25,58 @@ type CampFitV3ResultProps = {
   readonly conversationState: CampfitV3ConversationState
   readonly onBack: () => void
   readonly onRestart: () => void
+}
+
+function getAxisDetail(axisKey: string, state: CampfitV3ConversationState, basicInfo: CampfitV3BasicInfo): string {
+  switch (axisKey) {
+    case "english": {
+      const level = state.facts.childEnglishLevel?.value
+      if (level === "beginner") return "영어 초급자 수준"
+      if (level === "basic") return "단어·짧은 표현 수준"
+      if (level === "intermediate") return "영어 수업 참여 가능"
+      if (level === "advanced") return "유창한 영어 소통 가능"
+      return "어학 수준에 맞춤"
+    }
+    case "school": {
+      const strength = (state.facts.experienceGoals?.value as Record<string, unknown> | undefined)?.['schoolSchooling']
+      if (strength === "primary") return "스쿨링·현지 수업 선호"
+      if (strength === "secondary") return "학교 분위기 체험"
+      return "방학 단기 활동 중심"
+    }
+    case "project": {
+      const strength = (state.facts.experienceGoals?.value as Record<string, unknown> | undefined)?.['subjectProject']
+      if (strength === "primary") return "로봇·과학·결과물 선호"
+      if (strength === "secondary") return "창의·프로젝트 관심"
+      return "일반 활동형 경험"
+    }
+    case "culture": {
+      const strength = (state.facts.experienceGoals?.value as Record<string, unknown> | undefined)?.['cultureActivity']
+      if (strength === "primary") return "자연·야외 활동 선호"
+      if (strength === "secondary") return "다양한 문화 체험"
+      return "실내외 균형 활동"
+    }
+    case "support": {
+      const care = state.facts.specialCareFollowUp?.value
+      const support = state.facts.koreanSupportNeed?.value
+      if (care === "required") return "특별관리 지원 필요"
+      if (support === "must_daily") return "매일 한국어 지원 필요"
+      if (support === "emergency_only") return "비상시 한국어 대응 필요"
+      return "자율적인 현지 적응 가능"
+    }
+    case "family": {
+      const stay = state.facts.parentStayGoals?.value
+      if (Array.isArray(stay) && stay.length > 0) {
+        if (stay.includes("remoteWork")) return "원격근무 선호"
+        if (stay.includes("restWellness")) return "휴식·웰니스 선호"
+        if (stay.includes("cafeDining")) return "현지 생활·카페 탐방"
+        if (stay.includes("natureBeach")) return "자연·해변 휴양"
+        if (stay.includes("childScheduleFirst")) return "아이 일정 동행 우선"
+      }
+      return "부모 현지 동반 체류"
+    }
+    default:
+      return ""
+  }
 }
 
 export function CampFitV3Result({
@@ -59,7 +111,7 @@ export function CampFitV3Result({
           </p>
           {result.limitedResult && result.catalogSource === "supabase" ? (
             <p className="mt-4 rounded-2xl bg-[var(--surface-tint-yellow)] px-4 py-3 text-sm leading-6 text-[var(--status-warning)] [word-break:keep-all]">
-              현재 확인된 프로그램 수가 적어 조건과 도시 방향을 중심으로 정리했습니다. 없는 후보를 임의로 만들지 않았어요.
+              현재 확인된 프로그램 수가 적어 조건과 도시 방향을 중심으로 정리했습니다.
             </p>
           ) : null}
         </section>
@@ -68,36 +120,53 @@ export function CampFitV3Result({
           title="이렇게 판단했어요"
           subtitle="아이의 경험과 부모의 체류 조건을 함께 놓고 비교했어요. 정확한 내부 점수는 표시하지 않습니다."
         >
-          <div className="apple-glass-soft rounded-[24px] p-4 print:[break-inside:avoid] print:shadow-none sm:p-7">
-            <CampFitV3DecisionRadar axes={axes} />
-            <p className="mx-auto mt-5 max-w-2xl text-center text-sm font-semibold leading-6 text-[var(--text-secondary)] [word-break:keep-all]">
-              {decisionAxesSummary(axes)}
-            </p>
+          <div className="apple-glass-soft rounded-[24px] p-4 print:[break-inside:avoid] print:shadow-none sm:p-5 flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="w-full lg:w-[38%] max-w-[320px] shrink-0">
+              <CampFitV3DecisionRadar axes={axes} />
+            </div>
+            <div className="w-full lg:w-[58%] flex flex-col gap-3 border-t border-[var(--border-default)] pt-4 lg:border-t-0 lg:pt-0">
+              {axes.map((axis) => (
+                <div key={axis.key} className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[var(--border-default)] pb-2 gap-1 text-sm">
+                  <span className="font-extrabold text-[var(--text-secondary)]">{axis.label}</span>
+                  <span className="font-bold text-[var(--text-primary)]">{getAxisDetail(axis.key, conversationState, basicInfo)}</span>
+                </div>
+              ))}
+              <p className="mt-2 text-xs font-semibold leading-6 text-[var(--text-secondary)] [word-break:keep-all]">
+                {decisionAxesSummary(axes)}
+              </p>
+            </div>
           </div>
         </Section>
 
         <Section title="함께 비교할 경험 방향" subtitle="가장 중요한 방향과 함께 비교할 수 있는 선택지를 정리했어요.">
           <div className="grid gap-3 sm:grid-cols-2">
-            {result.experienceDirections.map((direction) => (
-              <article className="apple-glass-soft rounded-[22px] p-5 print:[break-inside:avoid] print:shadow-none" key={direction.key}>
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="font-extrabold [word-break:keep-all]">{direction.label}</h3>
-                  <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent-primary)]">
-                    {direction.fitLabel}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{direction.explanation}</p>
-              </article>
-            ))}
+            {result.experienceDirections
+              .filter((direction) => direction.fitLabel !== "현재 우선순위가 낮음")
+              .map((direction) => (
+                <article className="apple-glass-soft rounded-[22px] p-5 print:[break-inside:avoid] print:shadow-none" key={direction.key}>
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="font-extrabold [word-break:keep-all]">{direction.label}</h3>
+                    <span className="shrink-0 rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent-primary)]">
+                      {direction.fitLabel === "조건을 조정하면 가능" ? "조건을 조정하면 함께 검토할 수 있어요" : direction.fitLabel}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{direction.explanation}</p>
+                </article>
+              ))}
           </div>
         </Section>
 
         <Section title="추천 도시" subtitle="도시별 강점과 먼저 확인할 조건, 예상 체류비를 비교해보세요.">
-          {result.catalogSource === "demo" ? <p className="mb-4 inline-flex rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-primary)]">시연용 도시 예시</p> : null}
           <p className="mb-4 max-w-3xl text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">도시별 비용은 월평균 비용을 체류기간에 맞춰 환산한 비교용 추정치입니다. 실제 항공·숙소·프로그램 비용은 예약 시점에 달라질 수 있어요.</p>
           {result.destinationRecommendations.length ? (
-            <div className="grid gap-4 md:grid-cols-3">
-              {result.destinationRecommendations.map((city) => <CityCard city={city} demo={result.catalogSource === "demo"} key={city.cityId} />)}
+            <div className={`grid gap-4 ${
+              result.destinationRecommendations.length === 1
+                ? "grid-cols-1 max-w-md"
+                : result.destinationRecommendations.length === 2
+                  ? "grid-cols-1 md:grid-cols-2 max-w-4xl"
+                  : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            }`}>
+              {result.destinationRecommendations.map((city) => <CityCard city={city} key={city.cityId} />)}
             </div>
           ) : (
             <Empty text="현재 조건에서 근거를 확인할 수 있는 도시가 없습니다." />
@@ -116,7 +185,13 @@ export function CampFitV3Result({
               <p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{catalogPresentation.unavailableGuidance}</p>
             </div>
           ) : result.programCandidates.length ? (
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className={`grid gap-4 ${
+              result.programCandidates.length === 1
+                ? "grid-cols-1 max-w-md"
+                : result.programCandidates.length === 2
+                  ? "grid-cols-1 md:grid-cols-2 max-w-4xl"
+                  : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+            }`}>
               {result.programCandidates.map((program) => <ProgramCard program={program} demo={result.catalogSource === "demo"} key={program.programId} />)}
             </div>
           ) : (
@@ -164,26 +239,16 @@ function Section({ title, subtitle, children }: { readonly title: string; readon
   )
 }
 
-function CityCard({ city, demo }: { readonly city: CampfitV3DestinationRecommendation; readonly demo: boolean }) {
-  const href = demo ? null : buildAnogroCityHref(city.cityName)
-  const card = <CityCardContent city={city} linked={href !== null} />
-
-  if (!href) {
-    return <article className="apple-glass-soft overflow-hidden rounded-[22px] print:[break-inside:avoid] print:shadow-none">{card}</article>
-  }
-
+function CityCard({ city }: { readonly city: CampfitV3DestinationRecommendation }) {
+  const href = buildAnogroCityHref(city.cityName)
   return (
-    <a
-      className="apple-glass-soft group block overflow-hidden rounded-[22px] border border-transparent transition-transform duration-200 ease-in-out hover:-translate-y-0.5 hover:border-[var(--cta-glass-border)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] motion-reduce:transition-none print:[break-inside:avoid] print:transform-none print:shadow-none"
-      href={href}
-      aria-label={`${city.cityName} 도시 자세히 보기`}
-    >
-      {card}
-    </a>
+    <article className="apple-glass-soft flex flex-col overflow-hidden rounded-[22px] print:[break-inside:avoid] print:shadow-none">
+      <CityCardContent city={city} href={href} />
+    </article>
   )
 }
 
-function CityCardContent({ city, linked }: { readonly city: CampfitV3DestinationRecommendation; readonly linked: boolean }) {
+function CityCardContent({ city, href }: { readonly city: CampfitV3DestinationRecommendation; readonly href: string | null }) {
   return (
     <>
       {city.imageUrl ? (
@@ -193,20 +258,28 @@ function CityCardContent({ city, linked }: { readonly city: CampfitV3Destination
           {city.cityName.slice(0, 1)}
         </div>
       )}
-      <div className="p-5">
+      <div className="flex flex-1 flex-col p-5">
         <p className="text-xs font-bold text-[var(--accent-primary)]">{city.role}</p>
         <h3 className="mt-1 text-xl font-black">{city.cityName}</h3>
-        {!linked ? <span className="mt-2 inline-flex rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent-primary)]">시연용 예시</span> : null}
         <p className="text-sm text-[var(--text-secondary)]">{city.countryName}</p>
-        <p className="mt-3 text-sm leading-6 [word-break:keep-all]">{city.reason}</p>
+        <p className="mt-3 text-sm leading-6 [word-break:keep-all] flex-1">{city.reason}</p>
         <div className="mt-4 rounded-xl bg-white p-3">
           <p className="text-xs font-bold text-[var(--text-secondary)]">{city.costEstimate.label} · 신뢰도 {confidenceLabel(city.costEstimate.confidence)}</p>
           <p className="mt-1 font-extrabold">{costLabel(city.costEstimate.estimatedTotalMinKrw, city.costEstimate.estimatedTotalMaxKrw)}</p>
         </div>
         {city.verify.length ? <p className="mt-3 text-xs leading-5 text-[var(--status-warning)] [word-break:keep-all]">확인: {city.verify.join(" · ")}</p> : null}
-        <p className={`mt-5 inline-flex min-h-11 items-center text-sm font-extrabold ${linked ? "text-[var(--accent-primary)]" : "text-[var(--text-tertiary)]"}`}>
-          {linked ? <>도시 자세히 보기 <span className="ml-2 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden>→</span></> : "상세정보 준비 중"}
-        </p>
+        {href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]"
+            aria-label={`${city.cityName} 도시 자세히 보기 (새 창 열림)`}
+          >
+            도시 자세히 보기
+            <span className="ml-1.5" aria-hidden>↗</span>
+          </a>
+        ) : null}
       </div>
     </>
   )
@@ -214,24 +287,14 @@ function CityCardContent({ city, linked }: { readonly city: CampfitV3Destination
 
 function ProgramCard({ program, demo }: { readonly program: CampfitV3ProgramCandidate; readonly demo: boolean }) {
   const href = demo ? null : safeProgramDetailHref(program.detailUrl)
-  const card = <ProgramCardContent program={program} linked={href !== null} />
-
-  if (!href) {
-    return <article className="apple-glass-soft flex flex-col overflow-hidden rounded-[22px] print:[break-inside:avoid] print:shadow-none">{card}</article>
-  }
-
   return (
-    <a
-      className="apple-glass-soft group flex flex-col overflow-hidden rounded-[22px] border border-transparent transition-transform duration-200 ease-in-out hover:-translate-y-0.5 hover:border-[var(--cta-glass-border)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] motion-reduce:transition-none print:[break-inside:avoid] print:transform-none print:shadow-none"
-      href={href}
-      aria-label={`${program.name} 프로그램 살펴보기`}
-    >
-      {card}
-    </a>
+    <article className="apple-glass-soft flex flex-col overflow-hidden rounded-[22px] print:[break-inside:avoid] print:shadow-none">
+      <ProgramCardContent program={program} href={href} />
+    </article>
   )
 }
 
-function ProgramCardContent({ program, linked }: { readonly program: CampfitV3ProgramCandidate; readonly linked: boolean }) {
+function ProgramCardContent({ program, href }: { readonly program: CampfitV3ProgramCandidate; readonly href: string | null }) {
   return (
     <>
       {program.imageUrl ? (
@@ -241,17 +304,25 @@ function ProgramCardContent({ program, linked }: { readonly program: CampfitV3Pr
       )}
       <div className="flex flex-1 flex-col p-5">
         <span className="self-start rounded-full bg-[var(--accent-soft)] px-3 py-1 text-[11px] font-bold text-[var(--accent-primary)]">{program.group}</span>
-        {!linked ? <span className="mt-2 self-start rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--accent-primary)]">시연용 예시</span> : null}
         <h3 className="mt-3 text-lg font-black leading-6 [word-break:keep-all]">{program.name}</h3>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">{program.cityName}, {program.countryName}</p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-[var(--text-secondary)]">
           <span>{program.ageLabel}</span><span aria-hidden>·</span><span>{program.durationLabel}</span><span aria-hidden>·</span><span>{program.priceLabel}</span>
         </div>
-        <p className="mt-4 text-sm leading-6 [word-break:keep-all]">{program.reason}</p>
+        <p className="mt-4 text-sm leading-6 [word-break:keep-all] flex-1">{program.reason}</p>
         {program.verify.length ? <p className="mt-3 text-xs leading-5 text-[var(--status-warning)] [word-break:keep-all]">확인: {program.verify.join(" · ")}</p> : null}
-        <p className={`mt-auto inline-flex min-h-11 items-end pt-5 text-sm font-extrabold ${linked ? "text-[var(--accent-primary)]" : "text-[var(--text-tertiary)]"}`}>
-          {linked ? <>프로그램 살펴보기 <span className="ml-2 transition-transform duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden>→</span></> : "상세정보 준비 중"}
-        </p>
+        {href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]"
+            aria-label={`${program.name} 프로그램 살펴보기 (새 창 열림)`}
+          >
+            프로그램 살펴보기
+            <span className="ml-1.5" aria-hidden>↗</span>
+          </a>
+        ) : null}
       </div>
     </>
   )
@@ -294,8 +365,8 @@ function ResultActions({ onBack, onRestart }: { readonly onBack: () => void; rea
         <button className="glass-cta min-h-12 rounded-full px-6 text-sm font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" type="button" onClick={() => window.print()}>
           PDF로 저장하기
         </button>
-        <button className={secondaryButtonClass} type="button" onClick={() => setNotice("이메일로 결과를 받는 기능은 준비 중입니다.")}>
-          이메일로 받기 · 준비 중
+        <button className={secondaryButtonClass} type="button" onClick={() => setNotice("이메일로 결과를 받는 기능은 곧 제공될 예정이에요.")}>
+          이메일로 받기
         </button>
         <button className={secondaryButtonClass} type="button" onClick={onBack}>상담 내용 다시 보기</button>
         <button className={tertiaryButtonClass} type="button" onClick={requestRestart}>조건을 바꿔 다시 상담하기</button>

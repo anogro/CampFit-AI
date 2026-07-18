@@ -95,16 +95,8 @@ export function CampFitV3DecisionRadar({ axes }: CampFitV3DecisionRadarProps) {
           )
         })}
       </svg>
-      <figcaption id={captionId} className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {chartAxes.map((axis) => (
-          <div
-            key={`decision-legend-${axis.key}`}
-            className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-3 py-2"
-          >
-            <span className="min-w-0 text-xs font-semibold text-[var(--text-secondary)] [word-break:keep-all]">{axis.label}</span>
-            <span className="shrink-0 text-xs font-extrabold text-[var(--accent-primary)]">{decisionAxisLevelLabel(axis.level)}</span>
-          </div>
-        ))}
+      <figcaption id={captionId} className="sr-only">
+        판단 근거 그래프: 영어 경험, 학교·학습, 주제·프로젝트, 문화·활동, 지원 필요, 가족 체류 현실성의 6개 축별 분석 수준을 시각적으로 나타내는 차트입니다. 상세 분석 수치는 우측의 요약 리스트를 참조해 주세요.
       </figcaption>
     </figure>
   )

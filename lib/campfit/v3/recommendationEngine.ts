@@ -49,7 +49,7 @@ export function buildRecommendation(input: {
 
   if (input.catalog.source === "unavailable") {
     return {
-      consultingConclusion: "실제 프로그램 카탈로그를 확인하지 못해 프로그램과 도시를 임의로 추천하지 않았습니다. 잠시 후 다시 확인해 주세요.",
+      consultingConclusion: "실제 프로그램 카탈로그를 확인하지 못했습니다. 잠시 후 다시 확인해 주세요.",
       experienceDirections: directions,
       destinationRecommendations: [],
       requiredSupportConditions,

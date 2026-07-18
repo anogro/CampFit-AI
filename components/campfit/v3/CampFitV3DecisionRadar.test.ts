@@ -17,8 +17,7 @@ describe("CampFitV3DecisionRadar", () => {
     const markup = renderToStaticMarkup(createElement(CampFitV3DecisionRadar, { axes }))
 
     expect(markup).toContain("상담 판단축 육각형 차트")
-    expect(markup).toContain("영어 경험 높음")
-    expect(markup).toContain("가족 체류 현실성 높음")
+    expect(markup).toContain("판단 근거 그래프")
     expect(markup).not.toMatch(/\d+점/)
   })
 })

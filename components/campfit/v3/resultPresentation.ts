@@ -181,5 +181,5 @@ function joinKorean(items: readonly string[]): string {
 }
 
 function anogroBaseUrl(): string {
-  return process.env["NEXT_PUBLIC_ANOGRO_SITE_URL"] ?? "https://www.anogro.com"
+  return process.env["NEXT_PUBLIC_ANOGRO_BASE_URL"] ?? process.env["NEXT_PUBLIC_ANOGRO_SITE_URL"] ?? "https://www.anogro.com"
 }
