@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { loadV3Catalog } from "@/lib/campfit/v3/catalogRepository"
-import { loadDemoCatalog } from "@/lib/campfit/v3/demoCatalog"
 import { isReadyForRecommendation } from "@/lib/campfit/v3/progress"
 import { buildRecommendation } from "@/lib/campfit/v3/recommendationEngine"
 import {
@@ -22,7 +21,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const catalog = parsed.data.demo === true ? loadDemoCatalog() : await loadV3Catalog()
+    const catalog = await loadV3Catalog()
+    if (catalog.source === "unavailable") {
+      return NextResponse.json(
+        { ok: false, error: { code: "CATALOG_UNAVAILABLE", message: "추천 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." } },
+        { status: 503 },
+      )
+    }
     const deterministicResult = buildRecommendation({
       basicInfo: parsed.data.basicInfo,
       state: parsed.data.finalState,

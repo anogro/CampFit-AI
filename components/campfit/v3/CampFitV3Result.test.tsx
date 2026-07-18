@@ -51,7 +51,7 @@ const result: CampfitV3RecommendationResult = {
   verificationChecklist: ["확인사항"],
   alternatives: ["대안"],
   limitedResult: false,
-  catalogSource: "demo",
+  catalogSource: "supabase",
 }
 
 describe("CampFitV3Result UI component", () => {

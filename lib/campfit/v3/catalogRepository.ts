@@ -1,6 +1,5 @@
 import "server-only"
 
-import { camps as staticCamps } from "@/data/campfit/camps"
 import {
   extractSessionWindowsFromText,
   inferDirectionSignals,
@@ -26,47 +25,6 @@ export type V3PriceOption = {
   readonly currency: string | null
   readonly priceValue: number | null
   readonly status: string | null
-}
-
-export type V3DemoLevel = "low" | "medium" | "high"
-
-export type V3DemoProgramProfile = {
-  readonly dataSource: "synthetic_demo"
-  readonly isBookable: false
-  readonly verificationStatus: "synthetic_demo"
-  readonly primaryDirection: string
-  readonly secondaryDirections: readonly string[]
-  readonly availableSeasons: readonly string[]
-  readonly availableDurationsWeeks: readonly number[]
-  readonly childExperienceSignals: readonly string[]
-  readonly childFitProfile: Readonly<Record<string, V3DemoLevel>>
-  readonly parentCompatibilitySignals: readonly string[]
-  readonly supportProfile: Readonly<Record<string, string>>
-  readonly idealFor: readonly string[]
-  readonly notIdealFor: readonly string[]
-  readonly whyItFits: readonly string[]
-  readonly verificationChecklist: readonly string[]
-  readonly priceConfidence: string
-  readonly priceNotes: string
-  readonly displayBadge: string
-}
-
-export type V3DemoCityProfile = {
-  readonly dataSource: "synthetic_demo_profile"
-  readonly isSyntheticProfile: true
-  readonly cityArchetype: readonly string[]
-  readonly experienceStrengths: Readonly<Record<string, V3DemoLevel>>
-  readonly parentStayProfile: Readonly<Record<string, V3DemoLevel>>
-  readonly childStayProfile: Readonly<Record<string, V3DemoLevel>>
-  readonly mobilityProfile: Readonly<Record<string, string | boolean>>
-  readonly costProfile: Readonly<Record<string, string>>
-  readonly environmentProfile: Readonly<Record<string, V3DemoLevel>>
-  readonly supportEnvironment: Readonly<Record<string, V3DemoLevel>>
-  readonly citySignals: readonly string[]
-  readonly idealFor: readonly string[]
-  readonly notIdealFor: readonly string[]
-  readonly verificationChecklist: readonly string[]
-  readonly displayBadge: string
 }
 
 export type V3CatalogProgram = {
@@ -102,9 +60,8 @@ export type V3CatalogProgram = {
   readonly sessionStatusNeedsConfirmation: boolean
   readonly imageUrl: string | null
   readonly status: "active"
-  readonly catalogSource: Exclude<V3CatalogSource, "unavailable">
+  readonly catalogSource: "supabase"
   readonly updatedAt: string | null
-  readonly demoProfile?: V3DemoProgramProfile
 }
 
 export type V3CatalogCity = {
@@ -119,8 +76,7 @@ export type V3CatalogCity = {
   readonly flightCostKrw: number | null
   readonly livingCostMonthlyKrw: number | null
   readonly housingCostMonthlyKrw: number | null
-  readonly catalogSource: Exclude<V3CatalogSource, "unavailable">
-  readonly demoProfile?: V3DemoCityProfile
+  readonly catalogSource: "supabase"
 }
 
 export type V3Catalog = {
@@ -134,7 +90,7 @@ type Row = Record<string, unknown>
 
 export async function loadV3Catalog(): Promise<V3Catalog> {
   const client = createServerSupabaseClient()
-  if (client === null) return unavailableOrDevelopmentFallback("Supabase 연결 설정을 확인할 수 없습니다.")
+  if (client === null) return unavailableCatalog("Supabase 연결 설정을 확인할 수 없습니다.")
 
   const [programResult, priceResult, profileResult, cityResult, sessionResult] = await Promise.all([
     client.from("programs").select("*"),
@@ -146,7 +102,14 @@ export async function loadV3Catalog(): Promise<V3Catalog> {
 
   if (programResult.error) {
     console.error("CampFit v3 programs read failed", programResult.error.message)
-    return unavailableOrDevelopmentFallback("프로그램 카탈로그를 불러오지 못했습니다.")
+    return unavailableCatalog("프로그램 카탈로그를 불러오지 못했습니다.")
+  }
+
+  const queryResults = [programResult, priceResult, profileResult, cityResult, sessionResult]
+  const failedQuery = queryResults.find((result) => result.error || !Array.isArray(result.data))
+  if (failedQuery) {
+    if (failedQuery.error) console.error("CampFit v3 catalog read failed", failedQuery.error.message)
+    return unavailableCatalog("추천 카탈로그를 확인하지 못했습니다.")
   }
 
   const warnings: string[] = []
@@ -178,7 +141,7 @@ export async function loadV3Catalog(): Promise<V3Catalog> {
     const mapped = mapProductionProgram({ row, profile, priceOptions, sessionRows: sessionRowsForProgram, id, name, city, country })
     return [mapped]
   })
-  const cities = cityRows.flatMap((row) => mapCity(row, "supabase"))
+  const cities = cityRows.flatMap((row) => mapCity(row))
 
   if (!cities.length) warnings.push("도시 카탈로그를 확인할 수 없어 프로그램 후보를 표시하지 않습니다.")
   return { programs, cities, source: "supabase", warnings }
@@ -286,70 +249,15 @@ function mapProductionProgram(input: {
   }
 }
 
-function unavailableOrDevelopmentFallback(reason: string): V3Catalog {
-  if (process.env.NODE_ENV === "production") {
-    return { programs: [], cities: [], source: "unavailable", warnings: [reason] }
-  }
-  const fallback = fallbackCatalog(staticCamps)
-  return { ...fallback, warnings: [`개발용 정적 카탈로그를 사용합니다. ${reason}`] }
-}
-
-function fallbackCatalog(programs: readonly Camp[]): V3Catalog {
-  const mapped = programs.filter((program) => program.parentAccompanied).map((program): V3CatalogProgram => {
-    const parentScope = inferParentScope({
-      participationText: "부모 동반",
-      accommodationText: "",
-      groupText: "부모동반 가족형",
-      coverageText: "",
-      nameText: program.name,
-      profileParentAccompanied: true,
-    })
-    const text = [program.name, program.programType, ...program.traits].join(" ")
-    return {
-      id: program.id,
-      slug: program.anogroProgramSlug ?? null,
-      name: program.name,
-      city: program.city,
-      country: program.country,
-      programType: program.programType,
-      directionSignals: inferDirectionSignals({ profileProgramType: program.programType, traits: program.traits, structuredText: text }),
-      ageMin: program.ageMin,
-      ageMax: program.ageMax,
-      ageSource: "profile_inferred",
-      durationWeeks: durationNumbers([], program.durationWeeks),
-      durationSource: "profile_or_text",
-      parentAccompanied: true,
-      parentScope,
-      koreanManager: program.koreanManager,
-      koreanDailySupport: program.koreanManager,
-      koreanEmergencySupport: program.koreanManager,
-      emergencySupport: null,
-      beginnerClass: program.beginnerClass,
-      earlyAdaptationSupport: null,
-      dailyParentReport: program.dailyParentReport,
-      traits: program.traits,
-      specialCareSupport: "unknown",
-      budgetMinKrw: positiveNumber(program.budgetMinKrw) ?? null,
-      budgetMaxKrw: positiveNumber(program.budgetMaxKrw) ?? null,
-      priceOptions: [],
-      sessionWindows: [],
-      hasSessionRows: false,
-      hasScheduledSessionRows: false,
-      sessionStatusNeedsConfirmation: true,
-      imageUrl: null,
-      status: "active",
-      catalogSource: "static_fallback",
-      updatedAt: null,
-    }
-  })
-  return { programs: mapped, cities: deriveCities(mapped, "static_fallback"), source: "static_fallback", warnings: [] }
+function unavailableCatalog(reason: string): V3Catalog {
+  return { programs: [], cities: [], source: "unavailable", warnings: [reason] }
 }
 
 function isActivePublicProgram(row: Row, today: string): boolean {
   return isPublicV3ProgramRow(row, today)
 }
 
-function mapCity(row: Row, source: Exclude<V3CatalogSource, "unavailable">): readonly V3CatalogCity[] {
+function mapCity(row: Row): readonly V3CatalogCity[] {
   if (!isVisibleV3CityRow(row)) return []
   const id = readString(row, ["id"])
   const name = readString(row, ["City name", "name", "city_name", "title"])
@@ -374,27 +282,8 @@ function mapCity(row: Row, source: Exclude<V3CatalogSource, "unavailable">): rea
     flightCostKrw: positiveNumber(readNumber(row, ["Flight Cost KRW"])) ?? null,
     livingCostMonthlyKrw: positiveNumber(readNumber(row, ["LivingCost KRW"])) ?? null,
     housingCostMonthlyKrw: positiveNumber(readNumber(row, ["HousingCost KRW"])) ?? null,
-    catalogSource: source,
+    catalogSource: "supabase",
   }]
-}
-
-function deriveCities(programs: readonly V3CatalogProgram[], source: "static_fallback"): readonly V3CatalogCity[] {
-  const pairs = new Map<string, { readonly city: string; readonly country: string }>()
-  for (const program of programs) pairs.set(`${program.city}|${program.country}`, { city: program.city, country: program.country })
-  return Array.from(pairs.values()).map((item) => ({
-    id: `${item.country}-${item.city}`.toLowerCase().replace(/\s+/g, "-"),
-    slug: null,
-    name: item.city,
-    country: item.country,
-    regionGroup: inferCityRegionGroup(item.country),
-    imageUrl: null,
-    description: null,
-    parentStayEvidence: null,
-    flightCostKrw: null,
-    livingCostMonthlyKrw: null,
-    housingCostMonthlyKrw: null,
-    catalogSource: source,
-  }))
 }
 
 function optionalRows(

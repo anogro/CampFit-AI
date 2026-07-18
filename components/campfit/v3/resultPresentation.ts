@@ -74,26 +74,6 @@ export function programCatalogPresentation(
       unavailableGuidance: null,
     }
   }
-  if (source === "static_fallback") {
-    return {
-      sectionTitle: "개발용 예시 후보",
-      sectionSubtitle: "실제 프로그램 DB 후보가 아니며, 화면 흐름과 비교 방식을 확인하기 위한 예시입니다.",
-      notice: "이 카드는 실제 프로그램 DB 후보가 아니며, 개발용 예시 후보입니다. 실제 선택이나 상담에는 사용하지 마세요.",
-      showProgramCards: true,
-      unavailableTitle: null,
-      unavailableGuidance: null,
-    }
-  }
-  if (source === "demo") {
-    return {
-      sectionTitle: "추천 프로그램 예시",
-      sectionSubtitle: "현재 조건에서 함께 비교할 시연용 후보입니다.",
-      notice: "현재 화면의 프로그램은 추천 흐름을 보여주기 위한 시연용 예시입니다. 실제 운영 일정·가격·모집 여부는 제공기관 확인이 필요합니다.",
-      showProgramCards: true,
-      unavailableTitle: null,
-      unavailableGuidance: null,
-    }
-  }
   return {
     sectionTitle: "프로그램 정보 확인",
     sectionSubtitle: "프로그램 데이터 연결 상태를 다시 확인해주세요.",

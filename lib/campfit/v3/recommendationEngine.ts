@@ -75,16 +75,10 @@ export function buildRecommendation(input: {
     || programCandidates.length < 2
     || input.catalog.source !== "supabase"
   const primaryDirection = directions[0]
-  const sourceNotice = input.catalog.source === "static_fallback"
-    ? " 현재 결과는 개발 환경의 정적 표본이며 실제 프로그램 추천으로 확정할 수 없습니다."
-    : input.catalog.source === "demo"
-      ? " 시연용 가상 카탈로그로 비교 기준을 보여드리는 결과이며 실제 운영·예약·가격 정보가 아닙니다."
-    : ""
-
   return {
     consultingConclusion: primaryDirection
-      ? `현재 조건에서는 ${primaryDirection.label}을 중심으로 살펴보는 편이 좋습니다. 연령·세션 일정·기간·부모 체류 범위를 통과한 후보만 비교했습니다.${sourceNotice}`
-      : `현재 확인한 조건을 기준으로 부모가 같은 도시에 머무를 수 있는 프로그램을 살펴봅니다.${sourceNotice}`,
+      ? `현재 조건에서는 ${primaryDirection.label}을 중심으로 살펴보는 편이 좋습니다. 연령·세션 일정·기간·부모 체류 범위를 통과한 후보만 비교했습니다.`
+      : `현재 확인한 조건을 기준으로 부모가 같은 도시에 머무를 수 있는 프로그램을 살펴봅니다.`,
     experienceDirections: directions,
     destinationRecommendations: destinations,
     requiredSupportConditions,
@@ -96,7 +90,6 @@ export function buildRecommendation(input: {
       "항공편과 단기 숙소의 실제 견적",
       ...missingRequired,
       ...input.catalog.warnings,
-      ...(input.catalog.source === "static_fallback" ? ["개발용 정적 후보를 production 추천으로 사용하지 않기"] : []),
     ])),
     alternatives: buildAlternatives(directions, scoredPrograms, missingRequired),
     limitedResult,
@@ -221,8 +214,6 @@ function evaluateProgram(input: {
     verify.push("프로그램비의 최신 원화 환산액")
   }
 
-  if (input.program.catalogSource === "static_fallback") verify.push("개발용 정적 카탈로그 후보")
-
   const direction = bestProgramDirection(input.program, input.directions)
   const primaryDirection = input.directions[0]?.key
   const primarySignal = primaryDirection ? input.program.directionSignals[primaryDirection] : 50
@@ -231,17 +222,14 @@ function evaluateProgram(input: {
   const beginnerFit = childLevel === "beginner" ? input.program.beginnerClass === true ? 100 : input.program.beginnerClass === false ? 30 : 55 : 75
   const supportFit = supportScore(koreanNeed, input.program)
   const budgetFit = referenceMinimumKrw === null ? 58 : referenceMinimumKrw <= input.basicInfo.budgetMaxKrw ? 90 : 25
-  const demoFit = input.program.catalogSource === "demo" ? demoProgramFit(input.program, input.state) : 60
-  const score = clamp(goalFit * 0.46 + beginnerFit * 0.14 + supportFit * 0.14 + budgetFit * 0.14 + demoFit * 0.07 + metadataScore(input.program) * 0.05)
+  const score = clamp(goalFit * 0.46 + beginnerFit * 0.14 + supportFit * 0.14 + budgetFit * 0.14 + 60 * 0.07 + metadataScore(input.program) * 0.05)
   const classification: ProgramClassification = excluded.length
     ? "excluded"
-    : input.catalogSource === "static_fallback"
-      ? "conditional"
-      : softMismatch.length > 0 || score < 62
-        ? "alternative"
-        : verify.length > 0
-          ? "conditional"
-          : "main"
+    : softMismatch.length > 0 || score < 62
+      ? "alternative"
+      : verify.length > 0
+        ? "conditional"
+        : "main"
 
   return {
     program: input.program,
@@ -313,7 +301,7 @@ function scoreDestinations(
     const regionFit = !preferred.length ? 70 : preferred.includes(city.regionGroup) ? 100 : importance === "strong" ? 35 : 60
     const costFit = cityBudgetFit(city, cityPrograms[0]?.program ?? null, basicInfo)
     const parentFit = parentStayFit(city, stayGoals)
-    const profileFit = demoCityFit(city, directions, stayGoals)
+    const profileFit = 70
     return [{ city, cityPrograms, balance: regionFit * 0.12 + supply * 0.17 + programFit * 0.31 + costFit * 0.14 + parentFit * 0.14 + profileFit * 0.12, preference: regionFit * 0.4 + programFit * 0.4 + profileFit * 0.2, alternative: costFit * 0.55 + parentFit * 0.35 + profileFit * 0.1 }]
   })
   const selected: typeof scored = []
@@ -345,14 +333,9 @@ function toProgramCandidate(item: ScoredProgram, basicInfo: CampfitV3BasicInfo):
       ? "조건 확인 후 살펴볼 프로그램"
       : "함께 비교할 대안"
   const baseUrl = process.env["NEXT_PUBLIC_ANOGRO_SITE_URL"] ?? "https://www.anogro.com"
-  const reason = item.program.catalogSource === "static_fallback"
-    ? "개발 환경의 정적 표본입니다. 실제 DB 프로그램으로 확정하지 마세요."
-    : item.program.catalogSource === "demo"
-      ? `${item.program.demoProfile?.whyItFits[0] ?? `${directionLabels[item.direction]} 중심의 시연용 예시입니다.`}${item.program.demoProfile?.notIdealFor[0] ? ` 다만 ${item.program.demoProfile.notIdealFor[0]}에는 덜 맞을 수 있습니다.` : ""} 실제 운영·예약·가격 정보가 아닌 비교용 예시입니다.`
-    : item.classification === "alternative"
-      ? `${directionLabels[item.direction]} 요소는 있으나 가장 중요한 방향과 차이가 있어 대안으로만 표시합니다.`
-      : `${directionLabels[item.direction]}과 연령·일정·기간·부모 체류 조건을 함께 검토한 실제 DB 후보입니다.`
-  const demoVerify = item.program.catalogSource === "demo" ? item.program.demoProfile?.verificationChecklist ?? [] : []
+  const reason = item.classification === "alternative"
+    ? `${directionLabels[item.direction]} 요소는 있으나 가장 중요한 방향과 차이가 있어 대안으로만 표시합니다.`
+    : `${directionLabels[item.direction]}과 연령·일정·기간·부모 체류 조건을 함께 검토한 실제 DB 후보입니다.`
   return {
     programId: item.program.id,
     name: item.program.name,
@@ -364,8 +347,8 @@ function toProgramCandidate(item: ScoredProgram, basicInfo: CampfitV3BasicInfo):
     priceLabel,
     primaryDirection: directionLabels[item.direction],
     reason,
-    verify: item.verify.length ? Array.from(new Set([...item.verify, ...demoVerify])) : demoVerify.length ? demoVerify : ["최신 일정과 실제 수업 구성"],
-    detailUrl: item.program.catalogSource === "demo" ? null : item.program.slug ? `${baseUrl}/program/${encodeURIComponent(item.program.slug)}` : null,
+    verify: item.verify.length ? item.verify : ["최신 일정과 실제 수업 구성"],
+    detailUrl: item.program.slug ? `${baseUrl}/program/${encodeURIComponent(item.program.slug)}` : null,
     group,
     score: item.score,
   }
@@ -433,7 +416,7 @@ function selectPrice(program: V3CatalogProgram, basicInfo: CampfitV3BasicInfo): 
     && option.durationWeeks === basicInfo.durationWeeks)
   const exactFamily = matching.find((option) => option.adultCount === basicInfo.adultCount)
   if (exactFamily) return exactFamily
-  if (program.parentScope.stayMode === "day" || program.catalogSource === "demo") return matching.find((option) => option.adultCount === 0) ?? null
+  if (program.parentScope.stayMode === "day") return matching.find((option) => option.adultCount === 0) ?? null
   return null
 }
 
@@ -503,10 +486,6 @@ function directionExplanation(direction: ExperienceDirectionKey, readiness: numb
 function cityReason(city: V3CatalogCity, programCount: number, preferred: boolean): string {
   const parts = [`조건을 통과한 부모 체류 호환 프로그램 ${programCount}개가 실제 카탈로그에 있습니다.`]
   if (preferred) parts.push("사용자가 선택한 지역 선호와도 일치합니다.")
-  if (city.catalogSource === "demo") {
-    if (city.demoProfile?.idealFor[0]) parts.push(city.demoProfile.idealFor[0])
-    parts.push("시연용 도시 예시이므로 실제 이동·숙박·운영 조건은 별도 확인이 필요합니다.")
-  }
   return parts.join(" ")
 }
 
@@ -517,7 +496,6 @@ function cityVerify(city: V3CatalogCity, stayGoals: readonly string[]): readonly
   if (city.housingCostMonthlyKrw === null) items.push("단기 가족 숙소 가격")
   else items.push("도심 1BR 월 비용과 실제 단기 가족 숙소의 차이")
   if (stayGoals.includes("remoteWork") && !hasParentStayEvidence(city, "remoteWork")) items.push("인터넷·업무공간 등 원격근무 환경")
-  if (city.catalogSource === "demo") items.push(...(city.demoProfile?.verificationChecklist ?? []))
   return items
 }
 
@@ -558,33 +536,6 @@ function metadataScore(program: V3CatalogProgram): number {
   if (program.durationSource === "session_or_price") score += 15
   if (program.updatedAt) score += 10
   return Math.min(100, score)
-}
-
-function demoCityFit(city: V3CatalogCity, directions: readonly CampfitV3ExperienceDirection[], stayGoals: readonly string[]): number {
-  const profile = city.demoProfile
-  if (!profile) return 70
-  const primary = directions[0]?.key
-  const directionScore = primary ? levelScore(profile.experienceStrengths[primary]) : 70
-  const stayScore = stayGoals.length
-    ? Math.round(stayGoals.reduce((sum, goal) => sum + levelScore(profile.parentStayProfile[goal]), 0) / stayGoals.length)
-    : 70
-  const mobilityScore = levelScore(profile.mobilityProfile["dailyCommuteEase"])
-  return Math.round(directionScore * 0.55 + stayScore * 0.3 + mobilityScore * 0.15)
-}
-
-function demoProgramFit(program: V3CatalogProgram, state: CampfitV3ConversationState): number {
-  const profile = program.demoProfile
-  if (!profile) return 60
-  const goals = arrayValue(state.facts.parentStayGoals?.value)
-  const parentMatches = goals.filter((goal) => profile.parentCompatibilitySignals.some((signal) => signal.toLowerCase().includes(goal.toLowerCase()))).length
-  const parentScore = goals.length ? Math.min(100, 65 + parentMatches * 15) : 70
-  const childLevel = String(state.facts.childEnglishLevel?.value ?? "unknown")
-  const beginnerScore = childLevel === "beginner" && profile.childExperienceSignals.some((signal) => /beginner|first|low_language/i.test(signal)) ? 95 : 70
-  return Math.round(parentScore * 0.55 + beginnerScore * 0.45)
-}
-
-function levelScore(value: unknown): number {
-  return value === "high" ? 100 : value === "medium" ? 72 : value === "low" ? 42 : 60
 }
 
 function comparePrograms(left: ScoredProgram, right: ScoredProgram): number {

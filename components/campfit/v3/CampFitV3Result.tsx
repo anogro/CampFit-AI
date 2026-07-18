@@ -192,7 +192,7 @@ export function CampFitV3Result({
                   ? "grid-cols-1 md:grid-cols-2 max-w-4xl"
                   : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
             }`}>
-              {result.programCandidates.map((program) => <ProgramCard program={program} demo={result.catalogSource === "demo"} key={program.programId} />)}
+              {result.programCandidates.map((program) => <ProgramCard program={program} key={program.programId} />)}
             </div>
           ) : (
             <Empty text="연령·기간·부모동반 조건을 모두 확인할 수 있는 프로그램 후보가 아직 없습니다." />
@@ -285,8 +285,8 @@ function CityCardContent({ city, href }: { readonly city: CampfitV3DestinationRe
   )
 }
 
-function ProgramCard({ program, demo }: { readonly program: CampfitV3ProgramCandidate; readonly demo: boolean }) {
-  const href = demo ? null : safeProgramDetailHref(program.detailUrl)
+function ProgramCard({ program }: { readonly program: CampfitV3ProgramCandidate }) {
+  const href = safeProgramDetailHref(program.detailUrl)
   return (
     <article className="apple-glass-soft flex flex-col overflow-hidden rounded-[22px] print:[break-inside:avoid] print:shadow-none">
       <ProgramCardContent program={program} href={href} />

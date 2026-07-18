@@ -165,14 +165,13 @@ export const CampfitV3RecommendationResultSchema = z.object({
   verificationChecklist: z.array(z.string()).max(50),
   alternatives: z.array(z.string()).max(20),
   limitedResult: z.boolean(),
-  catalogSource: z.enum(["supabase", "static_fallback", "demo", "unavailable"]),
+  catalogSource: z.enum(["supabase", "unavailable"]),
 })
 
 export const CampfitV3RecommendRequestSchema = z.object({
   transcript: CampfitV3TranscriptSchema,
   finalState: CampfitV3ConversationStateSchema,
   basicInfo: CampfitV3BasicInfoSchema,
-  demo: z.boolean().optional(),
 })
 
 const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], readonly string[]>> = {

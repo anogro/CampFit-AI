@@ -205,5 +205,5 @@ export type CampfitV3RecommendationResult = {
   readonly verificationChecklist: readonly string[]
   readonly alternatives: readonly string[]
   readonly limitedResult: boolean
-  readonly catalogSource: "supabase" | "static_fallback" | "demo" | "unavailable"
+  readonly catalogSource: "supabase" | "unavailable"
 }

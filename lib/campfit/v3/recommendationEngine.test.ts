@@ -215,14 +215,6 @@ describe("CampFit v3 recommendation engine", () => {
     expect(result.verificationChecklist).toContain("DB read failed")
   })
 
-  it("labels development static fallback and never presents it as a confirmed DB match", () => {
-    const fallbackProgram = program({ direction: "cultureActivity", catalogSource: "static_fallback", hasSessionRows: false, hasScheduledSessionRows: false, sessionWindows: [] })
-    const fallbackCity = city("Cebu", "Philippines", "southeast_asia", "static_fallback")
-    const result = recommend("cultureActivity", { programs: [fallbackProgram], cities: [fallbackCity], source: "static_fallback", warnings: [] })
-    expect(result.catalogSource).toBe("static_fallback")
-    expect(result.programCandidates[0]?.reason).toContain("정적 표본")
-    expect(result.programCandidates[0]?.group).toBe("조건 확인 후 살펴볼 프로그램")
-  })
 
   it("does not render program cards when their public city rows are unavailable", () => {
     const catalog: V3Catalog = { programs: [program({ direction: "cultureActivity" })], cities: [], source: "supabase", warnings: ["도시 카탈로그 없음"] }

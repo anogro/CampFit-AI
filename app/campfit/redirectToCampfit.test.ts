@@ -6,8 +6,8 @@ describe("campfitRedirectPath", () => {
     expect(campfitRedirectPath()).toBe("/campfit")
   })
 
-  it("preserves demo and embedded query parameters", () => {
-    expect(campfitRedirectPath({ demo: "1", embedded: "1" })).toBe("/campfit?demo=1&embedded=1")
+  it("preserves query parameters for the canonical CampFit path", () => {
+    expect(campfitRedirectPath({ embedded: "1" })).toBe("/campfit?embedded=1")
   })
 
   it("preserves repeated query parameters and omits undefined values", () => {
