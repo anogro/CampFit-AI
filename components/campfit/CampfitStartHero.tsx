@@ -6,7 +6,7 @@ export function CampfitStartHero({ onStart }: { readonly onStart: () => void }) 
   return (
     <main className="h-dvh overflow-hidden bg-transparent">
       <section className="h-full px-3 py-3 sm:px-6 sm:py-6 lg:px-8">
-        <div className="apple-glass mx-auto flex h-full w-full max-w-[1280px] flex-col overflow-hidden rounded-[24px] px-4 py-4 sm:rounded-[32px] sm:px-8 sm:py-7 lg:px-10">
+        <div className="apple-glass campfit-v3-frame-surface mx-auto flex h-full w-full max-w-[1280px] flex-col overflow-hidden rounded-[24px] px-4 py-4 sm:rounded-[32px] sm:px-8 sm:py-7 lg:px-10">
           <header className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5">
               <img src="/images/Small Logo.png" alt="" className="h-6 w-6 object-contain" draggable={false} />

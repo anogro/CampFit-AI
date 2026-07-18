@@ -8,7 +8,11 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "campfit:quality:backfill": "vite-node --config vitest.config.ts scripts/campfit/backfillProgramVerifications.ts"
+    "campfit:quality:backfill": "vite-node --config vitest.config.ts scripts/campfit/backfillProgramVerifications.ts",
+    "campfit:v3:eval": "vite-node --config vitest.config.ts scripts/campfit/v3/counselingEvaluationCli.ts --mode=fallback",
+    "campfit:v3:eval:fallback": "vite-node --config vitest.config.ts scripts/campfit/v3/counselingEvaluationCli.ts --mode=fallback",
+    "campfit:v3:eval:mock": "vite-node --config vitest.config.ts scripts/campfit/v3/counselingEvaluationCli.ts --mode=mock",
+    "campfit:v3:eval:live": "vite-node --config vitest.config.ts scripts/campfit/v3/counselingEvaluationCli.ts --mode=live"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation"
 import { campfitRedirectPath, type CampfitRouteSearchParams } from "@/app/campfit/redirectToCampfit"
 
-type CampfitLegacyPageProps = {
+type CampfitV3PageProps = {
   readonly searchParams?: Promise<CampfitRouteSearchParams>
 }
 
-export default async function CampfitLegacyPage({ searchParams }: CampfitLegacyPageProps) {
+export default async function CampfitV3Page({ searchParams }: CampfitV3PageProps) {
   redirect(campfitRedirectPath(await searchParams))
 }
