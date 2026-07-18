@@ -59,25 +59,30 @@ export function inferParentScope(input: {
   const fallback = normalizeText([input.groupText, input.coverageText, input.nameText].join(" "))
   const parentRequired = /(부모\s*동반\s*필수|parent[_\s-]*(?:required|must)|guardian[_\s-]*required)/i.test(participation)
   const parentRecommended = /(부모\s*동반\s*권장|parent[_\s-]*recommended|부모동반\/현지\s*체류형)/i.test(participation)
-  const childOnly = /(아이\s*단독|주니어\s*단독|child[_\s-]*(?:only|alone)|unaccompanied|without\s+(?:a\s+)?parent)/i.test(participation)
+  const childOnly = isExplicitChildOnlyParticipation(participation)
   const homestay = /(homestay|홈스테이)/i.test(accommodation)
   const residential = /(boarding|residential|기숙|dormitor|residence|학생\s*숙소|campus\s*residence)/i.test(accommodation)
   const day = /(day[_\s-]*(?:camp|program|programme)|낮\s*프로그램|통학형|숙소\s*별도|accommodation[_\s-]*(?:not[_\s-]*included|not[_\s-]*described|없음))/i.test(accommodation)
   const familyStay = /(family[_\s-]*stay|가족\s*숙소|부모\s*숙박)/i.test(accommodation)
   const mixed = /(self[-_\s]*arranged|자체\s*숙소|선택\s*가능|option|mixed)/i.test(accommodation)
 
-  const participationMode: V3ParticipationMode = parentRequired
-    ? "parent_required"
-    : parentRecommended
+  const participationMode: V3ParticipationMode = childOnly
+    ? "child_only_allowed"
+    : parentRequired
+      ? "parent_required"
+      : parentRecommended
       ? "parent_recommended"
-      : childOnly || /(아이\s*단독\s*참여\s*가능)/i.test(participation)
-        ? "child_only_allowed"
-        : "unknown"
+      : "unknown"
 
-  // Explicit participation and accommodation fields always outrank labels or names.
-  if (childOnly && (homestay || residential) && !day) {
-    return { participationMode, stayMode: homestay ? "homestay" : "child_residential", guardianNearbyCompatible: false }
+  // Explicit child-only participation always outranks profile and accommodation inference.
+  if (childOnly) {
+    return {
+      participationMode,
+      stayMode: homestay ? "homestay" : residential ? "child_residential" : day ? "day" : "unknown",
+      guardianNearbyCompatible: false,
+    }
   }
+  // Explicit participation and accommodation fields always outrank labels or names.
   if ((parentRequired || parentRecommended) && (homestay || residential) && !day && !familyStay) {
     return { participationMode, stayMode: "mixed", guardianNearbyCompatible: null }
   }
@@ -164,7 +169,7 @@ function applyDirectionKeywords(scores: Record<ExperienceDirectionKey, number>, 
   if (/(english|영어|esl|language\s*school|어학|immersion|몰입)/i.test(text)) {
     scores.englishIntensive = Math.max(scores.englishIntensive, 82)
   }
-  if (/(\bstem\b|\bsteam\b|\bcoding\b|코딩|\brobot(?:ics)?\b|로봇|\bmaker\b|\bscience\b|과학|\btechnology\b|\bengineering\b|\bproject(?:s)?\b|프로젝트|\bcreative\s+(?:project|arts?)\b|창의\s*(?:프로젝트|창작)|\bart\s+project\b|예술\s*프로젝트|\bmusic\s+(?:project|production)\b|음악\s*(?:프로젝트|제작)|\bsports?\s+specialt(?:y|ies)\b|스포츠\s*특화)/i.test(text)) {
+  if (/(\bstem\b|\bsteam\b|\bcoding\b|코딩|\brobot(?:ics)?\b|로봇|\bmaker\b|\bscience\b|과학|\btechnology\b|\bengineering\b|\bproject(?:s)?\b|프로젝트|\bcreative\s+(?:project|arts?)\b|창의\s*(?:활동|프로젝트|창작)|\bart\s+project\b|예술\s*프로젝트|\bmusic\s+(?:project|production)\b|음악\s*(?:프로젝트|제작)|\bsports?\s+specialt(?:y|ies)\b|스포츠\s*특화)/i.test(text)) {
     scores.subjectProject = Math.max(scores.subjectProject, 90)
   }
   if (/(culture|문화|activity|액티비티|sports|스포츠|outdoor|야외|excursion|현장\s*체험|nature|자연|beach|해변)/i.test(text)) {
@@ -325,6 +330,10 @@ function utcDateParts(value: Date): { readonly year: number; readonly month: num
 
 function normalizeText(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ")
+}
+
+function isExplicitChildOnlyParticipation(value: string): boolean {
+  return /(아이\s*단독\s*(?:참여|참가)|아동\s*단독\s*(?:참여|참가)|주니어\s*단독\s*(?:참여|참가|캠프)|보호자\s*없이\s*(?:참여|참가)|부모\s*없이\s*(?:참여|참가)|학생\s*단독\s*(?:참여|참가)|child[-_\s]*only|child[-_\s]*alone|unaccompanied|without\s+(?:a\s+)?parent|student[-_\s]*only|junior[-_\s]*(?:residential|camp))/i.test(value)
 }
 
 function readRowString(row: CatalogRow, key: string): string | undefined {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { V3Catalog, V3CatalogCity, V3CatalogProgram } from "@/lib/campfit/v3/catalogRepository"
+import { inferDirectionSignals } from "@/lib/campfit/v3/catalogPolicy"
 import { buildRecommendation, scoreExperienceDirections } from "@/lib/campfit/v3/recommendationEngine"
 import { createFact, createInitialConversationState, mergeFacts } from "@/lib/campfit/v3/stateEngine"
 import type { CampfitV3BasicInfo, CampfitV3ConversationState, ExperienceDirectionKey } from "@/types/campfitV3"
@@ -48,6 +49,41 @@ describe("CampFit v3 recommendation engine", () => {
     expect(result.programCandidates).toEqual([])
     expect(result.destinationRecommendations).toEqual([])
     expect(result.alternatives.join(" ")).toContain("조건을 통과한 후보가 적습니다")
+  })
+
+  it("keeps a parent-compatible four-week program when 창의활동 supplies the requested project direction", () => {
+    const directionSignals = inferDirectionSignals({
+      profileProgramType: "managed_immersion",
+      traits: [" 창의 활동 "],
+      structuredText: "방학캠프 영어몰입형",
+    })
+    const candidate = program({
+      id: "creative-family-four-week",
+      direction: "subjectProject",
+      programType: "managed_immersion",
+      traits: [" 창의 활동 "],
+      directionSignals,
+      sessionWindows: [session("2026-08-03", "2026-08-30", 4)],
+      priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 4, currency: "KRW", priceValue: 10_000_000, status: "active" }],
+      durationWeeks: [4],
+    })
+    const result = buildRecommendation({
+      basicInfo: {
+        ...basicInfo,
+        childAges: [7],
+        departureWindow: "2026년 8월",
+        durationWeeks: 4,
+        budgetMinKrw: 8_000_000,
+        budgetMaxKrw: 12_000_000,
+      },
+      state: stateFor("subjectProject", { parentStayGoals: ["restWellness"] }),
+      catalog: productionCatalog([candidate]),
+      now: new Date("2026-07-18T00:00:00.000Z"),
+    })
+
+    expect(directionSignals.subjectProject).toBe(90)
+    expect(result.programCandidates.map((item) => item.programId)).toContain("creative-family-four-week")
+    expect(result.destinationRecommendations.map((item) => item.cityName)).toContain("Cebu")
   })
 
   it("keeps special-care follow-up out of direction scores", () => {
@@ -287,6 +323,10 @@ function program(input: {
   readonly budgetMaxKrw?: number | null
   readonly priceOptions?: V3CatalogProgram["priceOptions"]
   readonly sessionWindows?: V3CatalogProgram["sessionWindows"]
+  readonly durationWeeks?: readonly number[]
+  readonly programType?: V3CatalogProgram["programType"]
+  readonly traits?: readonly string[]
+  readonly directionSignals?: V3CatalogProgram["directionSignals"]
   readonly hasSessionRows?: boolean
   readonly hasScheduledSessionRows?: boolean
   readonly catalogSource?: V3CatalogProgram["catalogSource"]
@@ -299,8 +339,8 @@ function program(input: {
     name: input.id ?? `${input.direction} verified program`,
     city: input.city ?? "Cebu",
     country: input.country ?? "Philippines",
-    programType: input.direction === "schoolSchooling" ? "schooling" : input.direction === "subjectProject" ? "creative_daycamp" : input.direction === "cultureActivity" ? "activity" : "managed_immersion",
-    directionSignals: {
+    programType: input.programType ?? (input.direction === "schoolSchooling" ? "schooling" : input.direction === "subjectProject" ? "creative_daycamp" : input.direction === "cultureActivity" ? "activity" : "managed_immersion"),
+    directionSignals: input.directionSignals ?? {
       schoolSchooling: signal("schoolSchooling"),
       englishIntensive: signal("englishIntensive"),
       subjectProject: signal("subjectProject"),
@@ -309,7 +349,7 @@ function program(input: {
     ageMin: input.ageMin === undefined ? 5 : input.ageMin,
     ageMax: input.ageMax === undefined ? 12 : input.ageMax,
     ageSource: input.ageSource ?? "program",
-    durationWeeks: [2],
+    durationWeeks: input.durationWeeks ?? [2],
     durationSource: "session_or_price",
     parentAccompanied: input.parentScope?.guardianNearbyCompatible === true || input.parentScope === undefined,
     parentScope: input.parentScope ?? { participationMode: "parent_required", stayMode: "day", guardianNearbyCompatible: true },
@@ -320,7 +360,7 @@ function program(input: {
     beginnerClass: true,
     earlyAdaptationSupport: true,
     dailyParentReport: true,
-    traits: [],
+    traits: input.traits ?? [],
     specialCareSupport: input.specialCareSupport ?? "unknown",
     budgetMinKrw: input.budgetMinKrw === undefined ? price : input.budgetMinKrw,
     budgetMaxKrw: input.budgetMaxKrw === undefined ? price : input.budgetMaxKrw,
