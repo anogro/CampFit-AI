@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { processConversationMessage, startConversation } from "@/lib/campfit/v3/conversationService"
+import { processConversationMessage, startConversation, cleanAcknowledgement } from "@/lib/campfit/v3/conversationService"
 import { selectNextQuestion } from "@/lib/campfit/v3/questionBank"
 import { calculateProgress } from "@/lib/campfit/v3/progress"
 import { createFact, createInitialConversationState, extractDeterministicFacts, mergeFacts } from "@/lib/campfit/v3/stateEngine"
@@ -311,5 +311,13 @@ describe("CampFit v3 conversational counselor flow", () => {
     expect(response.updatedState.facts.specialCareFollowUp?.evidence).not.toContain("의료정보")
     expect(response.updatedState.facts.specialCareFollowUp?.evidence).not.toContain("질환")
     expect(response.assistantMessage).not.toContain("의료정보")
+  })
+
+  it("normalizes model assistantMessage by removing questions correctly", () => {
+    expect(cleanAcknowledgement("아이가 프로젝트 활동을 좋아해요.")).toBe("아이가 프로젝트 활동을 좋아해요.")
+    expect(cleanAcknowledgement("영어 수업에도 참여할 수 있어요.")).toBe("영어 수업에도 참여할 수 있어요.")
+    expect(cleanAcknowledgement("부모님은 현지에서 어떻게 지내고 싶으세요?")).toBe("말씀해주신 내용을 확인했어요.")
+    expect(cleanAcknowledgement("원하는 지역을 알려주세요.")).toBe("말씀해주신 내용을 확인했어요.")
+    expect(cleanAcknowledgement("영어로 의사소통할 수 있어요. 원하는 지역을 알려주세요.")).toBe("영어로 의사소통할 수 있어요.")
   })
 })

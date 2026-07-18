@@ -23,3 +23,15 @@ export function CampFitV3Frame({ children, className = "", contentClassName = ""
     </main>
   )
 }
+
+export function V3Header() {
+  return (
+    <header className="flex min-h-16 items-center justify-between gap-4 border-b border-[var(--border-default)]">
+      <div className="flex items-center gap-2.5">
+        <img className="h-6 w-auto object-contain" src="/images/Small Logo.png" alt="" />
+        <span className="text-lg font-black tracking-[-.03em] text-[#18382a]">ANOGRO</span>
+      </div>
+      <span className="text-xs font-extrabold text-[var(--accent-primary)] sm:text-sm">CampFit AI</span>
+    </header>
+  )
+}

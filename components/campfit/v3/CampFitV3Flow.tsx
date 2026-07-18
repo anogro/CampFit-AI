@@ -4,13 +4,14 @@ import * as React from "react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { CampfitStartHero } from "@/components/campfit/CampfitStartHero"
 import { CampFitV3Chat } from "@/components/campfit/v3/CampFitV3Chat"
-import { CampFitV3Frame } from "@/components/campfit/v3/CampFitV3Frame"
+import { CampFitV3Frame, V3Header } from "@/components/campfit/v3/CampFitV3Frame"
 import { CampFitV3Intake } from "@/components/campfit/v3/CampFitV3Intake"
 import { CampFitV3Result } from "@/components/campfit/v3/CampFitV3Result"
 import { useCampFitShellMode } from "@/components/campfit/v3/CampFitShell"
 import { sanitizeConversationInput } from "@/components/campfit/v3/conversationInput"
 import { appendOptimisticUserMessage } from "@/components/campfit/v3/chatUi"
 import { shouldDiscardStoredCampfitV3Session } from "@/components/campfit/v3/sessionMode"
+import { AiAvatar } from "@/components/campfit/v3/AiAvatar"
 import {
   emptyCampfitV3IntakeDraft,
   intakeDraftFromBasicInfo,
@@ -232,26 +233,16 @@ function StartScreen({ demoMode, onStart }: { readonly demoMode: boolean; readon
   )
 }
 
-export function V3Header() {
-  return (
-    <header className="flex min-h-16 items-center justify-between gap-4 border-b border-[var(--border-default)]">
-      <div className="flex items-center gap-2.5">
-        <img className="h-6 w-auto object-contain" src="/images/Small Logo.png" alt="" />
-        <span className="text-lg font-black tracking-[-.03em] text-[#18382a]">ANOGRO</span>
-      </div>
-      <span className="text-xs font-extrabold text-[var(--accent-primary)] sm:text-sm">CampFit AI</span>
-    </header>
-  )
-}
+
 
 function LoadingScreen() {
   return (
     <CampFitV3Frame>
       <V3Header />
-      <section className="flex flex-1 flex-col items-center justify-center py-12 text-center">
-        <div className="grid h-24 w-24 place-items-center rounded-[32px] bg-[var(--accent-soft)] text-3xl font-black text-[var(--accent-primary)] motion-safe:animate-pulse">CF</div>
-        <h1 className="mt-7 text-2xl font-bold tracking-[-.03em] sm:text-3xl">상담 내용을 정리하고 있어요</h1>
-        <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--text-secondary)] sm:text-base">경험 방향, 도시 현실성, 실제 프로그램 후보와 마지막 확인사항을 함께 비교합니다.</p>
+      <section className="flex flex-1 flex-col items-center justify-center py-12 text-center" aria-label="결과 생성 중">
+        <AiAvatar className="h-24 w-24 motion-safe:animate-pulse" />
+        <h1 className="mt-7 text-2xl font-bold tracking-[-.03em] sm:text-3xl">우리 가족에게 맞는 방향을 정리하고 있어요</h1>
+        <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--text-secondary)] sm:text-base">도시와 프로그램 조건을 함께 비교하고 있어요</p>
       </section>
     </CampFitV3Frame>
   )

@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { CampFitV3Frame } from "@/components/campfit/v3/CampFitV3Frame"
-import { V3Header } from "@/components/campfit/v3/CampFitV3Flow"
+import { CampFitV3Frame, V3Header } from "@/components/campfit/v3/CampFitV3Frame"
 import { isChatNearBottom, shouldSendChatMessage } from "@/components/campfit/v3/chatUi"
 import { TypingIndicator } from "@/components/campfit/v3/TypingIndicator"
+import { AiAvatar } from "@/components/campfit/v3/AiAvatar"
 import type { CampfitV3BasicInfo, CampfitV3ConversationResponse, CampfitV3TranscriptMessage } from "@/types/campfitV3"
 
 type Props = {
@@ -180,15 +180,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
   )
 }
 
-function AiAvatar({ className }: { readonly className: string }) {
-  return (
-    <span className={`relative grid place-items-center overflow-hidden rounded-full bg-[linear-gradient(135deg,#bfdbfe_0%,#fbcfe8_48%,#c4b5fd_100%)] shadow-[inset_0_1px_0_rgb(255_255_255_/_0.8),0_5px_14px_rgb(154_134_189_/_0.18)] ${className}`} aria-hidden>
-      <span className="absolute -left-1 top-1 h-5 w-5 rounded-full bg-white/55 blur-[5px]" />
-      <span className="absolute -bottom-1 right-0 h-6 w-6 rounded-full bg-[#8b5cf6]/25 blur-[6px]" />
-      <span className="h-3 w-3 rounded-full border border-white/75 bg-white/35 backdrop-blur-sm" />
-    </span>
-  )
-}
+
 
 function Summary({ term, value }: { readonly term: string; readonly value: string }) {
   return <div className="flex justify-between gap-3"><dt className="text-[var(--text-tertiary)]">{term}</dt><dd className="text-right font-bold">{value}</dd></div>

@@ -340,6 +340,46 @@ function warningForDiagnostics(diagnostics: CampfitV3AiDiagnostics, targetUpdate
   }
 }
 
+export function cleanAcknowledgement(text: string): string {
+  const sentences = text.match(/[^.!?]+(?:[.!?]+|$)/g) || [text];
+  const cleanSentences = sentences
+    .map((s) => s.trim())
+    .filter((s) => {
+      if (s.length === 0) return false;
+      if (s.includes("?") || s.includes("？")) return false;
+      if (
+        s.includes("알려주세요") ||
+        s.includes("말씀해 주세요") ||
+        s.includes("말씀해주세요") ||
+        s.includes("선택해 주세요") ||
+        s.includes("적어주세요")
+      ) {
+        return false;
+      }
+      const cleanEnd = s.replace(/[.!]+$/, "").trim();
+      const questionEndings = [
+        "인가요",
+        "있나요",
+        "할까요",
+        "싶으세요",
+        "원하시나요",
+        "어떻게 생각하세요",
+        "무엇인가요",
+        "어떤가요",
+      ];
+      if (questionEndings.some((ending) => cleanEnd.endsWith(ending))) {
+        return false;
+      }
+      return true;
+    });
+
+  const sliced = cleanSentences.slice(0, 2);
+  if (sliced.length === 0) {
+    return "말씀해주신 내용을 확인했어요.";
+  }
+  return sliced.join(" ");
+}
+
 function acknowledgement(
   model: CampfitV3ModelResponse | null,
   deterministicFacts: readonly CampfitV3Fact[],
@@ -350,7 +390,7 @@ function acknowledgement(
     ? fallbackAcknowledgement(deterministicFacts, userMessage)
     : model.facts.some((fact) => fact.key === "specialCareFollowUp")
       ? "별도로 확인할 사항의 존재 여부만 반영했어요. 상세 내용은 프로그램 상담 단계에서 확인해 주세요."
-      : model.assistantMessage
+      : cleanAcknowledgement(model.assistantMessage)
   const previousAssistant = [...transcript].reverse().find((item) => item.role === "assistant")?.content
   if (model !== null && previousAssistant !== undefined && normalizeMessage(candidate).includes(normalizeMessage(previousAssistant))) {
     return fallbackAcknowledgement(deterministicFacts, userMessage)

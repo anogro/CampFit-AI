@@ -2,8 +2,7 @@
 
 import * as React from "react"
 import { useMemo, useState, type ReactNode } from "react"
-import { CampFitV3Frame } from "@/components/campfit/v3/CampFitV3Frame"
-import { V3Header } from "@/components/campfit/v3/CampFitV3Flow"
+import { CampFitV3Frame, V3Header } from "@/components/campfit/v3/CampFitV3Frame"
 import {
   CAMPFIT_V3_MAX_DURATION_WEEKS,
   CAMPFIT_V3_MAX_TRAVEL_CHILDREN,
