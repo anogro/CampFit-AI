@@ -75,7 +75,7 @@ const result: CampfitV3RecommendationResult = {
 }
 
 describe("CampFitV3Result UI component", () => {
-  it("leads with parent-readable city reasons and keeps secondary detail collapsed", () => {
+  it("builds a parent-readable saved report in the intended order", () => {
     const markup = renderToStaticMarkup(
       createElement(CampFitV3Result, {
         result,
@@ -86,15 +86,45 @@ describe("CampFitV3Result UI component", () => {
       })
     )
 
-    expect(markup).toContain("도시 Top3 비교")
-    expect(markup).toContain("왜 추천해요?")
+    expect(markup).toContain("CampFit AI 추천 리포트")
+    expect(markup).toContain("생성일")
+    expect(markup).toContain("우리 가족 조건")
+    expect(markup).toContain("AI 요약")
+    expect(markup).toContain("추천 도시 Top3")
+    expect(markup).toContain("도시 비교")
+    expect(markup).toContain("확인해야 할 사항")
+    expect(markup).toContain("추천 이유와 장점")
     expect(markup).toContain("Best Match")
     expect(markup).toContain("이 도시에서 볼 프로그램")
+    expect(markup).toContain("도시별 총여행비와 추천 조건 비교")
+    expect(markup).toContain('data-campfit-export-root="true"')
+    expect(markup).toContain('data-campfit-export-ignore="true"')
     expect(markup).not.toContain("프로그램 선택지")
-    expect(markup.indexOf("결과를 저장해두세요")).toBeGreaterThan(markup.indexOf("판단 근거와 세부 확인사항 보기"))
+    expect(markup.indexOf("CampFit AI 추천 리포트")).toBeLessThan(markup.indexOf("우리 가족 조건"))
+    expect(markup.indexOf("우리 가족 조건")).toBeLessThan(markup.indexOf("AI 요약"))
+    expect(markup.indexOf("AI 요약")).toBeLessThan(markup.indexOf("추천 도시 Top3"))
+    expect(markup.indexOf("추천 도시 Top3")).toBeLessThan(markup.indexOf("도시 비교"))
+    expect(markup.indexOf("도시 비교")).toBeLessThan(markup.indexOf("확인해야 할 사항"))
+    expect(markup.indexOf("결과를 저장해두세요")).toBeGreaterThan(markup.indexOf("확인해야 할 사항"))
     expect(markup).toContain("비용과 세부 정보 보기")
     expect(markup).not.toContain("가장 잘 맞는 방향")
     expect(markup).not.toContain("낮은 우선순위 설명")
+  })
+
+  it("keeps report city and program cards tied to real result records", () => {
+    const markup = renderToStaticMarkup(
+      createElement(CampFitV3Result, {
+        result,
+        basicInfo,
+        conversationState,
+        onBack: vi.fn(),
+        onRestart: vi.fn(),
+      })
+    )
+
+    expect(markup).toContain('data-campfit-city-card="true" data-city-name="싱가포르"')
+    expect(markup).toContain('data-campfit-program-card="true" data-program-id="prog-1" data-city-name="싱가포르"')
+    expect(markup).toContain("싱가포르 STEM 캠프")
   })
 
   it("presents basic English as words and short phrases without overstating fluency", () => {
@@ -141,6 +171,8 @@ describe("CampFitV3Result UI component", () => {
     )
 
     expect(markup).toContain("이메일로 받기")
+    expect(markup).toContain("PNG 이미지 저장")
+    expect(markup).toContain("PDF 저장하기")
     expect(markup).not.toContain("이메일로 받기 · 준비 중")
   })
 })

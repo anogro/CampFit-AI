@@ -1,9 +1,14 @@
 "use client"
 
-import { useState, type FormEvent, type RefObject } from "react"
+import { useRef, useState, type FormEvent, type RefObject } from "react"
 import * as React from "react"
 import type { CampfitV3BasicInfo, CampfitV3RecommendationResult } from "@/types/campfitV3"
-import { downloadCampFitResult } from "@/components/campfit/v3/resultExport"
+import {
+  createCampFitExportLock,
+  downloadCampFitResult,
+  getCampFitReportFilename,
+  type CampFitResultExportFormat,
+} from "@/components/campfit/v3/resultExport"
 
 export type CampFitV3EmailRequest = {
   readonly email: string
@@ -28,23 +33,26 @@ export function CampFitV3ResultActions({
   onBack,
   onRestart,
 }: CampFitV3ResultActionsProps) {
-  const [pdfBusy, setPdfBusy] = useState(false)
+  const [exportBusy, setExportBusy] = useState<CampFitResultExportFormat | null>(null)
+  const exportLock = useRef(createCampFitExportLock())
   const [emailOpen, setEmailOpen] = useState(false)
   const [email, setEmail] = useState("")
   const [notice, setNotice] = useState("")
   const [emailError, setEmailError] = useState("")
 
-  async function savePdf(): Promise<void> {
-    if (!reportRef.current) return
-    setPdfBusy(true)
+  async function saveReport(format: CampFitResultExportFormat): Promise<void> {
+    const report = reportRef.current
+    if (!report || !exportLock.current.acquire()) return
+    setExportBusy(format)
     setNotice("")
     try {
-      await downloadCampFitResult(reportRef.current, "campfit-result.pdf")
-      setNotice("결과 PDF를 저장했어요.")
+      await downloadCampFitResult(report, getCampFitReportFilename(format), format)
+      setNotice(format === "pdf" ? "결과 PDF를 저장했어요." : "결과 PNG 이미지를 저장했어요.")
     } catch {
-      setNotice("PDF 저장에 실패했어요. 잠시 후 다시 시도해 주세요.")
+      setNotice("리포트를 저장하지 못했어요. 잠시 후 다시 시도해주세요.")
     } finally {
-      setPdfBusy(false)
+      setExportBusy(null)
+      exportLock.current.release()
     }
   }
 
@@ -80,14 +88,17 @@ export function CampFitV3ResultActions({
         <p className="min-h-6 text-sm font-semibold text-[var(--accent-primary)]" role="status" aria-live="polite">{notice}</p>
       </div>
       <div className="mt-5 flex flex-wrap gap-3">
-        <button className="glass-cta min-h-12 rounded-full px-6 text-sm font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:cursor-wait disabled:opacity-60" type="button" onClick={savePdf} disabled={pdfBusy}>
-          {pdfBusy ? "PDF 만드는 중…" : "PDF 저장하기"}
+        <button className="glass-cta min-h-12 rounded-full px-6 text-sm font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:cursor-wait disabled:opacity-60" type="button" onClick={() => saveReport("pdf")} disabled={exportBusy !== null}>
+          {exportBusy === "pdf" ? "PDF 만드는 중…" : "PDF 저장하기"}
         </button>
-        <button className={secondaryButtonClass} type="button" onClick={() => { setEmailError(""); setEmailOpen(true) }}>
+        <button className="glass-cta min-h-12 rounded-full px-5 text-sm font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:cursor-wait disabled:opacity-60" type="button" onClick={() => saveReport("png")} disabled={exportBusy !== null}>
+          {exportBusy === "png" ? "PNG 만드는 중…" : "PNG 이미지 저장"}
+        </button>
+        <button className={secondaryButtonClass} type="button" onClick={() => { setEmailError(""); setEmailOpen(true) }} disabled={exportBusy !== null}>
           이메일로 받기
         </button>
-        <button className={secondaryButtonClass} type="button" onClick={onBack}>상담 내용 다시 보기</button>
-        <button className={tertiaryButtonClass} type="button" onClick={requestRestart}>조건을 바꿔 다시 상담하기</button>
+        <button className={secondaryButtonClass} type="button" onClick={onBack} disabled={exportBusy !== null}>상담 내용 다시 보기</button>
+        <button className={tertiaryButtonClass} type="button" onClick={requestRestart} disabled={exportBusy !== null}>조건을 바꿔 다시 상담하기</button>
       </div>
       {emailOpen ? (
         <div className="mt-4 max-w-xl rounded-[20px] border border-[var(--border-default)] bg-white p-5" role="dialog" aria-labelledby="email-result-title" aria-modal="false">

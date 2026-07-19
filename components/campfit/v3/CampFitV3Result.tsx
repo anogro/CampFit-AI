@@ -91,6 +91,29 @@ function getAxisDetail(axisKey: string, state: CampfitV3ConversationState): stri
   }
 }
 
+function englishLevelLabel(state: CampfitV3ConversationState): string {
+  const level = state.facts.childEnglishLevel?.value
+  if (level === "beginner") return "영어 초급자 수준"
+  if (level === "basic") return "단어·짧은 표현 수준"
+  if (level === "intermediate") return "영어 수업 참여 가능"
+  if (level === "advanced") return "자연스러운 영어 소통 가능"
+  return "상담 중 확인한 맞춤"
+}
+
+function reportDateLabel(date = new Date()): string {
+  return new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "long", day: "numeric" }).format(date)
+}
+
+function importantCriteria(
+  result: CampfitV3RecommendationResult,
+  state: CampfitV3ConversationState,
+): readonly string[] {
+  const directions = result.experienceDirections.slice(0, 2).map((direction) => direction.label.replace(/ 경험$/, ""))
+  const stayGoals = state.facts.parentStayGoals?.value
+  const parentGoal = Array.isArray(stayGoals) && stayGoals.length ? getAxisDetail("family", state) : null
+  return Array.from(new Set([...directions, parentGoal].filter((value): value is string => Boolean(value)))).slice(0, 3)
+}
+
 export function CampFitV3Result({
   result,
   basicInfo,
@@ -111,24 +134,30 @@ export function CampFitV3Result({
     <CampFitV3Frame>
       <V3Header />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <div ref={reportRef} data-campfit-result-report className="mx-auto max-w-[1120px] px-0 py-7 sm:py-10">
-          <section className="rounded-[24px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 sm:p-7">
+        <div ref={reportRef} data-campfit-result-report data-campfit-export-root="true" className="mx-auto max-w-[1120px] px-0 py-7 sm:py-10">
+          <section data-campfit-report-section="title" className="rounded-[24px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 sm:p-7">
             <div className="flex flex-wrap items-center gap-2 text-xs font-black tracking-[.12em] text-[var(--accent-primary)]">
+              <img className="h-6 w-auto object-contain" src="/images/Small Logo.png" alt="" />
               <span>CAMPFIT AI</span>
               <span className="h-1 w-1 rounded-full bg-[var(--accent-primary)]" aria-hidden />
-              <span>가족 맞춤 결과</span>
+              <span>저장용 결과 리포트</span>
             </div>
-            <h1 className="mt-3 max-w-3xl text-3xl font-bold tracking-[-.035em] [word-break:keep-all] sm:text-4xl">우리 가족에게 맞는 도시와 프로그램</h1>
-            <p className="mt-4 max-w-3xl text-base font-medium leading-8 text-[var(--text-secondary)] [word-break:keep-all]">{result.consultingConclusion}</p>
-            <div className="mt-5 flex flex-wrap gap-2 text-sm font-semibold text-[var(--text-secondary)]">
-              <span className="rounded-full bg-white px-3 py-1.5">아이 {basicInfo.childAges.join(", ")}세</span>
-              <span className="rounded-full bg-white px-3 py-1.5">{basicInfo.durationWeeks}주 체류</span>
-              <span className="rounded-full bg-white px-3 py-1.5">예산 {budgetLabel(basicInfo.budgetMinKrw, basicInfo.budgetMaxKrw)}</span>
-              <span className="rounded-full bg-white px-3 py-1.5">부모 동행</span>
-            </div>
+            <h1 className="mt-3 max-w-3xl text-3xl font-bold tracking-[-.035em] [word-break:keep-all] sm:text-4xl">CampFit AI 추천 리포트</h1>
+            <p className="mt-3 text-sm font-semibold text-[var(--text-secondary)]">생성일 {reportDateLabel()}</p>
           </section>
 
-          <ResultSection title="도시 Top3 비교" subtitle="서로 다른 도시를 먼저 비교하고, 각 도시 안에서 실제 프로그램을 살펴보세요.">
+          <ReportSection title="우리 가족 조건" subtitle="상담에서 확인한 가족 조건을 한눈에 정리했습니다.">
+            <FamilyConditionGrid basicInfo={basicInfo} conversationState={conversationState} result={result} />
+          </ReportSection>
+
+          <ReportSection title="AI 요약" subtitle="새로운 해석을 덧붙이지 않고, 상담과 추천 결과에서 확인된 내용을 정리했습니다.">
+            <article data-campfit-report-section="summary" className="rounded-[22px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 sm:p-6">
+              <p className="max-w-3xl text-base font-semibold leading-8 [word-break:keep-all]">{result.consultingConclusion}</p>
+              {cityComparisons[0] ? <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-secondary)] [word-break:keep-all]">{cityComparisons[0].city.reason}</p> : null}
+            </article>
+          </ReportSection>
+
+          <ReportSection title="추천 도시 Top3" subtitle="서로 다른 도시를 먼저 비교하고, 각 도시 안에서 실제 프로그램을 살펴보세요.">
             {catalogPresentation.notice ? (
               <p className="mb-4 rounded-2xl bg-[var(--surface-tint-yellow)] px-4 py-3 text-sm font-semibold leading-6 text-[var(--status-warning)] [word-break:keep-all]" role="status">
                 {catalogPresentation.notice}
@@ -143,11 +172,15 @@ export function CampFitV3Result({
             ) : (
               <Empty text="현재 조건에서 실제로 비교할 도시를 찾지 못했어요. 출발 시기나 기간을 조금 넓히면 다시 비교할 수 있어요." />
             )}
-          </ResultSection>
+          </ReportSection>
 
-          <ResultSection title="확인이 필요한 사항" subtitle="신청 전에 최신 운영 조건과 실제 가족 비용을 확인하세요.">
+          <ReportSection title="도시 비교" subtitle="현재 결과에 포함된 도시별 비용과 선택 역할을 비교했습니다.">
+            <CityComparisonTable cityComparisons={cityComparisons} basicInfo={basicInfo} />
+          </ReportSection>
+
+          <ReportSection title="확인해야 할 사항" subtitle="신청 전에 최신 운영 조건과 실제 가족 비용을 확인하세요.">
             <ListCard title="최종 선택 전 확인사항" items={result.verificationChecklist} />
-          </ResultSection>
+          </ReportSection>
 
           <details className="group mt-8 rounded-[22px] border border-[var(--border-default)] bg-white">
             <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-bold [word-break:keep-all] [&::-webkit-details-marker]:hidden sm:px-6">
@@ -185,32 +218,101 @@ export function CampFitV3Result({
               ) : null}
             </div>
           </details>
+        </div>
 
-          <div data-campfit-export-ignore="true">
-            <CampFitV3ResultActions
-              reportRef={reportRef}
-              result={result}
-              basicInfo={basicInfo}
-              {...(onRequestEmail ? { onRequestEmail } : {})}
-              onBack={onBack}
-              onRestart={onRestart}
-            />
-          </div>
+        <div data-campfit-export-ignore="true">
+          <CampFitV3ResultActions
+            reportRef={reportRef}
+            result={result}
+            basicInfo={basicInfo}
+            {...(onRequestEmail ? { onRequestEmail } : {})}
+            onBack={onBack}
+            onRestart={onRestart}
+          />
         </div>
       </div>
     </CampFitV3Frame>
   )
 }
 
-function ResultSection({ title, subtitle, children }: { readonly title: string; readonly subtitle?: string; readonly children: ReactNode }) {
+function ReportSection({ title, subtitle, children }: { readonly title: string; readonly subtitle?: string; readonly children: ReactNode }) {
   return (
-    <section className="mt-8">
+    <section className="mt-8" data-campfit-report-section={title}>
       <div className="mb-4">
         <h2 className="text-2xl font-bold tracking-[-.025em] [word-break:keep-all]">{title}</h2>
         {subtitle ? <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{subtitle}</p> : null}
       </div>
       {children}
     </section>
+  )
+}
+
+function FamilyConditionGrid({
+  basicInfo,
+  conversationState,
+  result,
+}: {
+  readonly basicInfo: CampfitV3BasicInfo
+  readonly conversationState: CampfitV3ConversationState
+  readonly result: CampfitV3RecommendationResult
+}) {
+  const criteria = importantCriteria(result, conversationState)
+  const items = [
+    ["아이 나이", basicInfo.childAges.map((age) => `만 ${age}세`).join(" · ") || "상담 중 확인"],
+    ["여행 기간", `${basicInfo.durationWeeks}주`],
+    ["가족 구성", `성인 ${basicInfo.adultCount}명 · 아동 ${basicInfo.childCount}명`],
+    ["예산", budgetLabel(basicInfo.budgetMinKrw, basicInfo.budgetMaxKrw)],
+    ["영어 수준", englishLevelLabel(conversationState)],
+    ["중요하게 생각한 조건", criteria.length ? criteria.join(" · ") : "가족 체류와 아이의 경험을 함께 고려"],
+  ] as const
+
+  return (
+    <dl data-campfit-report-section="family-conditions" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map(([label, value]) => (
+        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4" key={label}>
+          <dt className="text-xs font-black tracking-[.06em] text-[var(--text-secondary)]">{label}</dt>
+          <dd className="mt-2 text-sm font-extrabold leading-6 [word-break:keep-all]">{value}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
+function CityComparisonTable({
+  cityComparisons,
+  basicInfo,
+}: {
+  readonly cityComparisons: readonly CampfitV3CityComparison[]
+  readonly basicInfo: CampfitV3BasicInfo
+}) {
+  if (!cityComparisons.length) return <Empty text="비교할 도시가 아직 없습니다." />
+
+  return (
+    <div data-campfit-report-section="city-comparison" className="overflow-x-auto rounded-[22px] border border-[var(--border-default)] bg-[var(--surface-elevated)]">
+      <table className="min-w-[640px] w-full text-left text-sm">
+        <caption className="sr-only">도시별 총여행비와 추천 조건 비교</caption>
+        <thead className="border-b border-[var(--border-default)] text-xs font-black text-[var(--text-secondary)]">
+          <tr>
+            <th className="px-4 py-4 sm:px-5" scope="col">도시</th>
+            <th className="px-4 py-4 sm:px-5" scope="col">총여행비</th>
+            <th className="px-4 py-4 sm:px-5" scope="col">선택 역할</th>
+            <th className="px-4 py-4 sm:px-5" scope="col">추천 기간</th>
+            <th className="px-4 py-4 sm:px-5" scope="col">실제 프로그램</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cityComparisons.map(({ city, programs, tripCost }, index) => (
+            <tr className="border-b border-[var(--border-default)] last:border-b-0" key={city.cityId}>
+              <th className="px-4 py-4 font-black sm:px-5" scope="row">{index + 1}. {city.cityName}</th>
+              <td className="px-4 py-4 font-bold sm:px-5">{tripCost ? tripCostLabel(tripCost.totalLow, tripCost.totalHigh) : "금액 확인 필요"}</td>
+              <td className="px-4 py-4 leading-6 text-[var(--text-secondary)] sm:px-5">{city.role}</td>
+              <td className="px-4 py-4 text-[var(--text-secondary)] sm:px-5">{basicInfo.durationWeeks}주</td>
+              <td className="px-4 py-4 text-[var(--text-secondary)] sm:px-5">{programs.length}개</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -234,7 +336,7 @@ function CityCard({
   const checks = cityCheckItems(city)
   const costDetails = cityCostDetails(city)
   return (
-    <article className="apple-glass-soft flex flex-col overflow-hidden rounded-[22px]">
+    <article data-campfit-city-card data-city-name={city.cityName} className="apple-glass-soft flex flex-col overflow-hidden rounded-[22px]">
       <div className="flex items-start justify-between gap-3 p-5 pb-0 sm:p-6 sm:pb-0">
         <div>
           <p className="text-xs font-black uppercase tracking-[.1em] text-[var(--accent-primary)]">{index === 0 ? "01" : `0${index + 1}`} · {rankLabel(index)}</p>
@@ -244,7 +346,7 @@ function CityCard({
         {city.imageUrl ? <img className="h-20 w-24 rounded-2xl object-cover" src={city.imageUrl} alt="" /> : <div className="grid h-20 w-24 shrink-0 place-items-center rounded-2xl bg-[var(--accent-soft)] text-2xl font-black text-[var(--accent-primary)]" aria-hidden>{city.cityName.slice(0, 1)}</div>}
       </div>
       <div className="flex flex-1 flex-col p-5 sm:p-6">
-        <h4 className="text-sm font-black text-[var(--text-primary)]">왜 추천해요?</h4>
+        <h4 className="text-sm font-black text-[var(--text-primary)]">추천 이유와 장점</h4>
         <ul className="mt-3 space-y-2.5">
           {cityWhyBullets(city, basicInfo, conversationState, result).map((item) => (
             <li className="flex gap-2.5 text-sm leading-6 [word-break:keep-all]" key={item}>
@@ -299,7 +401,7 @@ function ProgramInlineCard({ program, index }: { readonly program: CampfitV3Prog
   const strengths = programStrengths(program)
   const cautions = programCautions(program)
   return (
-    <article className="rounded-2xl border border-[var(--border-default)] bg-white p-4">
+    <article data-campfit-program-card data-program-id={program.programId} data-city-name={program.cityName} className="rounded-2xl border border-[var(--border-default)] bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-black uppercase tracking-[.08em] text-[var(--accent-primary)]">프로그램 {index + 1} · {rankLabel(index)}</p>
