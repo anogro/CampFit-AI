@@ -3,7 +3,14 @@ import {
   parseDepartureRange,
   rangesOverlap,
 } from "@/lib/campfit/v3/catalogPolicy"
-import type { V3Catalog, V3CatalogCity, V3CatalogProgram, V3PriceOption } from "@/lib/campfit/v3/catalogRepository"
+import type { ExperienceSignalStatus, V3ParentStayPreferences } from "@/lib/campfit/v3/catalogPolicy"
+import type {
+  V3Catalog,
+  V3CatalogCity,
+  V3CatalogProgram,
+  V3CatalogSessionVariant,
+  V3PriceOption,
+} from "@/lib/campfit/v3/catalogRepository"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationState,
@@ -25,6 +32,24 @@ const directionLabels: Readonly<Record<ExperienceDirectionKey, string>> = {
 
 type ProgramClassification = "main" | "conditional" | "alternative" | "excluded"
 
+type PriceMatchStatus = "exact_quote" | "partial_quote" | "estimated_quote" | "price_unknown" | "confirmed_over_budget"
+type VariantDecisionStatus = "confirmed_match" | "confirmed_mismatch" | "needs_confirmation" | "unknown"
+
+type SessionVariantAssessment = {
+  readonly variant: V3CatalogSessionVariant
+  readonly scheduleStatus: VariantDecisionStatus
+  readonly durationStatus: VariantDecisionStatus
+  readonly selectedDurationWeeks: number | null
+  readonly matchingPriceOptions: readonly V3PriceOption[]
+  readonly confidence: "high" | "medium" | "low"
+}
+
+type PriceAssessment = {
+  readonly status: PriceMatchStatus
+  readonly option: V3PriceOption | null
+  readonly matchingOptions: readonly V3PriceOption[]
+}
+
 type ScoredProgram = {
   readonly program: V3CatalogProgram
   readonly city: V3CatalogCity | null
@@ -34,18 +59,25 @@ type ScoredProgram = {
   readonly verify: readonly string[]
   readonly excludedReasons: readonly string[]
   readonly exactPrice: V3PriceOption | null
+  readonly sessionAssessment: SessionVariantAssessment | null
+  readonly priceAssessment: PriceAssessment
 }
+
+export type V3RecommendationParentPreferences = V3ParentStayPreferences
 
 export function buildRecommendation(input: {
   readonly basicInfo: CampfitV3BasicInfo
   readonly state: CampfitV3ConversationState
   readonly catalog: V3Catalog
+  /** Optional internal preference projection; absent values remain unknown. */
+  readonly parentPreferences?: V3RecommendationParentPreferences
   readonly now?: Date
 }): CampfitV3RecommendationResult {
   const now = input.now ?? new Date()
   const directions = scoreExperienceDirections(input.state)
   const requiredSupportConditions = supportConditions(input.state)
   const missingRequired = requiredFactLabels(input.state)
+  const parentPreferences = input.parentPreferences ?? inferParentStayPreferences(input.basicInfo, input.state)
 
   if (input.catalog.source === "unavailable") {
     return {
@@ -61,15 +93,14 @@ export function buildRecommendation(input: {
     }
   }
 
-  const scoredPrograms = scorePrograms(input.basicInfo, input.state, input.catalog, directions, now)
+  const scoredPrograms = scorePrograms(input.basicInfo, input.state, input.catalog, directions, parentPreferences, now)
   const eligiblePrograms = scoredPrograms.filter((item) => item.classification !== "excluded")
   const destinations = scoreDestinations(input.basicInfo, input.state, input.catalog.cities, eligiblePrograms, directions)
-  const selectedCityNames = new Set(destinations.map((destination) => normalize(destination.cityName)))
-  const programCandidates = eligiblePrograms
-    .filter((item) => selectedCityNames.has(normalize(item.program.city)))
-    .sort(comparePrograms)
+  const sortedEligiblePrograms = eligiblePrograms.sort(comparePrograms)
+  const programCandidates = destinations.flatMap((destination) => sortedEligiblePrograms
+    .filter((item) => normalize(item.program.city) === normalize(destination.cityName) && normalize(item.program.country) === normalize(destination.countryName))
     .slice(0, 3)
-    .map((item) => toProgramCandidate(item, input.basicInfo))
+    .map((item) => toProgramCandidate(item, input.basicInfo)))
   const limitedResult = missingRequired.length > 0
     || destinations.length < 2
     || programCandidates.length < 2
@@ -124,11 +155,12 @@ function scorePrograms(
   state: CampfitV3ConversationState,
   catalog: V3Catalog,
   directions: readonly CampfitV3ExperienceDirection[],
+  parentPreferences: V3ParentStayPreferences,
   now: Date,
 ): readonly ScoredProgram[] {
   const directionScore = new Map(directions.map((direction) => [direction.key, direction.score]))
   const cityByKey = new Map(catalog.cities.map((city) => [cityKey(city.name, city.country), city]))
-  return catalog.programs.map((program) => evaluateProgram({ program, city: cityByKey.get(cityKey(program.city, program.country)) ?? null, basicInfo, state, directions, directionScore, catalogSource: catalog.source, now }))
+  return catalog.programs.map((program) => evaluateProgram({ program, city: cityByKey.get(cityKey(program.city, program.country)) ?? null, basicInfo, state, directions, parentPreferences, directionScore, catalogSource: catalog.source, now }))
 }
 
 function evaluateProgram(input: {
@@ -137,6 +169,7 @@ function evaluateProgram(input: {
   readonly basicInfo: CampfitV3BasicInfo
   readonly state: CampfitV3ConversationState
   readonly directions: readonly CampfitV3ExperienceDirection[]
+  readonly parentPreferences: V3ParentStayPreferences
   readonly directionScore: ReadonlyMap<ExperienceDirectionKey, number>
   readonly catalogSource: V3Catalog["source"]
   readonly now: Date
@@ -150,11 +183,9 @@ function evaluateProgram(input: {
   const childLevel = String(input.state.facts.childEnglishLevel?.value ?? "unknown")
 
   if (input.program.status !== "active") excluded.push("active 프로그램이 아님")
-  if (input.program.parentScope.guardianNearbyCompatible === false || ["child_residential", "homestay"].includes(input.program.parentScope.stayMode)) {
-    excluded.push("아이 단독 기숙·홈스테이 범위")
-  } else if (input.program.parentScope.guardianNearbyCompatible === null) {
-    verify.push("부모가 같은 도시에서 머무르는 낮 프로그램인지 확인")
-  }
+  const parentCheck = evaluateParentCompatibility(input.program.parentScope, input.parentPreferences)
+  excluded.push(...parentCheck.excluded)
+  verify.push(...parentCheck.verify)
 
   if (input.program.ageMin === null || input.program.ageMax === null) {
     verify.push("공식 연령 범위")
@@ -164,7 +195,7 @@ function evaluateProgram(input: {
     verify.push("공식 모집 연령 재확인")
   }
 
-  const timing = evaluateTiming(input.program, input.basicInfo, input.now)
+  const timing = evaluateTimingVariant(input.program, input.basicInfo, input.now)
   if (timing.excludedReason) excluded.push(timing.excludedReason)
   verify.push(...timing.verify)
 
@@ -201,11 +232,13 @@ function evaluateProgram(input: {
     else if (input.program.specialCareSupport !== "supported") verify.push("특별 식사·복약·건강·생활 지원 조건")
   }
 
-  const exactPrice = selectPrice(input.program, input.basicInfo)
+  const priceAssessment = assessPrice(input.program, input.basicInfo)
+  const exactPrice = priceAssessment.option
   const exactMinimumKrw = exactPrice?.currency?.toUpperCase() === "KRW" && exactPrice.priceValue !== null
     ? exactPrice.priceValue
     : null
   const referenceMinimumKrw = exactMinimumKrw ?? input.program.budgetMinKrw
+  if (priceAssessment.status === "partial_quote") verify.push("부모 숙소를 포함한 가격도 확인")
   if (exactMinimumKrw !== null && exactMinimumKrw > input.basicInfo.budgetMaxKrw) {
     excluded.push("확인된 최소 프로그램비가 최대 예산을 초과")
   } else if (exactPrice === null) {
@@ -216,9 +249,19 @@ function evaluateProgram(input: {
 
   const direction = bestProgramDirection(input.program, input.directions)
   const primaryDirection = input.directions[0]?.key
-  const primarySignal = primaryDirection ? input.program.directionSignals[primaryDirection] : 50
-  if (primaryDirection !== undefined && primarySignal < 60) excluded.push(`핵심 경험 방향(${directionLabels[primaryDirection]})을 뒷받침하는 구조화 근거 부족`)
-  const goalFit = clamp((input.directionScore.get(direction) ?? 50) * 0.55 + input.program.directionSignals[direction] * 0.45)
+  const primarySignal = primaryDirection ? programExperienceScore(input.program, primaryDirection) : 50
+  const primaryStatus = primaryDirection ? programExperienceStatus(input.program, primaryDirection) : undefined
+  if (primaryDirection !== undefined && primarySignal < 60) {
+    softMismatch.push(
+      primaryStatus === "unknown" || (primaryStatus === undefined && primarySignal <= 15)
+        ? `핵심 경험 방향(${directionLabels[primaryDirection]})의 구조화 근거 미확인`
+        : `핵심 경험 방향(${directionLabels[primaryDirection]}) 적합도가 낮음`,
+    )
+  }
+  const goalFit = clamp(
+    (input.directionScore.get(direction) ?? 50) * 0.55
+      + directionSignalForScoring(programExperienceScore(input.program, direction), programExperienceStatus(input.program, direction)) * 0.45,
+  )
   const beginnerFit = childLevel === "beginner" ? input.program.beginnerClass === true ? 100 : input.program.beginnerClass === false ? 30 : 55 : 75
   const supportFit = supportScore(koreanNeed, input.program)
   const budgetFit = referenceMinimumKrw === null ? 58 : referenceMinimumKrw <= input.basicInfo.budgetMaxKrw ? 90 : 25
@@ -240,7 +283,239 @@ function evaluateProgram(input: {
     verify: Array.from(new Set([...verify, ...softMismatch])),
     excludedReasons: Array.from(new Set(excluded)),
     exactPrice,
+    sessionAssessment: timing.assessment ?? null,
+    priceAssessment,
   }
+}
+
+function evaluateParentCompatibility(
+  scope: V3CatalogProgram["parentScope"],
+  preferences: V3ParentStayPreferences,
+): { readonly excluded: readonly string[]; readonly verify: readonly string[] } {
+  const excluded: string[] = []
+  const verify: string[] = []
+  const assessment = scope.assessment
+
+  if (!assessment) {
+    // Keep old fixture compatibility while all production catalog programs use the normalized assessment above.
+    if (scope.guardianNearbyCompatible === false || ["child_residential", "homestay"].includes(scope.stayMode)) {
+      excluded.push("아이 단독 기숙·홈스테이 범위")
+    } else if (scope.guardianNearbyCompatible === null) {
+      verify.push("부모가 같은 도시에서 머무르는 낮 프로그램인지 확인")
+    }
+    return { excluded, verify }
+  }
+
+  if (assessment.parentCityStayCompatibility === "incompatible" && preferences.parentCityStay === "required") {
+    excluded.push("부모 체류·숙소 조건 불일치")
+  }
+  if (assessment.parentProgramParticipation === "required" && preferences.parentProgramParticipation === "not_required") {
+    excluded.push("부모 공동 참여 조건 불일치")
+  }
+  if (assessment.childParticipationMode === "day_independent" && preferences.dayProgramIndependent === "not_allowed") {
+    excluded.push("낮 프로그램 독립 참여 조건 불일치")
+  }
+
+  const residentialChildOnly = assessment.childLodgingMode === "residential_camp" || assessment.childLodgingMode === "homestay"
+  const noParentAlternative = assessment.parentCityStayCompatibility === "incompatible"
+    && assessment.parentLodgingCompatibility === "not_available"
+  if (residentialChildOnly && preferences.childResidential === "not_allowed" && noParentAlternative) {
+    excluded.push("아이 단독 기숙·홈스테이 조건 불일치")
+  }
+  if (preferences.sameLodging === "required"
+    && assessment.parentLodgingCompatibility !== "same_lodging_available"
+    && assessment.parentLodgingCompatibility !== "unknown") {
+    excluded.push("필수 동일 숙소 조건 불일치")
+  }
+
+  if (excluded.length === 0 && (assessment.parentFitStatus !== "match"
+    || assessment.parentLodgingCompatibility === "unknown"
+    || assessment.parentLodgingCompatibility === "not_available")) {
+    verify.push(...assessment.parentFitReasons)
+    if (assessment.parentFitStatus === "mismatch" && assessment.parentFitReasons.length === 0) {
+      verify.push("프로그램의 부모 체류 규정과 사용자 조건의 충돌 여부 확인")
+    }
+  }
+  return { excluded, verify: Array.from(new Set(verify)) }
+}
+
+function inferParentStayPreferences(
+  basicInfo: CampfitV3BasicInfo,
+  state: CampfitV3ConversationState,
+): V3ParentStayPreferences {
+  const separation = state.facts.dayProgramSeparationReadiness?.value
+  return {
+    parentCityStay: basicInfo.guardianStaysNearby === true ? "required" : "unknown",
+    parentProgramParticipation: "unknown",
+    sameLodging: "unknown",
+    childResidential: "unknown",
+    dayProgramIndependent: separation === "ready" ? "allowed" : separation === "needs_close_support" ? "not_allowed" : "unknown",
+    nearbyLodging: "unknown",
+  }
+}
+
+function evaluateTimingVariant(program: V3CatalogProgram, basicInfo: CampfitV3BasicInfo, now: Date): {
+  readonly excludedReason: string | null
+  readonly verify: readonly string[]
+  readonly assessment: SessionVariantAssessment | null
+} {
+  const today = isoToday(now)
+  const variants = catalogSessionVariants(program, today)
+  const departure = parseDepartureRange(basicInfo.departureWindow, now)
+  const verify: string[] = []
+
+  if (!departure) verify.push("여행 출발 시기와 실제 세션 날짜")
+  if (!variants.length) {
+    verify.push("예약 가능한 세션의 시작·종료일·기간")
+    return { excludedReason: null, verify, assessment: null }
+  }
+
+  const matchingPriceOptions = inputPriceOptionsFor(program, basicInfo)
+  const assessments = variants.map((variant) => assessSessionVariant(variant, departure, basicInfo.durationWeeks, today, matchingPriceOptions))
+  const viable = assessments.filter((item) => item.variant.availabilityStatus !== "closed"
+    && item.variant.availabilityStatus !== "confirmed_unavailable"
+    && item.scheduleStatus !== "confirmed_mismatch"
+    && item.durationStatus !== "confirmed_mismatch")
+  const best = [...viable].sort(compareVariantAssessments)[0]
+    ?? [...assessments].sort(compareVariantAssessments)[0]
+    ?? null
+
+  if (!viable.length) {
+    const allClosed = assessments.every((item) => ["closed", "confirmed_unavailable"].includes(item.variant.availabilityStatus))
+    if (allClosed) return { excludedReason: "모든 확인된 세션이 종료됨", verify: [], assessment: best }
+    const scheduleMismatch = assessments.length > 0 && assessments.every((item) => item.scheduleStatus === "confirmed_mismatch")
+    if (scheduleMismatch) return { excludedReason: "희망 출발 시기와 세션 일정 불일치", verify: [], assessment: best }
+    const durationMismatch = assessments.length > 0 && assessments.every((item) => item.durationStatus === "confirmed_mismatch")
+    if (durationMismatch) return { excludedReason: "희망 기간과 일치하는 세션이 없음", verify: [], assessment: best }
+    return { excludedReason: "희망 출발 시기와 기간을 동시에 만족하는 세션이 없음", verify: [], assessment: best }
+  }
+
+  if (best) {
+    if (best.variant.availabilityStatus === "needs_inquiry") verify.push("해당 세션의 모집 가능 여부 문의")
+    if (best.variant.availabilityStatus === "likely_available") verify.push("세션 모집 상태와 정확한 시작일 확인")
+    if (best.variant.availabilityStatus === "unknown") verify.push("세션 운영 상태 확인")
+    if (best.scheduleStatus !== "confirmed_match") verify.push("희망 출발 시기와 실제 세션 일정 확인")
+    if (best.durationStatus === "needs_confirmation" || best.durationStatus === "unknown") verify.push("요청 기간의 실제 운영 가능 여부 확인")
+    if (best.durationStatus === "confirmed_match" && best.variant.availableDurationWeeks.length > 1) verify.push("선택한 세션의 정확한 운영 기간 확인")
+    if (best.variant.source === "program_text") verify.push("정확한 세션 시작·종료일 확인")
+  }
+  return { excludedReason: null, verify: Array.from(new Set(verify)), assessment: best }
+}
+
+function catalogSessionVariants(program: V3CatalogProgram, today: string): readonly V3CatalogSessionVariant[] {
+  if (program.sessionVariants?.length) return program.sessionVariants
+  const legacy = program.sessionWindows.map((session): V3CatalogSessionVariant => ({
+    programId: program.id,
+    sessionId: null,
+    startDate: session.startDate,
+    endDate: session.endDate,
+    availableDurationWeeks: session.weeks === null ? [] : [session.weeks],
+    availabilityStatus: session.status?.toLowerCase() === "inquiry"
+      ? "needs_inquiry"
+      : session.endDate < today
+        ? "closed"
+        : session.source === "program_sessions" && session.status?.toLowerCase() === "scheduled"
+          ? "confirmed_available"
+          : "likely_available",
+    status: session.status,
+    label: null,
+    note: null,
+    source: session.source,
+    evidence: [{ source: `${session.source}.date_range`, value: `${session.startDate}/${session.endDate}`, confidence: session.precision === "exact" ? "high" : "low" }],
+  }))
+  if (legacy.length || !program.priceOptions.length) return legacy
+  return [{
+    programId: program.id,
+    sessionId: null,
+    startDate: null,
+    endDate: null,
+    availableDurationWeeks: [...program.durationWeeks],
+    availabilityStatus: "likely_available",
+    status: null,
+    label: null,
+    note: null,
+    source: "price_option",
+    evidence: [{ source: "program_price_options.duration_weeks", value: program.durationWeeks.join(","), confidence: program.durationWeeks.length ? "high" : "low" }],
+  }]
+}
+
+function assessSessionVariant(
+  variant: V3CatalogSessionVariant,
+  departure: ReturnType<typeof parseDepartureRange>,
+  requestedDurationWeeks: number,
+  today: string,
+  matchingPriceOptions: readonly V3PriceOption[],
+): SessionVariantAssessment {
+  const exactDates = variant.startDate !== null && variant.endDate !== null
+  const scheduleStatus: VariantDecisionStatus = !departure
+    ? "unknown"
+    : exactDates
+      ? rangesOverlap(departure, { startDate: variant.startDate!, endDate: variant.endDate! })
+        ? "confirmed_match"
+        : variant.availabilityStatus === "needs_inquiry" || variant.availabilityStatus === "unknown" || variant.availabilityStatus === "likely_available"
+          ? "needs_confirmation"
+          : "confirmed_mismatch"
+      : variant.availabilityStatus === "needs_inquiry" || variant.availabilityStatus === "likely_available"
+        ? "needs_confirmation"
+        : "unknown"
+  const knownDurations = variant.availableDurationWeeks
+  const durationStatus: VariantDecisionStatus = knownDurations.length === 0
+    ? "unknown"
+    : knownDurations.includes(requestedDurationWeeks)
+      ? (knownDurations.length > 1 && variant.source === "program_sessions" ? "needs_confirmation" : "confirmed_match")
+      : variant.availabilityStatus === "needs_inquiry" || variant.availabilityStatus === "likely_available" || variant.availabilityStatus === "unknown"
+        ? "needs_confirmation"
+        : "confirmed_mismatch"
+  return {
+    variant,
+    scheduleStatus,
+    durationStatus,
+    selectedDurationWeeks: knownDurations.includes(requestedDurationWeeks) ? requestedDurationWeeks : null,
+    matchingPriceOptions,
+    confidence: exactDates && knownDurations.length ? "high" : exactDates || knownDurations.length ? "medium" : "low",
+  }
+}
+
+function inputPriceOptionsFor(program: V3CatalogProgram, basicInfo: CampfitV3BasicInfo): readonly V3PriceOption[] {
+  return program.priceOptions.filter((option) => option.status?.toLowerCase() === "active"
+    && option.childCount === basicInfo.childAges.length
+    && option.durationWeeks === basicInfo.durationWeeks)
+}
+
+function compareVariantAssessments(left: SessionVariantAssessment, right: SessionVariantAssessment): number {
+  const availabilityRank: Record<V3CatalogSessionVariant["availabilityStatus"], number> = {
+    confirmed_available: 5,
+    likely_available: 4,
+    needs_inquiry: 3,
+    unknown: 2,
+    confirmed_unavailable: 1,
+    closed: 0,
+  }
+  const statusRank = (value: VariantDecisionStatus) => ({ confirmed_match: 4, needs_confirmation: 3, unknown: 2, confirmed_mismatch: 0 }[value])
+  return availabilityRank[right.variant.availabilityStatus] - availabilityRank[left.variant.availabilityStatus]
+    || statusRank(right.scheduleStatus) - statusRank(left.scheduleStatus)
+    || statusRank(right.durationStatus) - statusRank(left.durationStatus)
+}
+
+function assessPrice(program: V3CatalogProgram, basicInfo: CampfitV3BasicInfo): PriceAssessment {
+  const childCount = basicInfo.childAges.length
+  const matchingOptions = program.priceOptions.filter((option) => option.status?.toLowerCase() === "active"
+    && option.childCount === childCount
+    && option.durationWeeks === basicInfo.durationWeeks)
+  const exactFamily = matchingOptions.find((option) => option.adultCount === basicInfo.adultCount)
+  if (exactFamily) {
+    const hasExactAmount = exactFamily.priceValue !== null && exactFamily.currency !== null
+    const overBudget = hasExactAmount && exactFamily.currency?.toUpperCase() === "KRW"
+      && exactFamily.priceValue !== null
+      && exactFamily.priceValue > basicInfo.budgetMaxKrw
+    return { status: overBudget ? "confirmed_over_budget" : hasExactAmount ? "exact_quote" : "price_unknown", option: hasExactAmount ? exactFamily : null, matchingOptions }
+  }
+  if (program.parentScope.stayMode === "day") {
+    const childOnly = matchingOptions.find((option) => option.adultCount === 0) ?? null
+    const hasChildAmount = childOnly?.priceValue !== null && childOnly?.currency !== null
+    return { status: hasChildAmount ? "partial_quote" : "price_unknown", option: hasChildAmount ? childOnly : null, matchingOptions }
+  }
+  return { status: "price_unknown", option: null, matchingOptions }
 }
 
 function evaluateTiming(program: V3CatalogProgram, basicInfo: CampfitV3BasicInfo, now: Date): { readonly excludedReason: string | null; readonly verify: readonly string[] } {
@@ -456,8 +731,16 @@ function readGoalStrengths(state: CampfitV3ConversationState): Readonly<Record<E
 
 function bestProgramDirection(program: V3CatalogProgram, directions: readonly CampfitV3ExperienceDirection[]): ExperienceDirectionKey {
   return (Object.keys(directionLabels) as readonly ExperienceDirectionKey[])
-    .map((key) => ({ key, score: program.directionSignals[key] * 0.6 + (directions.find((direction) => direction.key === key)?.score ?? 0) * 0.4 }))
+    .map((key) => ({ key, score: programExperienceScore(program, key) * 0.6 + (directions.find((direction) => direction.key === key)?.score ?? 0) * 0.4 }))
     .sort((left, right) => right.score - left.score)[0]?.key ?? "cultureActivity"
+}
+
+function programExperienceScore(program: V3CatalogProgram, direction: ExperienceDirectionKey): number {
+  return program.experienceAssessment?.directionScores[direction] ?? program.directionSignals[direction]
+}
+
+function programExperienceStatus(program: V3CatalogProgram, direction: ExperienceDirectionKey): ExperienceSignalStatus | undefined {
+  return program.experienceAssessment?.directionStatuses[direction]
 }
 
 function englishReadiness(state: CampfitV3ConversationState): number {
@@ -554,9 +837,31 @@ function buildAlternatives(
   const excludedCount = programs.filter((program) => program.classification === "excluded").length
   const eligibleCount = programs.length - excludedCount
   if (eligibleCount < 2) items.push("현재 active·public 카탈로그에서 조건을 통과한 후보가 적습니다. 지역·시기·기간을 조정해 다시 확인할 수 있어요.")
-  if (excludedCount) items.push(`${excludedCount}개 프로그램은 연령·일정·기간·부모 체류·지원·예산 하드 조건으로 제외했습니다.`)
+  if (excludedCount) {
+    const categories = exclusionCategories(programs)
+    const categoryLabel = categories.length ? categories.join("·") : "확인된 조건"
+    items.push(`${excludedCount}개 프로그램은 ${categoryLabel} 하드 조건으로 제외했습니다.`)
+  }
   if (missing.length) items.push("아직 확인되지 않은 조건을 보완하면 도시·프로그램 순위가 달라질 수 있어요.")
   return items
+}
+
+function exclusionCategories(programs: readonly ScoredProgram[]): readonly string[] {
+  const reasons = programs.flatMap((program) => program.excludedReasons)
+  const categories: readonly { readonly label: string; readonly matches: (reason: string) => boolean }[] = [
+    { label: "연령", matches: (reason) => reason.includes("연령") },
+    { label: "일정·기간", matches: (reason) => /(세션|출발|기간|일정)/.test(reason) },
+    { label: "부모 체류", matches: (reason) => /(부모|아이 단독|기숙|홈스테이)/.test(reason) },
+    { label: "지원", matches: (reason) => /(한국어|특별관리)/.test(reason) },
+    { label: "예산", matches: (reason) => reason.includes("프로그램비") },
+    { label: "도시", matches: (reason) => reason.includes("도시") },
+  ]
+  return categories.filter((category) => reasons.some(category.matches)).map((category) => category.label)
+}
+
+function directionSignalForScoring(signal: number, status?: ExperienceSignalStatus): number {
+  if (status === "unknown") return 35
+  return signal <= 15 ? 50 : signal
 }
 
 function takeUnique<T extends { readonly city: { readonly id: string } }>(items: T[], candidate: T | undefined): void {

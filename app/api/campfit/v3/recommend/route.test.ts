@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const loadV3Catalog = vi.hoisted(() => vi.fn())
+const loadDemoCatalog = vi.hoisted(() => vi.fn())
 const isReadyForRecommendation = vi.hoisted(() => vi.fn())
 const buildRecommendation = vi.hoisted(() => vi.fn())
 const explainRecommendation = vi.hoisted(() => vi.fn())
 const createConversationProvider = vi.hoisted(() => vi.fn(() => ({ explainRecommendation })))
 
 vi.mock("@/lib/campfit/v3/catalogRepository", () => ({ loadV3Catalog }))
+vi.mock("@/lib/campfit/v3/demoCatalog", () => ({ loadDemoCatalog }))
 vi.mock("@/lib/campfit/v3/progress", () => ({ isReadyForRecommendation }))
 vi.mock("@/lib/campfit/v3/recommendationEngine", () => ({ buildRecommendation }))
 vi.mock("@/lib/campfit/v3/server/providerFactory", () => ({ createConversationProvider }))
@@ -48,11 +50,11 @@ const result = {
   catalogSource: "supabase" as const,
 }
 
-function request(): Request {
+function request(demo = false): Request {
   return new Request("http://localhost/api/campfit/v3/recommend", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ transcript: [], finalState, basicInfo }),
+    body: JSON.stringify({ transcript: [], finalState, basicInfo, ...(demo ? { demo: true } : {}) }),
   })
 }
 
@@ -60,6 +62,7 @@ describe("CampFit v3 recommendation route", () => {
   beforeEach(() => {
     isReadyForRecommendation.mockReturnValue(true)
     loadV3Catalog.mockResolvedValue({ programs: [], cities: [], source: "supabase", warnings: [] })
+    loadDemoCatalog.mockReturnValue({ programs: [], cities: [], source: "demo", warnings: [] })
     buildRecommendation.mockReturnValue(result)
     explainRecommendation.mockResolvedValue(null)
   })
@@ -77,6 +80,19 @@ describe("CampFit v3 recommendation route", () => {
 
     expect(response.status).toBe(200)
     expect(payload["catalogSource"]).toBe("supabase")
+  })
+
+  it("uses the Demo Catalog only when explicitly requested", async () => {
+    buildRecommendation.mockReturnValue({ ...result, catalogSource: "demo" })
+
+    const response = await POST(request(true))
+    const payload = await response.json() as Record<string, unknown>
+
+    expect(response.status).toBe(200)
+    expect(loadDemoCatalog).toHaveBeenCalledTimes(1)
+    expect(loadV3Catalog).not.toHaveBeenCalled()
+    expect(buildRecommendation).toHaveBeenCalledWith(expect.objectContaining({ catalog: expect.objectContaining({ source: "demo" }) }))
+    expect(payload["catalogSource"]).toBe("demo")
   })
 
   it("returns an explicit service error when the production catalog is unavailable", async () => {

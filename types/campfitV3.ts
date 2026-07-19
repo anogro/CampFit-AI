@@ -177,6 +177,7 @@ export type CampfitV3DestinationRecommendation = {
   readonly reason: string
   readonly verify: readonly string[]
   readonly costEstimate: CampfitV3CostEstimate
+  readonly tripCost?: CampfitV3TripCost | undefined
 }
 
 export type CampfitV3ProgramCandidate = {
@@ -194,6 +195,7 @@ export type CampfitV3ProgramCandidate = {
   readonly detailUrl: string | null
   readonly group: "우선 살펴볼 프로그램" | "조건 확인 후 살펴볼 프로그램" | "함께 비교할 대안"
   readonly score: number
+  readonly tripCost?: CampfitV3TripCost | undefined
 }
 
 export type CampfitV3RecommendationResult = {
@@ -205,5 +207,6 @@ export type CampfitV3RecommendationResult = {
   readonly verificationChecklist: readonly string[]
   readonly alternatives: readonly string[]
   readonly limitedResult: boolean
-  readonly catalogSource: "supabase" | "unavailable"
+  readonly catalogSource: "supabase" | "demo" | "unavailable"
 }
+import type { CampfitV3TripCost } from "@/lib/campfit/v3/cost/types"

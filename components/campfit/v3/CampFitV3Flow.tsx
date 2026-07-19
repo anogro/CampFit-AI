@@ -10,6 +10,7 @@ import { CampFitV3Result } from "@/components/campfit/v3/CampFitV3Result"
 import { useCampFitShellMode } from "@/components/campfit/v3/CampFitShell"
 import { sanitizeConversationInput } from "@/components/campfit/v3/conversationInput"
 import { appendOptimisticUserMessage } from "@/components/campfit/v3/chatUi"
+import { shouldDiscardStoredCampfitV3Session } from "@/components/campfit/v3/sessionMode"
 import { AiAvatar } from "@/components/campfit/v3/AiAvatar"
 import {
   emptyCampfitV3IntakeDraft,
@@ -39,6 +40,7 @@ type StoredSession = {
   readonly conversation: CampfitV3ConversationResponse | null
   readonly transcript: readonly CampfitV3TranscriptMessage[]
   readonly result: CampfitV3RecommendationResult | null
+  readonly demoMode?: boolean
 }
 
 const storageKey = "campfit-v3-conversational-mvp"
@@ -51,31 +53,39 @@ export function CampFitV3Flow() {
   const [conversation, setConversation] = useState<CampfitV3ConversationResponse | null>(null)
   const [transcript, setTranscript] = useState<readonly CampfitV3TranscriptMessage[]>([])
   const [result, setResult] = useState<CampfitV3RecommendationResult | null>(null)
+  const [demoMode, setDemoMode] = useState(false)
   const [hydrated, setHydrated] = useState(false)
   const [error, setError] = useState("")
   const skipNextSessionWriteRef = useRef(false)
 
   useEffect(() => {
     try {
+      const demoRequested = new URLSearchParams(window.location.search).get("demo") === "1"
+      if (demoRequested) setDemoMode(true)
       const raw = sessionStorage.getItem(storageKey)
       if (raw) {
         const saved = JSON.parse(raw) as Partial<StoredSession>
-        if (isStage(saved.stage)) setStage(saved.stage === "loading" ? "chat" : saved.stage)
-        const parsedBasic = CampfitV3BasicInfoSchema.safeParse(saved.basicInfo)
-        const parsedConversation = CampfitV3ConversationResponseSchema.safeParse(saved.conversation)
-        const parsedTranscript = CampfitV3TranscriptSchema.safeParse(saved.transcript)
-        const parsedResult = CampfitV3RecommendationResultSchema.safeParse(saved.result)
-        const parsedDraft = parseStoredIntakeDraft(saved.intakeDraft)
-        if (parsedBasic.success) {
-          setBasicInfo(parsedBasic.data)
-          if (parsedDraft === null) setIntakeDraft(intakeDraftFromBasicInfo(parsedBasic.data))
-        }
-        if (parsedDraft !== null) setIntakeDraft(parsedDraft)
-        if (parsedConversation.success) setConversation(parsedConversation.data)
-        if (parsedTranscript.success) setTranscript(parsedTranscript.data)
-        if (parsedResult.success) setResult(parsedResult.data)
-        if ((saved.basicInfo && !parsedBasic.success) || (saved.conversation && !parsedConversation.success) || (saved.result && !parsedResult.success)) {
-          throw new Error("invalid stored session")
+        if (shouldDiscardStoredCampfitV3Session(demoRequested, saved.demoMode)) {
+          sessionStorage.removeItem(storageKey)
+        } else {
+          if (saved.demoMode === true) setDemoMode(true)
+          if (isStage(saved.stage)) setStage(saved.stage === "loading" ? "chat" : saved.stage)
+          const parsedBasic = CampfitV3BasicInfoSchema.safeParse(saved.basicInfo)
+          const parsedConversation = CampfitV3ConversationResponseSchema.safeParse(saved.conversation)
+          const parsedTranscript = CampfitV3TranscriptSchema.safeParse(saved.transcript)
+          const parsedResult = CampfitV3RecommendationResultSchema.safeParse(saved.result)
+          const parsedDraft = parseStoredIntakeDraft(saved.intakeDraft)
+          if (parsedBasic.success) {
+            setBasicInfo(parsedBasic.data)
+            if (parsedDraft === null) setIntakeDraft(intakeDraftFromBasicInfo(parsedBasic.data))
+          }
+          if (parsedDraft !== null) setIntakeDraft(parsedDraft)
+          if (parsedConversation.success) setConversation(parsedConversation.data)
+          if (parsedTranscript.success) setTranscript(parsedTranscript.data)
+          if (parsedResult.success) setResult(parsedResult.data)
+          if ((saved.basicInfo && !parsedBasic.success) || (saved.conversation && !parsedConversation.success) || (saved.result && !parsedResult.success)) {
+            throw new Error("invalid stored session")
+          }
         }
       }
     } catch {
@@ -93,9 +103,9 @@ export function CampFitV3Flow() {
       sessionStorage.removeItem(storageKey)
       return
     }
-    const value: StoredSession = { stage, intakeDraft, basicInfo, conversation, transcript, result }
+    const value: StoredSession = { stage, intakeDraft, basicInfo, conversation, transcript, result, demoMode }
     sessionStorage.setItem(storageKey, JSON.stringify(value))
-  }, [basicInfo, conversation, hydrated, intakeDraft, result, stage, transcript])
+  }, [basicInfo, conversation, demoMode, hydrated, intakeDraft, result, stage, transcript])
 
   async function beginConversation(info: CampfitV3BasicInfo): Promise<void> {
     setError("")
@@ -155,6 +165,7 @@ export function CampFitV3Flow() {
         transcript,
         finalState: conversation.updatedState,
         basicInfo,
+        demo: demoMode,
       })
       setResult(response)
       setStage("result")
@@ -177,7 +188,7 @@ export function CampFitV3Flow() {
   }
 
   const content = useMemo(() => {
-    if (stage === "start") return <StartScreen onStart={() => setStage("intake")} />
+    if (stage === "start") return <StartScreen demoMode={demoMode} onStart={() => setStage("intake")} />
     if (stage === "intake") return <CampFitV3Intake draft={intakeDraft} onDraftChange={setIntakeDraft} onBack={() => setStage("start")} onSubmit={beginConversation} />
     if (stage === "chat" && conversation && basicInfo) {
       return <CampFitV3Chat basicInfo={basicInfo} conversation={conversation} transcript={transcript} onAnswer={submitAnswer} onEditBasic={() => setStage("intake")} onResult={generateResult} />
@@ -194,8 +205,8 @@ export function CampFitV3Flow() {
         />
       )
     }
-    return <StartScreen onStart={() => setStage("intake")} />
-  }, [basicInfo, conversation, intakeDraft, result, stage, transcript])
+    return <StartScreen demoMode={demoMode} onStart={() => setStage("intake")} />
+  }, [basicInfo, conversation, demoMode, intakeDraft, result, stage, transcript])
 
   return (
     <div
@@ -209,10 +220,11 @@ export function CampFitV3Flow() {
   )
 }
 
-function StartScreen({ onStart }: { readonly onStart: () => void }) {
+function StartScreen({ demoMode, onStart }: { readonly demoMode: boolean; readonly onStart: () => void }) {
   return (
     <div className="relative">
       <CampfitStartHero onStart={onStart} />
+      {demoMode ? <p className="absolute left-1/2 top-24 -translate-x-1/2 rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-primary)]">Demo Catalog</p> : null}
     </div>
   )
 }

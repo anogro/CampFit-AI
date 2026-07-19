@@ -141,6 +141,48 @@ const CampfitV3CostEstimateSchema = z.object({
   label: z.literal("비교용 추정"),
 })
 
+const CampfitV3TripCostSourceAmountSchema = z.object({
+  label: z.string(),
+  currency: z.string(),
+  low: z.number().nonnegative().nullable(),
+  high: z.number().nonnegative().nullable(),
+  lowKrw: z.number().nonnegative().nullable(),
+  highKrw: z.number().nonnegative().nullable(),
+  exchangeRateToKrw: z.number().positive().nullable(),
+  exchangeRateAsOf: z.string().nullable(),
+  exchangeRateSource: z.string().nullable(),
+})
+
+const CampfitV3TripCostLineSchema = z.object({
+  low: z.number().nonnegative().nullable(),
+  high: z.number().nonnegative().nullable(),
+  status: z.enum(["included", "exact", "partial", "estimated", "inquiry", "not_available"]),
+  selectedVariant: z.string().nullable(),
+  travelerCount: z.number().int().nonnegative().nullable(),
+  includedItems: z.array(z.string()),
+  notes: z.array(z.string()),
+  sourceAmounts: z.array(CampfitV3TripCostSourceAmountSchema),
+})
+
+const CampfitV3TripCostSchema = z.object({
+  currency: z.literal("KRW"),
+  totalLow: z.number().nonnegative().nullable(),
+  totalHigh: z.number().nonnegative().nullable(),
+  confidence: z.enum(["high", "medium", "low"]),
+  priceStatus: z.enum(["exact", "partial", "estimated", "inquiry"]),
+  calculatedAt: z.string(),
+  assumptions: z.array(z.string()),
+  unresolvedItems: z.array(z.string()),
+  breakdown: z.object({
+    program: CampfitV3TripCostLineSchema,
+    accommodation: CampfitV3TripCostLineSchema,
+    flights: CampfitV3TripCostLineSchema,
+    living: CampfitV3TripCostLineSchema,
+    localTransport: CampfitV3TripCostLineSchema,
+    other: CampfitV3TripCostLineSchema.extend({ items: z.array(z.string()) }),
+  }),
+})
+
 export const CampfitV3RecommendationResultSchema = z.object({
   consultingConclusion: z.string().min(1).max(1000),
   experienceDirections: z.array(z.object({
@@ -153,25 +195,26 @@ export const CampfitV3RecommendationResultSchema = z.object({
   destinationRecommendations: z.array(z.object({
     cityId: z.string().min(1), cityName: z.string().min(1), countryName: z.string().min(1),
     role: z.enum(["가장 균형 잡힌 선택", "원래 희망을 가장 잘 살리는 선택", "비용·부모 체류 관점의 대안"]),
-    imageUrl: z.string().nullable(), reason: z.string(), verify: z.array(z.string()), costEstimate: CampfitV3CostEstimateSchema,
+    imageUrl: z.string().nullable(), reason: z.string(), verify: z.array(z.string()), costEstimate: CampfitV3CostEstimateSchema, tripCost: CampfitV3TripCostSchema.optional(),
   })).max(3),
   requiredSupportConditions: z.array(z.string()).max(30),
   programCandidates: z.array(z.object({
     programId: z.string().min(1), name: z.string().min(1), cityName: z.string().min(1), countryName: z.string().min(1),
     imageUrl: z.string().nullable(), ageLabel: z.string(), durationLabel: z.string(), priceLabel: z.string(), primaryDirection: z.string(),
     reason: z.string(), verify: z.array(z.string()), detailUrl: z.string().nullable(),
-    group: z.enum(["우선 살펴볼 프로그램", "조건 확인 후 살펴볼 프로그램", "함께 비교할 대안"]), score: z.number().min(0).max(100),
-  })).max(3),
+    group: z.enum(["우선 살펴볼 프로그램", "조건 확인 후 살펴볼 프로그램", "함께 비교할 대안"]), score: z.number().min(0).max(100), tripCost: CampfitV3TripCostSchema.optional(),
+  })).max(9),
   verificationChecklist: z.array(z.string()).max(50),
   alternatives: z.array(z.string()).max(20),
   limitedResult: z.boolean(),
-  catalogSource: z.enum(["supabase", "unavailable"]),
+  catalogSource: z.enum(["supabase", "demo", "unavailable"]),
 })
 
 export const CampfitV3RecommendRequestSchema = z.object({
   transcript: CampfitV3TranscriptSchema,
   finalState: CampfitV3ConversationStateSchema,
   basicInfo: CampfitV3BasicInfoSchema,
+  demo: z.boolean().optional(),
 })
 
 const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], readonly string[]>> = {

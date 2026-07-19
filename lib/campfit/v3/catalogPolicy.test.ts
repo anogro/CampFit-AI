@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import {
   inferDirectionSignals,
+  inferExperienceAssessment,
   inferParentScope,
   isPublicV3ProgramRow,
   isVisibleV3CityRow,
@@ -23,7 +24,7 @@ describe("CampFit v3 catalog policy", () => {
     expect(isVisibleV3CityRow({ id: "private", is_listed: false })).toBe(false)
   })
 
-  it("lets explicit child-only residential data outrank a family-camp name", () => {
+  it("keeps explicit child-only residential data distinct from a family-camp name", () => {
     const scope = inferParentScope({
       participationText: "child_alone",
       accommodationText: "residential boarding",
@@ -32,14 +33,22 @@ describe("CampFit v3 catalog policy", () => {
       nameText: "Premium Family Camp",
       profileParentAccompanied: true,
     })
-    expect(scope).toEqual({ participationMode: "child_only_allowed", stayMode: "child_residential", guardianNearbyCompatible: false })
+    expect(scope).toMatchObject({ participationMode: "child_only_allowed", stayMode: "child_residential", guardianNearbyCompatible: null })
+    expect(scope.assessment).toMatchObject({
+      childParticipationMode: "residential_child_only",
+      parentProgramParticipation: "not_allowed",
+      childLodgingMode: "residential_camp",
+      parentCityStayCompatibility: "unknown",
+      parentFitStatus: "needs_confirmation",
+      conflict: true,
+    })
   })
 
   it.each([
     "아이 단독 참여 가능",
     "child-only",
     "보호자 없이 참가",
-  ])("prioritizes explicit child-only participation over profile and lodging: %s", (participationText) => {
+  ])("separates explicit child-only participation from parent city stay: %s", (participationText) => {
     const scope = inferParentScope({
       participationText,
       accommodationText: "호텔 또는 리조트형 숙소",
@@ -48,8 +57,11 @@ describe("CampFit v3 catalog policy", () => {
       nameText: "Camp",
       profileParentAccompanied: true,
     })
-    expect(scope.guardianNearbyCompatible).toBe(false)
+    expect(scope.guardianNearbyCompatible).toBeNull()
     expect(scope.participationMode).toBe("child_only_allowed")
+    expect(scope.assessment?.parentProgramParticipation).toBe("not_allowed")
+    expect(scope.assessment?.parentCityStayCompatibility).toBe("unknown")
+    expect(scope.assessment?.parentFitStatus).toBe("needs_confirmation")
   })
 
   it("prioritizes explicit parent-required participation over a false profile value", () => {
@@ -62,6 +74,8 @@ describe("CampFit v3 catalog policy", () => {
       profileParentAccompanied: false,
     })
     expect(scope.guardianNearbyCompatible).toBe(true)
+    expect(scope.assessment?.parentProgramParticipation).toBe("required")
+    expect(scope.assessment?.parentFitStatus).toBe("needs_confirmation")
   })
 
   it("uses a true profile value only when explicit participation is absent", () => {
@@ -74,6 +88,8 @@ describe("CampFit v3 catalog policy", () => {
       profileParentAccompanied: true,
     })
     expect(scope.guardianNearbyCompatible).toBe(true)
+    expect(scope.assessment?.parentLodgingCompatibility).toBe("unknown")
+    expect(scope.assessment?.parentFitStatus).toBe("needs_confirmation")
   })
 
   it("keeps unknown parent scope as null when profile and lodging are inconclusive", () => {
@@ -86,6 +102,60 @@ describe("CampFit v3 catalog policy", () => {
       profileParentAccompanied: null,
     })
     expect(scope.guardianNearbyCompatible).toBeNull()
+    expect(scope.assessment?.parentFitStatus).toBe("unknown")
+  })
+
+  it("classifies a child-only day program as nearby-lodging compatible", () => {
+    const scope = inferParentScope({
+      participationText: "아이 단독 참여 가능",
+      accommodationText: "낮 프로그램, 숙소 별도",
+      groupText: "",
+      coverageText: "",
+      nameText: "Day Camp",
+      profileParentAccompanied: false,
+    })
+    expect(scope.guardianNearbyCompatible).toBe(true)
+    expect(scope.assessment).toMatchObject({
+      childParticipationMode: "day_independent",
+      parentProgramParticipation: "not_allowed",
+      parentCityStayCompatibility: "compatible",
+      parentLodgingCompatibility: "nearby_lodging_possible",
+      childLodgingMode: "day_only",
+      parentFitStatus: "match",
+      conflict: false,
+    })
+  })
+
+  it("does not treat an unstructured child residential label as parent city incompatibility", () => {
+    const scope = inferParentScope({
+      participationText: "아이 단독 참여 가능",
+      accommodationText: "호텔",
+      groupText: "",
+      coverageText: "",
+      nameText: "Junior Camp",
+      profileParentAccompanied: null,
+    })
+    expect(scope.guardianNearbyCompatible).toBeNull()
+    expect(scope.assessment?.childLodgingMode).toBe("unknown")
+    expect(scope.assessment?.parentLodgingCompatibility).toBe("unknown")
+    expect(scope.assessment?.parentFitStatus).toBe("unknown")
+  })
+
+  it("keeps nearby lodging compatible when the program does not provide the same lodging", () => {
+    const scope = inferParentScope({
+      participationText: "부모 동반 권장",
+      accommodationText: "숙소 별도",
+      groupText: "가족형",
+      coverageText: "",
+      nameText: "Family Day Program",
+      profileParentAccompanied: null,
+    })
+    expect(scope.assessment).toMatchObject({
+      parentCityStayCompatibility: "compatible",
+      parentLodgingCompatibility: "nearby_lodging_possible",
+      parentFitStatus: "match",
+    })
+    expect(scope.assessment?.parentLodgingCompatibility).not.toBe("same_lodging_available")
   })
 
   it("does not mistake child-only class attendance in a family camp for child-only participation", () => {
@@ -99,6 +169,8 @@ describe("CampFit v3 catalog policy", () => {
     })
     expect(scope.guardianNearbyCompatible).toBe(true)
     expect(scope.participationMode).toBe("parent_required")
+    expect(scope.assessment?.childParticipationMode).toBe("parent_joint")
+    expect(scope.assessment?.parentProgramParticipation).toBe("required")
   })
 
   it("keeps conflicting parent-required and residential structure conditional", () => {
@@ -154,5 +226,106 @@ describe("CampFit v3 catalog policy", () => {
   it("parses an explicit departure window without inventing a season", () => {
     expect(parseDepartureRange("2026-07-20 ~ 2026-07-31")).toEqual({ startDate: "2026-07-20", endDate: "2026-07-31" })
     expect(parseDepartureRange("아직 모르겠어요")).toBeNull()
+  })
+
+  it("normalizes the experience taxonomy into tags and direction scores", () => {
+    const assessment = inferExperienceAssessment({
+      profileProgramType: null,
+      traits: [" 창의 활동 ", "robotics"],
+      sources: [
+        { source: "program.subject", text: "STEM science experiments, technology coding robotics maker design and problem solving", confidence: "high" },
+        { source: "program.description", text: "local culture, nature and art activities", confidence: "low" },
+      ],
+    })
+    const tags = assessment.tags.map((signal) => signal.tag)
+    expect(tags).toEqual(expect.arrayContaining([
+      "stem", "science", "technology", "coding", "robotics", "maker", "design", "problem_solving", "creative_project",
+      "culture", "local_experience", "nature", "arts",
+    ]))
+    expect(assessment.directionScores.subjectProject).toBe(90)
+    expect(assessment.directionStatuses.subjectProject).toBe("confirmed_strong")
+    expect(assessment.confidence).toBe("high")
+  })
+
+  it("recognizes school, English, collaboration, presentation and life-skill evidence", () => {
+    const assessment = inferExperienceAssessment({
+      profileProgramType: null,
+      traits: [],
+      sources: [{
+        source: "program.highlights",
+        text: "school classroom English intensive immersion leadership teamwork group project presentation and life skills",
+        confidence: "medium",
+      }],
+    })
+    const tags = assessment.tags.map((signal) => signal.tag)
+    expect(tags).toEqual(expect.arrayContaining(["school", "english_intensive", "english_immersive", "leadership", "collaboration", "creative_project", "presentation", "life_skills"]))
+    expect(assessment.directionScores.schoolSchooling).toBe(55)
+    expect(assessment.directionScores.englishIntensive).toBe(55)
+    expect(assessment.primaryDirection).toBe("schoolSchooling")
+    expect(assessment.secondaryDirections).toEqual(expect.arrayContaining(["englishIntensive"]))
+  })
+
+  it("keeps unknown evidence distinct from a confirmed weak signal and avoids common false positives", () => {
+    const assessment = inferExperienceAssessment({
+      profileProgramType: null,
+      traits: [],
+      sources: [{ source: "program.description", text: "AI tools and outdoor pool access; start here", confidence: "low" }],
+    })
+    expect(assessment.tags.map((signal) => signal.tag)).toEqual([])
+    expect(Object.values(assessment.directionStatuses).every((status) => status === "unknown")).toBe(true)
+
+    const weak = inferExperienceAssessment({
+      profileProgramType: null,
+      traits: [],
+      sources: [{ source: "program.description", text: "art workshop", confidence: "low" }],
+    })
+    expect(weak.directionStatuses.cultureActivity).toBe("confirmed_weak")
+    expect(weak.directionStatuses.cultureActivity).not.toBe(assessment.directionStatuses.cultureActivity)
+
+    const projectOnly = inferExperienceAssessment({
+      profileProgramType: null,
+      traits: [],
+      sources: [{ source: "program.description", text: "project", confidence: "high" }],
+    })
+    expect(projectOnly.tags.map((signal) => signal.tag)).toEqual([])
+    expect(projectOnly.directionStatuses.subjectProject).toBe("unknown")
+  })
+
+  it("recognizes nature, environment, outdoor, sports, culture, arts and performance evidence", () => {
+    const assessment = inferExperienceAssessment({
+      profileProgramType: null,
+      traits: [],
+      sources: [{
+        source: "program.activity",
+        text: "nature ecology environment outdoor hiking sports football local culture museum arts music performance concert",
+        confidence: "high",
+      }],
+    })
+    expect(assessment.tags.map((signal) => signal.tag)).toEqual(expect.arrayContaining([
+      "nature", "environment", "outdoor", "sports", "culture", "local_experience", "arts", "performance",
+    ]))
+    expect(assessment.directionScores.cultureActivity).toBe(90)
+  })
+
+  it("normalizes early, mid and late month departure phrases to bounded ranges", () => {
+    expect(parseDepartureRange("2026\uB144 7\uC6D4 \uCD08")).toEqual({ startDate: "2026-07-01", endDate: "2026-07-10" })
+    expect(parseDepartureRange("2026\uB144 7\uC6D4 \uC911\uC21C")).toEqual({ startDate: "2026-07-11", endDate: "2026-07-20" })
+    expect(parseDepartureRange("2026\uB144 7\uC6D4 \uB9D0")).toEqual({ startDate: "2026-07-21", endDate: "2026-07-31" })
+  })
+
+  it("does not expand a late-July to August phrase to all of July", () => {
+    expect(parseDepartureRange("2026\uB144 7\uC6D4 \uB9D0\uBD80\uD130 8\uC6D4 \uC0AC\uC774")).toEqual({
+      startDate: "2026-07-21",
+      endDate: "2026-08-31",
+    })
+  })
+
+  it("normalizes a year-spanning month range", () => {
+    expect(parseDepartureRange("2026\uB144 7~8\uC6D4")).toEqual({ startDate: "2026-07-01", endDate: "2026-08-31" })
+  })
+
+  it("keeps relative date phrases bounded instead of turning them into exact dates", () => {
+    expect(parseDepartureRange("2026-07-20 \uC774\uD6C4")).toEqual({ startDate: "2026-07-20", endDate: "2026-10-18" })
+    expect(parseDepartureRange("2026-07-20 \uC804\uD6C4")).toEqual({ startDate: "2026-07-06", endDate: "2026-08-03" })
   })
 })

@@ -3,6 +3,7 @@ import "server-only"
 import {
   extractSessionWindowsFromText,
   inferDirectionSignals,
+  inferExperienceAssessment,
   inferParentScope,
   inferSpecialCareSupport,
   isPublicV3ProgramRow,
@@ -10,6 +11,7 @@ import {
   parseDurationWeeks,
   type V3CatalogSource,
   type V3DirectionSignals,
+  type V3ExperienceAssessment,
   type V3ParentScope,
   type V3SessionWindow,
 } from "@/lib/campfit/v3/catalogPolicy"
@@ -19,12 +21,78 @@ import type { CityRegionGroup } from "@/types/campfitCity"
 import type { Camp, DurationWeeks } from "@/types/campfit"
 
 export type V3PriceOption = {
+  readonly id?: string | null
   readonly adultCount: number | null
   readonly childCount: number | null
   readonly durationWeeks: number | null
   readonly currency: string | null
   readonly priceValue: number | null
   readonly status: string | null
+  readonly accommodationType?: string | null
+  readonly priceQuality?: "exact" | "official_surcharge" | "reference" | "inquiry" | null
+  readonly note?: string | null
+}
+
+export type V3DemoCityProfile = {
+  readonly costLevel: "low" | "medium" | "high"
+  readonly livingEnvironment: "quiet" | "balanced" | "urban"
+  readonly medicalLevel: "medium" | "high"
+  readonly safetyLevel: "medium" | "high"
+  readonly englishEnvironment: "medium" | "high"
+  readonly stemStrength: "medium" | "high"
+  readonly natureStrength: "low" | "medium" | "high"
+  readonly internationality: "medium" | "high"
+  readonly strengths: readonly string[]
+}
+
+export type V3DemoProgramProfile = {
+  readonly productCategory: "english" | "stem" | "sports" | "culture" | "schooling" | "project"
+  readonly accommodationOptions: readonly string[]
+  readonly priceQuality: "exact" | "official_surcharge" | "reference" | "inquiry"
+  readonly priceNote: string
+  readonly packageInclusions: V3ProgramPackageInclusions
+  readonly strengths: readonly string[]
+  readonly tradeoffs: readonly string[]
+}
+
+export type V3ProgramMealPlan = "none" | "weekday_lunch" | "weekday_two_meals" | "full_board"
+
+export type V3ProgramPackageInclusions = {
+  readonly accommodationIncluded: boolean
+  readonly mealPlan: V3ProgramMealPlan
+  readonly localTransportIncluded: boolean
+  readonly airportTransferIncluded: boolean
+  readonly registrationFeeKrw: number | null
+  readonly additionalAdultSurchargeKrw: number | null
+  readonly additionalChildProgramPriceKrw: number | null
+}
+
+export type V3SessionAvailabilityStatus =
+  | "confirmed_available"
+  | "likely_available"
+  | "needs_inquiry"
+  | "confirmed_unavailable"
+  | "closed"
+  | "unknown"
+
+export type V3SessionEvidence = {
+  readonly source: string
+  readonly value: string | number | null
+  readonly confidence: "high" | "medium" | "low"
+}
+
+export type V3CatalogSessionVariant = {
+  readonly programId: string
+  readonly sessionId: string | null
+  readonly startDate: string | null
+  readonly endDate: string | null
+  readonly availableDurationWeeks: readonly number[]
+  readonly availabilityStatus: V3SessionAvailabilityStatus
+  readonly status: string | null
+  readonly label: string | null
+  readonly note: string | null
+  readonly source: "program_sessions" | "program_text" | "price_option"
+  readonly evidence: readonly V3SessionEvidence[]
 }
 
 export type V3CatalogProgram = {
@@ -35,6 +103,7 @@ export type V3CatalogProgram = {
   readonly country: string
   readonly programType: Camp["programType"]
   readonly directionSignals: V3DirectionSignals
+  readonly experienceAssessment?: V3ExperienceAssessment
   readonly ageMin: number | null
   readonly ageMax: number | null
   readonly ageSource: "program" | "profile_inferred" | "unknown"
@@ -55,13 +124,17 @@ export type V3CatalogProgram = {
   readonly budgetMaxKrw: number | null
   readonly priceOptions: readonly V3PriceOption[]
   readonly sessionWindows: readonly V3SessionWindow[]
+  /** Optional runtime session/price combinations; legacy callers may omit this. */
+  readonly sessionVariants?: readonly V3CatalogSessionVariant[]
   readonly hasSessionRows: boolean
   readonly hasScheduledSessionRows: boolean
   readonly sessionStatusNeedsConfirmation: boolean
   readonly imageUrl: string | null
   readonly status: "active"
-  readonly catalogSource: "supabase"
+  readonly catalogSource: "supabase" | "demo"
   readonly updatedAt: string | null
+  readonly demoProfile?: V3DemoProgramProfile
+  readonly packageInclusions?: V3ProgramPackageInclusions
 }
 
 export type V3CatalogCity = {
@@ -76,7 +149,8 @@ export type V3CatalogCity = {
   readonly flightCostKrw: number | null
   readonly livingCostMonthlyKrw: number | null
   readonly housingCostMonthlyKrw: number | null
-  readonly catalogSource: "supabase"
+  readonly catalogSource: "supabase" | "demo"
+  readonly demoProfile?: V3DemoCityProfile
 }
 
 export type V3Catalog = {
@@ -138,7 +212,7 @@ export async function loadV3Catalog(): Promise<V3Catalog> {
     const profile = profileById.get(id)
     const priceOptions = pricesById.get(id) ?? []
     const sessionRowsForProgram = sessionsById.get(id) ?? []
-    const mapped = mapProductionProgram({ row, profile, priceOptions, sessionRows: sessionRowsForProgram, id, name, city, country })
+    const mapped = mapProductionProgram({ row, profile, priceOptions, sessionRows: sessionRowsForProgram, id, name, city, country, today })
     return [mapped]
   })
   const cities = cityRows.flatMap((row) => mapCity(row))
@@ -156,6 +230,7 @@ function mapProductionProgram(input: {
   readonly name: string
   readonly city: string
   readonly country: string
+  readonly today: string
 }): V3CatalogProgram {
   const rowAgeMin = readNumber(input.row, ["age_min"])
   const rowAgeMax = readNumber(input.row, ["age_max"])
@@ -170,7 +245,7 @@ function mapProductionProgram(input: {
   const ageMax = rowAgeMax ?? profileAgeMax ?? null
   const scheduledSessionRows = input.sessionRows.filter((row) => readString(row, ["status"])?.toLowerCase() === "scheduled")
   const canonicalSessionWindows = mapCanonicalSessions(scheduledSessionRows)
-  const explicitProgramWindows = input.sessionRows.length === 0 ? mapExplicitProgramAvailability(input.row) : []
+  const explicitProgramWindows = mapExplicitProgramAvailability(input.row)
   const sessionWindows = canonicalSessionWindows.length ? canonicalSessionWindows : explicitProgramWindows
   const sessionDurationWeeks = scheduledSessionRows.flatMap((row) => {
     const weeks = readNumber(row, ["weeks"])
@@ -190,8 +265,21 @@ function mapProductionProgram(input: {
       ? "profile_or_text"
       : "unknown"
   const sourceText = programSourceText(input.row, input.profile)
+  const sessionVariants = mapSessionVariants({
+    programId: input.id,
+    programRow: input.row,
+    sessionRows: input.sessionRows,
+    priceOptions: input.priceOptions,
+    fallbackDurationWeeks: [...durationWeeks],
+    today: input.today,
+  })
   const programType = readProgramType(input.profile) ?? inferProgramType(input.row)
   const traits = readStringArray(input.profile, ["traits"])
+  const experienceAssessment = inferExperienceAssessment({
+    profileProgramType: readString(input.profile, ["program_type"]) ?? null,
+    traits,
+    sources: experienceSources(input.row, input.profile, input.sessionRows, input.name),
+  })
   const parentScope = inferParentScope({
     participationText: readString(input.row, ["parent_participation_type"]) ?? "",
     accommodationText: [readString(input.row, ["accommodation_type"]), readString(input.row, ["item_accommodation"])].filter(Boolean).join(" "),
@@ -219,6 +307,7 @@ function mapProductionProgram(input: {
       structuredText: structuredDirectionText(input.row),
       fallbackText: fallbackDirectionText(input.row, input.name),
     }),
+    experienceAssessment,
     ageMin,
     ageMax,
     ageSource,
@@ -239,9 +328,10 @@ function mapProductionProgram(input: {
     budgetMaxKrw: profileBudgetMax ?? null,
     priceOptions: input.priceOptions,
     sessionWindows,
+    sessionVariants,
     hasSessionRows: input.sessionRows.length > 0,
     hasScheduledSessionRows: scheduledSessionRows.length > 0,
-    sessionStatusNeedsConfirmation: scheduledSessionRows.length > 0 && canonicalSessionWindows.length === 0,
+    sessionStatusNeedsConfirmation: sessionVariants.some((variant) => ["likely_available", "needs_inquiry", "unknown"].includes(variant.availabilityStatus)),
     imageUrl: readImage(input.row) ?? null,
     status: "active",
     catalogSource: "supabase",
@@ -311,6 +401,7 @@ function groupPrices(rows: readonly Row[]): ReadonlyMap<string, readonly V3Price
     const id = readString(row, ["program_id"])
     if (!id) continue
     const item: V3PriceOption = {
+      id: readString(row, ["id"]) ?? null,
       adultCount: readNumber(row, ["adult_count"]) ?? null,
       childCount: readNumber(row, ["child_count"]) ?? null,
       durationWeeks: readNumber(row, ["duration_weeks"]) ?? null,
@@ -326,8 +417,6 @@ function groupPrices(rows: readonly Row[]): ReadonlyMap<string, readonly V3Price
 function groupSessions(rows: readonly Row[]): ReadonlyMap<string, readonly Row[]> {
   const map = new Map<string, Row[]>()
   for (const row of rows) {
-    const status = readString(row, ["status"])?.toLowerCase() ?? "unknown"
-    if (["inactive", "cancelled", "canceled", "archived", "deleted"].includes(status)) continue
     const id = readString(row, ["program_id"])
     if (!id) continue
     map.set(id, [...(map.get(id) ?? []), row])
@@ -372,6 +461,119 @@ function mapExplicitProgramAvailability(row: Row): readonly V3SessionWindow[] {
     readString(row, ["operating_period"]),
   ].filter((value): value is string => Boolean(value)).join(" ")
   return explicitText ? extractSessionWindowsFromText(explicitText) : []
+}
+
+function mapSessionVariants(input: {
+  readonly programId: string
+  readonly programRow: Row
+  readonly sessionRows: readonly Row[]
+  readonly priceOptions: readonly V3PriceOption[]
+  readonly fallbackDurationWeeks: readonly number[]
+  readonly today: string
+}): readonly V3CatalogSessionVariant[] {
+  const variants: V3CatalogSessionVariant[] = []
+  for (const row of input.sessionRows) {
+    const rawStatus = readString(row, ["status"]) ?? null
+    const normalizedStatus = rawStatus?.toLowerCase() ?? "unknown"
+    const startDate = readDate(row, ["start_date", "session_start_date", "available_start_date"]) ?? null
+    const endDate = readDate(row, ["end_date", "session_end_date", "available_end_date"]) ?? null
+    const rowDuration = readNumber(row, ["weeks", "duration_weeks"])
+    const note = readString(row, ["note", "notes", "description", "session_note"])
+    const label = readString(row, ["label", "name", "title"])
+    const textDurations = parseDurationWeeks([note, label].filter(Boolean).join(" "))
+    const programTextDurations = parseDurationWeeks([
+      readString(input.programRow, ["duration"]),
+      readString(input.programRow, ["duration_options"]),
+      readString(input.programRow, ["minimum_duration"]),
+      readString(input.programRow, ["short_description"]),
+      readString(input.programRow, ["detailed_description"]),
+    ].filter(Boolean).join(" "))
+    const availableDurationWeeks = uniqueNumbers([
+      ...(rowDuration === undefined ? input.priceOptions.flatMap((option) => option.durationWeeks === null ? [] : [option.durationWeeks]) : [rowDuration]),
+      ...textDurations,
+      ...programTextDurations,
+    ])
+    const availabilityStatus = sessionAvailabilityStatus({ normalizedStatus, startDate, endDate, today: input.today })
+    variants.push({
+      programId: input.programId,
+      sessionId: readString(row, ["id", "session_id"]) ?? null,
+      startDate,
+      endDate,
+      availableDurationWeeks,
+      availabilityStatus,
+      status: rawStatus,
+      label: label ?? null,
+      note: note ?? null,
+      source: "program_sessions",
+      evidence: [
+        { source: "program_sessions.status", value: rawStatus, confidence: rawStatus ? "high" : "low" },
+        { source: "program_sessions.start_date", value: startDate, confidence: startDate ? "high" : "low" },
+        { source: "program_sessions.end_date", value: endDate, confidence: endDate ? "high" : "low" },
+        { source: "program_sessions.weeks", value: rowDuration ?? null, confidence: rowDuration === undefined ? "low" : "high" },
+        ...textDurations.map((weeks) => ({ source: "program_sessions.note", value: weeks, confidence: "medium" as const })),
+      ],
+    })
+  }
+
+  for (const window of mapExplicitProgramAvailability(input.programRow)) {
+    variants.push({
+      programId: input.programId,
+      sessionId: null,
+      startDate: window.startDate,
+      endDate: window.endDate,
+      availableDurationWeeks: uniqueNumbers([
+        ...(window.weeks === null ? [] : [window.weeks]),
+        ...input.fallbackDurationWeeks,
+      ]),
+      availabilityStatus: window.endDate < input.today ? "closed" : "likely_available",
+      status: window.status,
+      label: null,
+      note: null,
+      source: "program_text",
+      evidence: [
+        { source: "program_text.start_date", value: window.startDate, confidence: window.precision === "exact" ? "medium" : "low" },
+        { source: "program_text.end_date", value: window.endDate, confidence: window.precision === "exact" ? "medium" : "low" },
+        { source: "program_text.duration", value: window.weeks, confidence: window.weeks === null ? "low" : "medium" },
+      ],
+    })
+  }
+
+  if (variants.length === 0 && input.priceOptions.length > 0) {
+    const durations = uniqueNumbers([
+      ...input.priceOptions.flatMap((option) => option.durationWeeks === null ? [] : [option.durationWeeks]),
+      ...input.fallbackDurationWeeks,
+    ])
+    variants.push({
+      programId: input.programId,
+      sessionId: null,
+      startDate: null,
+      endDate: null,
+      availableDurationWeeks: durations,
+      availabilityStatus: "likely_available",
+      status: null,
+      label: null,
+      note: null,
+      source: "price_option",
+      evidence: [{ source: "program_price_options.duration_weeks", value: durations.length ? durations.join(",") : null, confidence: durations.length ? "high" : "low" }],
+    })
+  }
+  return variants
+}
+
+function sessionAvailabilityStatus(input: {
+  readonly normalizedStatus: string
+  readonly startDate: string | null
+  readonly endDate: string | null
+  readonly today: string
+}): V3SessionAvailabilityStatus {
+  if (["cancelled", "canceled", "archived", "deleted", "closed", "ended", "complete", "completed"].includes(input.normalizedStatus)) return "closed"
+  if (["inquiry", "inquire", "contact", "contact_required", "waitlist"].includes(input.normalizedStatus)) return "needs_inquiry"
+  if (["unavailable", "not_available", "full", "sold_out"].includes(input.normalizedStatus)) return "confirmed_unavailable"
+  if (input.endDate && input.endDate < input.today) return "closed"
+  if (["scheduled", "active", "open", "confirmed", "available"].includes(input.normalizedStatus)) {
+    return input.startDate && input.endDate ? "confirmed_available" : "likely_available"
+  }
+  return input.startDate && input.endDate ? "likely_available" : "unknown"
 }
 
 function inferKoreanSignals(row: Row, profile: Row | undefined): { readonly daily: boolean | null; readonly emergency: boolean | null } {
@@ -427,6 +629,33 @@ function fallbackDirectionText(row: Row, name: string): string {
     readString(row, ["detailed_description"]),
     readString(row, ["item_education_program"]),
   ].filter((value): value is string => Boolean(value)).join(" ")
+}
+
+function experienceSources(
+  row: Row,
+  profile: Row | undefined,
+  sessionRows: readonly Row[],
+  name: string,
+): readonly { readonly source: string; readonly text: string; readonly confidence: "high" | "medium" | "low" }[] {
+  const sources: { source: string; text: string; confidence: "high" | "medium" | "low" }[] = []
+  const add = (source: string, values: readonly string[], confidence: "high" | "medium" | "low") => {
+    const text = values.map((value) => value.trim()).filter(Boolean).join(" ")
+    if (text) sources.push({ source, text, confidence })
+  }
+
+  add("program.activity", readTextValues(row, ["activity", "activities", "activity_type", "activity_types"]), "high")
+  add("program.highlights", readTextValues(row, ["highlights", "program_highlights", "activity_highlights"]), "medium")
+  add("program.subject", readTextValues(row, ["subject", "subjects", "subject_area", "subject_areas"]), "high")
+  add("program.category", readTextValues(row, ["category", "categories", "program_category"]), "high")
+  add("program.curriculum", readTextValues(row, ["curriculum", "curriculum_type", "program_focus"]), "high")
+  add("program.description", readTextValues(row, ["short_description", "detailed_description", "item_education_program"]), "low")
+  add("program.name", [name], "low")
+  add("program_profile.activity", readTextValues(profile, ["activity", "activities", "highlights"]), "high")
+
+  for (const [index, session] of sessionRows.entries()) {
+    add(`program_sessions[${index}]`, readTextValues(session, ["label", "name", "title", "note", "notes", "description", "activities", "subject"]), "medium")
+  }
+  return sources
 }
 
 function durationNumbers(prices: readonly V3PriceOption[], legacy: readonly DurationWeeks[]): readonly number[] {
@@ -527,6 +756,22 @@ function readStringArray(row: Row | undefined, keys: readonly string[]): readonl
     if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string")
   }
   return []
+}
+
+function readTextValues(row: Row | undefined, keys: readonly string[]): readonly string[] {
+  if (!row) return []
+  const values: string[] = []
+  for (const key of keys) {
+    const value = row[key]
+    if (typeof value === "string" && value.trim()) {
+      values.push(value.trim())
+      continue
+    }
+    if (Array.isArray(value)) {
+      values.push(...value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim()))
+    }
+  }
+  return values
 }
 
 function readLooseStringArray(row: Row | undefined, keys: readonly string[]): readonly string[] {
