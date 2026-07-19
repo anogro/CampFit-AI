@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   createCampFitExportLock,
+  createCampFitResultPdfBlob,
   downloadCampFitResult,
   getCampFitReportFilename,
+  sendCampFitResultEmail,
   shouldIncludeCampFitExportNode,
   singlePagePdfDimensions,
 } from "@/components/campfit/v3/resultExport"
@@ -11,8 +13,8 @@ const exportMocks = vi.hoisted(() => ({
   toPng: vi.fn(),
   pdfOptions: null as Record<string, unknown> | null,
   addImageCalls: [] as unknown[][],
-  savedFiles: [] as string[],
   downloadedFiles: [] as string[],
+  revokedUrls: [] as string[],
 }))
 
 vi.mock("html-to-image", () => ({ toPng: exportMocks.toPng }))
@@ -27,9 +29,9 @@ vi.mock("jspdf", () => ({
       return this
     }
 
-    save(filename: string) {
-      exportMocks.savedFiles.push(filename)
-      return this
+    output(type: string) {
+      expect(type).toBe("blob")
+      return new Blob(["pdf"], { type: "application/pdf" })
     }
   },
 }))
@@ -40,8 +42,11 @@ describe("CampFit result export", () => {
     exportMocks.toPng.mockResolvedValue("data:image/png;base64,report")
     exportMocks.pdfOptions = null
     exportMocks.addImageCalls.length = 0
-    exportMocks.savedFiles.length = 0
     exportMocks.downloadedFiles.length = 0
+    exportMocks.revokedUrls.length = 0
+    vi.stubGlobal("fetch", vi.fn())
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:campfit-report")
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation((url) => { exportMocks.revokedUrls.push(url) })
     Object.defineProperty(globalThis, "document", {
       configurable: true,
       value: {
@@ -121,7 +126,43 @@ describe("CampFit result export", () => {
 
     expect(exportMocks.pdfOptions?.["format"]).toEqual([595, 5_950])
     expect(exportMocks.addImageCalls).toHaveLength(1)
-    expect(exportMocks.savedFiles).toEqual(["campfit-report-2026-07-19.pdf"])
+    expect(exportMocks.downloadedFiles).toEqual(["campfit-report-2026-07-19.pdf"])
+    expect(exportMocks.revokedUrls).toEqual(["blob:campfit-report"])
+  })
+
+  it("exposes the same single-page PDF as a Blob for email delivery", async () => {
+    Object.defineProperty(globalThis, "Image", {
+      configurable: true,
+      value: class MockImage {
+        naturalWidth = 400
+        naturalHeight = 4_000
+        set src(_value: string) {
+          queueMicrotask(() => this.onload?.())
+        }
+        onload?: () => void
+        onerror?: () => void
+      },
+    })
+
+    const pdf = await createCampFitResultPdfBlob(createExportRoot({ open: false }, { style: {} }))
+    expect(pdf).toBeInstanceOf(Blob)
+    expect(pdf.type).toBe("application/pdf")
+  })
+
+  it("sends the PDF as multipart form data without a JSON payload", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } }))
+    vi.stubGlobal("fetch", fetchMock)
+    const pdf = new Blob(["pdf"], { type: "application/pdf" })
+
+    await sendCampFitResultEmail({ email: "parent@example.com", pdf, filename: "campfit-report-2026-07-19.pdf" })
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit
+    expect(fetchMock).toHaveBeenCalledWith("/api/campfit/email-report", expect.objectContaining({ method: "POST" }))
+    expect(init.headers).toBeUndefined()
+    expect(init.body).toBeInstanceOf(FormData)
+    const formData = init.body as FormData
+    expect(formData.get("email")).toBe("parent@example.com")
+    expect(formData.get("pdf")).toBeTruthy()
   })
 
   it("calculates one-page dimensions without changing the image ratio", () => {

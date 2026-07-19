@@ -12,12 +12,18 @@ export async function downloadCampFitResult(
   filename: string,
   format: CampFitResultExportFormat = "pdf",
 ): Promise<void> {
-  const dataUrl = await captureCampFitResult(element)
   if (format === "png") {
+    const dataUrl = await captureCampFitResult(element)
     downloadDataUrl(dataUrl, filename.endsWith(".png") ? filename : `${filename}.png`)
     return
   }
 
+  const blob = await createCampFitResultPdfBlob(element)
+  downloadBlob(blob, filename.endsWith(".pdf") ? filename : `${filename}.pdf`)
+}
+
+export async function createCampFitResultPdfBlob(element: HTMLElement): Promise<Blob> {
+  const dataUrl = await captureCampFitResult(element)
   const { jsPDF } = await import("jspdf")
   const image = await loadImage(dataUrl)
   const dimensions = singlePagePdfDimensions(image.naturalWidth, image.naturalHeight)
@@ -28,7 +34,26 @@ export async function downloadCampFitResult(
     compress: true,
   })
   pdf.addImage(dataUrl, "PNG", 0, 0, dimensions.width, dimensions.height, undefined, "FAST")
-  pdf.save(filename.endsWith(".pdf") ? filename : `${filename}.pdf`)
+  return pdf.output("blob")
+}
+
+export async function sendCampFitResultEmail({
+  email,
+  pdf,
+  filename,
+}: {
+  readonly email: string
+  readonly pdf: Blob
+  readonly filename: string
+}): Promise<void> {
+  const formData = new FormData()
+  formData.append("email", email)
+  formData.append("pdf", pdf, filename)
+  const response = await fetch("/api/campfit/email-report", { method: "POST", body: formData })
+  const payload = await response.json().catch(() => null) as unknown
+  if (!response.ok) {
+    throw new Error(apiMessage(payload))
+  }
 }
 
 export function getCampFitReportFilename(format: CampFitResultExportFormat, date = new Date()): string {
@@ -223,4 +248,21 @@ function downloadDataUrl(dataUrl: string, filename: string): void {
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = filename
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+  URL.revokeObjectURL(url)
+}
+
+function apiMessage(value: unknown): string {
+  if (typeof value === "object" && value !== null && "message" in value && typeof value.message === "string") return value.message
+  if (typeof value === "object" && value !== null && "error" in value && typeof value.error === "object" && value.error !== null && "message" in value.error && typeof value.error.message === "string") return value.error.message
+  return "이메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요."
 }

@@ -223,8 +223,6 @@ export function CampFitV3Result({
         <div data-campfit-export-ignore="true">
           <CampFitV3ResultActions
             reportRef={reportRef}
-            result={result}
-            basicInfo={basicInfo}
             {...(onRequestEmail ? { onRequestEmail } : {})}
             onBack={onBack}
             onRestart={onRestart}
