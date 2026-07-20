@@ -126,7 +126,10 @@ export async function processConversationMessage(input: {
 
   const updatedBasicInfo = applyBasicInfoFacts(input.basicInfo, state)
   const ready = isReadyForRecommendation(state)
-  const nextQuestion = ready ? null : selectNextQuestion(state, model?.suggestedNextQuestionKey ?? null)
+  const continuingReadySession = input.currentState.currentQuestionKey === null && ready
+  const nextQuestion = ready && !continuingReadySession
+    ? null
+    : selectNextQuestion(state, model?.suggestedNextQuestionKey ?? null)
   if (nextQuestion !== null) state = markQuestionAsked(state, nextQuestion.key)
   else state = { ...state, currentQuestionKey: null }
 

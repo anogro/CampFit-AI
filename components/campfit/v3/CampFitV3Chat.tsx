@@ -19,6 +19,7 @@ type Props = {
 export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, onEditBasic, onResult }: Props) {
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
+  const [continuing, setContinuing] = useState(false)
   const messageListRef = useRef<HTMLDivElement>(null)
   const shouldAutoScrollRef = useRef(true)
   const compositionRef = useRef(false)
@@ -134,10 +135,17 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
           <div className="shrink-0 border-t border-[var(--border-default)] bg-white/80 px-4 py-3 sm:px-7 sm:py-4">
             {conversation.warnings.map((warning) => <p className="mb-3 rounded-xl bg-[var(--surface-tint-yellow)] px-3 py-2 text-xs leading-5 text-[var(--status-warning)]" key={warning}>{warning}</p>)}
             {conversation.readyForRecommendation ? (
-              <div className="flex justify-center py-1">
-                <button className="glass-cta min-h-12 rounded-full px-8 text-base font-extrabold focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" type="button" onClick={onResult}>추천 결과 보기 →</button>
+              <div className="mb-4 rounded-2xl border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)] px-4 py-3" role="status">
+                <p className="text-sm font-extrabold">추천을 시작할 핵심 조건이 모였어요.</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">지금 결과를 보거나, 아이 성향·선호 활동·부모 조건을 더 알려주고 추천을 정교하게 만들 수 있어요.</p>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <button className="glass-cta min-h-11 flex-1 rounded-full px-5 text-sm font-extrabold" type="button" onClick={onResult}>지금 결과 보기 →</button>
+                  <button className="min-h-11 flex-1 rounded-full border border-[var(--border-default)] bg-white px-5 text-sm font-bold" type="button" onClick={() => setContinuing(true)}>상담 더 이어가기</button>
+                </div>
+                {continuing ? <p className="mt-2 text-xs font-semibold text-[var(--accent-primary)]">추가로 알고 싶은 조건을 아래에 편하게 알려주세요.</p> : null}
               </div>
-            ) : (
+            ) : null}
+            {!conversation.readyForRecommendation || continuing ? (
               <>
                 {conversation.quickReplies.length ? <div className="mb-3 flex flex-wrap gap-2" aria-label="빠른 답변">{conversation.quickReplies.map((reply) => <button className="min-h-11 rounded-full border border-[var(--border-default)] bg-white px-4 text-sm font-bold transition hover:border-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50" disabled={sending} type="button" key={reply.key} onClick={() => void answer(reply.label, reply.key)}>{reply.label}</button>)}</div> : null}
                 {specialCare ? <p className="mb-2 text-xs font-semibold leading-5 text-[var(--status-warning)]">질환명이나 약 이름 등 상세정보는 입력하지 마세요. 자세한 내용은 프로그램 상담 시 별도로 확인합니다.</p> : null}
@@ -172,7 +180,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
                   <span className="sr-only" id="campfit-v3-chat-key-hint">Enter로 전송하고 Shift와 Enter를 함께 누르면 줄을 바꿀 수 있습니다.</span>
                 </form>
               </>
-            )}
+            ) : null}
           </div>
         </div>
       </section>

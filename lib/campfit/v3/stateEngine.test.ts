@@ -158,6 +158,21 @@ describe("CampFit v3 state and question engine", () => {
     expect(isReadyForRecommendation(state)).toBe(true)
   })
 
+  it("allows a first recommendation before refinement-only facts are answered", () => {
+    const state = completeExcept([
+      "regionImportance",
+      "koreanSupportNeed",
+      "parentCommunicationNeed",
+      "isFirstOverseasEducationExperience",
+      "dayProgramSeparationReadiness",
+    ])
+    expect(isReadyForRecommendation(state)).toBe(true)
+  })
+
+  it("still blocks recommendations when a core fact is missing", () => {
+    expect(isReadyForRecommendation(completeExcept(["experienceGoals"]))).toBe(false)
+  })
+
   it("gives at most half slot credit to a high-confidence inference", () => {
     const state = mergeFacts(createInitialConversationState(), [createFact({ key: "experienceGoals", subject: "preference", value: goals("cultureActivity"), source: "ai_inference", confidence: 0.9, evidence: "활동을 원한다고 해석" })])
     expect(calculateProgress(basicInfo, state)).toBe(43)

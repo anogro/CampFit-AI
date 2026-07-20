@@ -26,31 +26,20 @@ export function calculateProgress(basicInfo: CampfitV3BasicInfo, state: CampfitV
 }
 
 export function isReadyForRecommendation(state: CampfitV3ConversationState): boolean {
-  const required: readonly CampfitV3FactKey[] = [
+  const core: readonly CampfitV3FactKey[] = [
     "childEnglishLevel",
     "experienceGoals",
     "preferredRegions",
-    "regionImportance",
-    "koreanSupportNeed",
-    "parentCommunicationNeed",
     "parentStayGoals",
     "specialCareFollowUp",
-    "isFirstOverseasEducationExperience",
   ]
-  const requiredComplete = required.every((key) => {
+  return core.every((key) => {
     const fact = state.facts[key]
     return fact !== undefined
       && fact.status !== "unknown"
       && fact.status !== "tentative"
       && !state.conflicts.some((conflict) => conflict.key === key)
   })
-  if (!requiredComplete) return false
-  if (state.facts.isFirstOverseasEducationExperience?.value !== true) return true
-  const separation = state.facts.dayProgramSeparationReadiness
-  return separation !== undefined
-    && separation.status !== "unknown"
-    && separation.status !== "tentative"
-    && !state.conflicts.some((conflict) => conflict.key === "dayProgramSeparationReadiness")
 }
 
 export function progressMessage(progress: number): string {
