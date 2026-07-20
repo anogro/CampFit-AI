@@ -10,7 +10,10 @@ import { CampFitV3Result } from "@/components/campfit/v3/CampFitV3Result"
 import { useCampFitShellMode } from "@/components/campfit/v3/CampFitShell"
 import { sanitizeConversationInput } from "@/components/campfit/v3/conversationInput"
 import { appendOptimisticUserMessage } from "@/components/campfit/v3/chatUi"
-import { shouldDiscardStoredCampfitV3Session } from "@/components/campfit/v3/sessionMode"
+import {
+  shouldDiscardStoredCampfitV3Session,
+  shouldRefreshStoredCampfitV3Result,
+} from "@/components/campfit/v3/sessionMode"
 import { AiAvatar } from "@/components/campfit/v3/AiAvatar"
 import {
   emptyCampfitV3IntakeDraft,
@@ -75,6 +78,13 @@ export function CampFitV3Flow() {
           const parsedTranscript = CampfitV3TranscriptSchema.safeParse(saved.transcript)
           const parsedResult = CampfitV3RecommendationResultSchema.safeParse(saved.result)
           const parsedDraft = parseStoredIntakeDraft(saved.intakeDraft)
+          const refreshEmptyDemoResult = parsedResult.success && shouldRefreshStoredCampfitV3Result({
+            demoRequested,
+            savedDemoMode: saved.demoMode,
+            savedStage: saved.stage,
+            destinationCount: parsedResult.data.destinationRecommendations.length,
+            programCount: parsedResult.data.programCandidates.length,
+          })
           if (parsedBasic.success) {
             setBasicInfo(parsedBasic.data)
             if (parsedDraft === null) setIntakeDraft(intakeDraftFromBasicInfo(parsedBasic.data))
@@ -82,7 +92,12 @@ export function CampFitV3Flow() {
           if (parsedDraft !== null) setIntakeDraft(parsedDraft)
           if (parsedConversation.success) setConversation(parsedConversation.data)
           if (parsedTranscript.success) setTranscript(parsedTranscript.data)
-          if (parsedResult.success) setResult(parsedResult.data)
+          if (refreshEmptyDemoResult) {
+            setStage("chat")
+            setResult(null)
+          } else if (parsedResult.success) {
+            setResult(parsedResult.data)
+          }
           if ((saved.basicInfo && !parsedBasic.success) || (saved.conversation && !parsedConversation.success) || (saved.result && !parsedResult.success)) {
             throw new Error("invalid stored session")
           }

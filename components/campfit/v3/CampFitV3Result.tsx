@@ -150,6 +150,36 @@ export function CampFitV3Result({
             <FamilyConditionGrid basicInfo={basicInfo} conversationState={conversationState} result={result} />
           </ReportSection>
 
+          <ReportSection title="이번 상담에서 중요하게 본 것" subtitle="상담에서 확인한 우선순위와 가족 조건을 육각형 그래프로 정리했습니다.">
+            <div data-campfit-decision-criteria className="rounded-[22px] bg-[var(--surface-elevated)] p-4 sm:p-5">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                <div className="w-full shrink-0 sm:w-[36%] lg:w-[320px]"><CampFitV3DecisionRadar axes={axes} /></div>
+                <div className="flex w-full flex-col gap-3 border-t border-[var(--border-default)] pt-4 sm:border-t-0 sm:pt-0">
+                  {axes.map((axis) => (
+                    <div key={axis.key} className="flex flex-col justify-between gap-1 border-b border-[var(--border-default)] pb-2 text-sm sm:flex-row sm:items-center">
+                      <span className="font-extrabold text-[var(--text-secondary)]">{axis.label}</span>
+                      <span className="font-bold text-[var(--text-primary)]">{getAxisDetail(axis.key, conversationState)}</span>
+                    </div>
+                  ))}
+                  <p className="mt-2 text-xs font-semibold leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{decisionAxesSummary(axes)}</p>
+                </div>
+              </div>
+              {result.requiredSupportConditions.length ? (
+                <div className="mt-6 border-t border-[var(--border-default)] pt-5">
+                  <ListCard title="꼭 필요한 지원 조건" items={result.requiredSupportConditions} />
+                </div>
+              ) : null}
+              {result.alternatives.length ? (
+                <div className="mt-6 border-t border-[var(--border-default)] pt-5">
+                  <h3 className="text-lg font-bold">조건을 조정하면 가능한 대안</h3>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {result.alternatives.map((alternative) => <p className="rounded-2xl border border-[var(--border-default)] bg-white px-4 py-3 text-sm leading-6 [word-break:keep-all]" key={alternative}>{alternative}</p>)}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </ReportSection>
+
           <ReportSection title="AI 요약" subtitle="새로운 해석을 덧붙이지 않고, 상담과 추천 결과에서 확인된 내용을 정리했습니다.">
             <article data-campfit-report-section="summary" className="rounded-[22px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 sm:p-6">
               <p className="max-w-3xl text-base font-semibold leading-8 [word-break:keep-all]">{result.consultingConclusion}</p>
@@ -178,46 +208,9 @@ export function CampFitV3Result({
             <CityComparisonTable cityComparisons={cityComparisons} basicInfo={basicInfo} />
           </ReportSection>
 
-          <ReportSection title="확인해야 할 사항" subtitle="신청 전에 최신 운영 조건과 실제 가족 비용을 확인하세요.">
-            <ListCard title="최종 선택 전 확인사항" items={result.verificationChecklist} />
+          <ReportSection title="확인사항" subtitle="신청 전에 최신 운영 조건과 실제 가족 비용을 확인하세요.">
+            <ListCard title="최종 선택 전 확인사항" items={result.verificationChecklist.filter((item) => !result.requiredSupportConditions.includes(item))} />
           </ReportSection>
-
-          <details className="group mt-8 rounded-[22px] border border-[var(--border-default)] bg-white">
-            <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 font-bold [word-break:keep-all] [&::-webkit-details-marker]:hidden sm:px-6">
-              <span>판단 근거와 세부 확인사항 보기</span>
-              <span className="text-xl text-[var(--accent-primary)] transition-transform group-open:rotate-45" aria-hidden>＋</span>
-            </summary>
-            <div className="border-t border-[var(--border-default)] px-5 pb-6 sm:px-6">
-              <div className="pt-6">
-                <h2 className="text-xl font-bold">이번 상담에서 중요하게 본 것</h2>
-                <div className="mt-4 flex flex-col gap-5 rounded-[22px] bg-[var(--surface-elevated)] p-4 sm:flex-row sm:items-center sm:p-5">
-                  <div className="w-full shrink-0 sm:w-[36%] lg:w-[320px]"><CampFitV3DecisionRadar axes={axes} /></div>
-                  <div className="flex w-full flex-col gap-3 border-t border-[var(--border-default)] pt-4 sm:border-t-0 sm:pt-0">
-                    {axes.map((axis) => (
-                      <div key={axis.key} className="flex flex-col justify-between gap-1 border-b border-[var(--border-default)] pb-2 text-sm sm:flex-row sm:items-center">
-                        <span className="font-extrabold text-[var(--text-secondary)]">{axis.label}</span>
-                        <span className="font-bold text-[var(--text-primary)]">{getAxisDetail(axis.key, conversationState)}</span>
-                      </div>
-                    ))}
-                    <p className="mt-2 text-xs font-semibold leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{decisionAxesSummary(axes)}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-8 grid gap-5 lg:grid-cols-2">
-                <ListCard title="꼭 필요한 지원 조건" items={result.requiredSupportConditions} />
-              </div>
-
-              {result.alternatives.length ? (
-                <div className="mt-8">
-                  <h2 className="text-xl font-bold">조건을 조정하면 가능한 대안</h2>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {result.alternatives.map((alternative) => <p className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm leading-6 [word-break:keep-all]" key={alternative}>{alternative}</p>)}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          </details>
         </div>
 
         <div data-campfit-export-ignore="true">

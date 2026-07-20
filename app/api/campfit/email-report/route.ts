@@ -30,7 +30,12 @@ export async function POST(request: Request): Promise<Response> {
 
   const apiKey = process.env["RESEND_API_KEY"]
   const from = process.env["CAMPFIT_EMAIL_FROM"]
-  if (!apiKey || !from) {
+  const missingConfiguration = [
+    !apiKey ? "RESEND_API_KEY" : null,
+    !from ? "CAMPFIT_EMAIL_FROM" : null,
+  ].filter((value): value is string => value !== null)
+  if (missingConfiguration.length) {
+    console.error("CampFit email report configuration is missing", { missing: missingConfiguration })
     return NextResponse.json({ message: GENERIC_EMAIL_ERROR }, { status: 503 })
   }
 
@@ -56,7 +61,12 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ message: GENERIC_EMAIL_ERROR }, { status: 502 })
   }
 
+  const providerBody = await providerResponse.text()
   if (!providerResponse.ok) {
+    console.error("CampFit email provider rejected report", {
+      status: providerResponse.status,
+      body: providerBody.slice(0, 500),
+    })
     return NextResponse.json({ message: GENERIC_EMAIL_ERROR }, { status: 502 })
   }
   return NextResponse.json({ ok: true })
