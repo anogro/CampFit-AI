@@ -131,9 +131,9 @@ export function CampFitV3Result({
   const catalogPresentation = programCatalogPresentation(result.catalogSource)
 
   return (
-    <CampFitV3Frame>
+    <CampFitV3Frame className="h-auto min-h-dvh overflow-visible" contentClassName="h-auto min-h-full overflow-visible">
       <V3Header />
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="flex-1">
         <div ref={reportRef} data-campfit-result-report data-campfit-export-root="true" className="mx-auto max-w-[1120px] px-0 py-7 sm:py-10">
           <section data-campfit-report-section="title" className="rounded-[24px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 sm:p-7">
             <div className="flex flex-wrap items-center gap-2 text-xs font-black tracking-[.12em] text-[var(--accent-primary)]">
