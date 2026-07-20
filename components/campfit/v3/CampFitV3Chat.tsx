@@ -5,6 +5,7 @@ import { CampFitV3Frame, V3Header } from "@/components/campfit/v3/CampFitV3Frame
 import { isChatNearBottom, shouldSendChatMessage } from "@/components/campfit/v3/chatUi"
 import { TypingIndicator } from "@/components/campfit/v3/TypingIndicator"
 import { AiAvatar } from "@/components/campfit/v3/AiAvatar"
+import { selectNextQuestion } from "@/lib/campfit/v3/questionBank"
 import type { CampfitV3BasicInfo, CampfitV3ConversationResponse, CampfitV3TranscriptMessage } from "@/types/campfitV3"
 
 type Props = {
@@ -25,6 +26,9 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
   const compositionRef = useRef(false)
   const sendLockRef = useRef(false)
   const specialCare = conversation.questionKey === "special_care_follow_up"
+  const refinementQuestion = selectNextQuestion(conversation.updatedState)
+  const progressLabel = conversation.progress >= 100 ? "추천 가능 조건 100%" : `${conversation.progress}%`
+  const progressCopy = continuing ? "추천 정교화 진행 중 · 추가 답변은 결과를 더 정확하게 만드는 데 반영돼요." : conversation.progressMessage
 
   useEffect(() => {
     const messageList = messageListRef.current
@@ -75,14 +79,14 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-3 text-xs font-bold">
                 <span className="truncate">CampFit AI · 추천 조건 정리 중</span>
-                <span className="tabular-nums text-[var(--accent-primary)]">{conversation.progress}%</span>
+                <span className="tabular-nums text-[var(--accent-primary)]">{progressLabel}</span>
               </div>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${conversation.progress}%` }} /></div>
             </div>
             <span className="text-sm text-[var(--text-tertiary)] transition-transform group-open:rotate-180" aria-hidden>⌄</span>
           </summary>
           <div className="border-t border-[var(--border-default)] px-4 py-3">
-            <p className="mb-3 text-xs leading-5 text-[var(--text-secondary)]">{conversation.progressMessage}</p>
+            <p className="mb-3 text-xs leading-5 text-[var(--text-secondary)]">{progressCopy}</p>
             {summary}
           </div>
         </details>
@@ -93,9 +97,9 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
             <div><p className="font-extrabold">CampFit AI 컨설턴트</p><p className="mt-1 text-xs font-bold text-[var(--status-success)]">현재 상담 중</p></div>
           </div>
           <div className="mt-4">
-            <div className="flex items-center justify-between text-xs font-bold"><span>추천 조건 정리 중</span><span className="tabular-nums text-[var(--accent-primary)]">{conversation.progress}%</span></div>
+            <div className="flex items-center justify-between gap-2 text-xs font-bold"><span>추천 조건 정리 중</span><span className="shrink-0 tabular-nums text-[var(--accent-primary)]">{progressLabel}</span></div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${conversation.progress}%` }} /></div>
-            <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">{conversation.progressMessage}</p>
+            <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">{progressCopy}</p>
           </div>
           <div className="mt-5 border-t border-[var(--border-default)] pt-4">{summary}</div>
         </aside>
@@ -134,7 +138,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
 
           <div className="shrink-0 border-t border-[var(--border-default)] bg-white/80 px-4 py-3 sm:px-7 sm:py-4">
             {conversation.warnings.map((warning) => <p className="mb-3 rounded-xl bg-[var(--surface-tint-yellow)] px-3 py-2 text-xs leading-5 text-[var(--status-warning)]" key={warning}>{warning}</p>)}
-            {conversation.readyForRecommendation ? (
+            {conversation.readyForRecommendation && !continuing ? (
               <div className="mb-4 rounded-2xl border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)] px-4 py-3" role="status">
                 <p className="text-sm font-extrabold">추천을 시작할 핵심 조건이 모였어요.</p>
                 <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">지금 결과를 보거나, 아이 성향·선호 활동·부모 조건을 더 알려주고 추천을 정교하게 만들 수 있어요.</p>
@@ -142,10 +146,24 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
                   <button className="glass-cta min-h-11 flex-1 rounded-full px-5 text-sm font-extrabold" type="button" onClick={onResult}>지금 결과 보기 →</button>
                   <button className="min-h-11 flex-1 rounded-full border border-[var(--border-default)] bg-white px-5 text-sm font-bold" type="button" onClick={() => setContinuing(true)}>상담 더 이어가기</button>
                 </div>
-                {continuing ? <p className="mt-2 text-xs font-semibold text-[var(--accent-primary)]">추가로 알고 싶은 조건을 아래에 편하게 알려주세요.</p> : null}
               </div>
             ) : null}
-            {!conversation.readyForRecommendation || continuing ? (
+            {conversation.readyForRecommendation && continuing ? (
+              <div className="mb-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3" role="status">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-black tracking-[.08em] text-[var(--accent-primary)]">추천 정교화 진행 중</p>
+                  <button className="min-h-9 rounded-full border border-[var(--accent-primary)]/30 bg-white px-3 text-xs font-extrabold text-[var(--accent-primary)]" type="button" onClick={onResult}>지금 결과 보기</button>
+                </div>
+                {refinementQuestion ? <>
+                  <p className="mt-2 text-sm font-extrabold leading-6 [word-break:keep-all]">{refinementQuestion.followUpTitle ?? refinementQuestion.title}</p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{refinementQuestion.helper}</p>
+                  <div className="mt-3 flex flex-wrap gap-2" aria-label="빠른 답변">
+                    {refinementQuestion.quickReplies.map((reply) => <button className="min-h-10 rounded-full border border-[var(--border-default)] bg-white px-3 text-xs font-bold transition hover:border-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50" disabled={sending} type="button" key={reply.key} onClick={() => void answer(reply.label, reply.key)}>{reply.label}</button>)}
+                  </div>
+                </> : <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">추가로 확인할 핵심 조건이 없어요. 지금 결과를 확인해 보세요.</p>}
+              </div>
+            ) : null}
+            {!conversation.readyForRecommendation ? (
               <>
                 {conversation.quickReplies.length ? <div className="mb-3 flex flex-wrap gap-2" aria-label="빠른 답변">{conversation.quickReplies.map((reply) => <button className="min-h-11 rounded-full border border-[var(--border-default)] bg-white px-4 text-sm font-bold transition hover:border-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50" disabled={sending} type="button" key={reply.key} onClick={() => void answer(reply.label, reply.key)}>{reply.label}</button>)}</div> : null}
                 {specialCare ? <p className="mb-2 text-xs font-semibold leading-5 text-[var(--status-warning)]">질환명이나 약 이름 등 상세정보는 입력하지 마세요. 자세한 내용은 프로그램 상담 시 별도로 확인합니다.</p> : null}
