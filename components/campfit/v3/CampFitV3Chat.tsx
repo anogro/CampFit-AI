@@ -5,7 +5,6 @@ import { CampFitV3Frame, V3Header } from "@/components/campfit/v3/CampFitV3Frame
 import { isChatNearBottom, shouldSendChatMessage } from "@/components/campfit/v3/chatUi"
 import { TypingIndicator } from "@/components/campfit/v3/TypingIndicator"
 import { AiAvatar } from "@/components/campfit/v3/AiAvatar"
-import { selectNextQuestion } from "@/lib/campfit/v3/questionBank"
 import type { CampfitV3BasicInfo, CampfitV3ConversationResponse, CampfitV3TranscriptMessage } from "@/types/campfitV3"
 
 type Props = {
@@ -17,16 +16,64 @@ type Props = {
   readonly onResult: () => Promise<void>
 }
 
+const cityRefinementQuestions = [
+  {
+    key: "medical_access",
+    question: "아이가 아플 때를 생각하면, 병원·의료 접근성은 어느 정도로 중요하세요?",
+    helper: "도시의 병원 접근성과 응급 대응 조건을 추천에 반영할게요.",
+    quickReplies: [
+      { key: "medical_must", label: "믿을 만한 병원이 꼭 가까워야 해요" },
+      { key: "medical_emergency", label: "응급 상황 대응만 잘 되면 돼요" },
+      { key: "medical_preferred", label: "좋으면 더 안심돼요" },
+      { key: "medical_open", label: "특별히 중요하진 않아요" },
+    ],
+  },
+  {
+    key: "safety",
+    question: "아이와 부모가 지낼 동네는 어느 정도로 안전해야 하나요?",
+    helper: "숙소 주변 치안과 이동 시 안전을 도시 비교에 반영할게요.",
+    quickReplies: [
+      { key: "safety_must", label: "치안이 가장 중요한 조건이에요" },
+      { key: "safety_high", label: "안전한 동네를 우선하고 싶어요" },
+      { key: "safety_balanced", label: "기본적인 안전이면 충분해요" },
+      { key: "safety_open", label: "다른 조건이 더 중요해요" },
+    ],
+  },
+  {
+    key: "foreign_friendliness",
+    question: "아이가 현지에서 인종차별 없이 편안하게 지내는 것도 중요한가요?",
+    helper: "외국인·다문화 친화도와 아이가 적응하기 편한 환경을 살펴볼게요.",
+    quickReplies: [
+      { key: "friendly_must", label: "차별 우려가 적은 곳이 꼭 좋아요" },
+      { key: "friendly_preferred", label: "외국인에게 친화적이면 좋아요" },
+      { key: "friendly_support", label: "캠프의 보호·지원이 더 중요해요" },
+      { key: "friendly_open", label: "특별히 걱정하지 않아요" },
+    ],
+  },
+  {
+    key: "parent_stay",
+    question: "부모님이 함께 머무는 도시에서 꼭 필요한 생활 조건이 있나요?",
+    helper: "부모 체류 편의, 교통, 생활 환경을 도시 추천에 반영할게요.",
+    quickReplies: [
+      { key: "parent_work", label: "원격근무할 환경이 필요해요" },
+      { key: "parent_transport", label: "교통과 생활 편의가 중요해요" },
+      { key: "parent_nearby", label: "아이와 가까이 지낼 수 있으면 좋아요" },
+      { key: "parent_open", label: "특별한 조건은 없어요" },
+    ],
+  },
+] as const
+
 export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, onEditBasic, onResult }: Props) {
   const [message, setMessage] = useState("")
   const [sending, setSending] = useState(false)
   const [continuing, setContinuing] = useState(false)
+  const [refinementIndex, setRefinementIndex] = useState(0)
   const messageListRef = useRef<HTMLDivElement>(null)
   const shouldAutoScrollRef = useRef(true)
   const compositionRef = useRef(false)
   const sendLockRef = useRef(false)
   const specialCare = conversation.questionKey === "special_care_follow_up"
-  const refinementQuestion = selectNextQuestion(conversation.updatedState)
+  const refinementQuestion = cityRefinementQuestions[refinementIndex % cityRefinementQuestions.length]
   const progressLabel = conversation.progress >= 100 ? "추천 가능 조건 100%" : `${conversation.progress}%`
   const progressCopy = continuing ? "추천 정교화 진행 중 · 추가 답변은 결과를 더 정확하게 만드는 데 반영돼요." : conversation.progressMessage
 
@@ -51,6 +98,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
     try {
       const accepted = await onAnswer(trimmedContent, quickReplyKey)
       if (!accepted) return
+      if (continuing) setRefinementIndex((index) => index + 1)
     } finally {
       sendLockRef.current = false
       setSending(false)
@@ -155,12 +203,13 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
                   <button className="min-h-9 rounded-full border border-[var(--accent-primary)]/30 bg-white px-3 text-xs font-extrabold text-[var(--accent-primary)]" type="button" onClick={onResult}>지금 결과 보기</button>
                 </div>
                 {refinementQuestion ? <>
-                  <p className="mt-2 text-sm font-extrabold leading-6 [word-break:keep-all]">{refinementQuestion.followUpTitle ?? refinementQuestion.title}</p>
+                  <p className="mt-2 text-sm font-extrabold leading-6 [word-break:keep-all]">{refinementQuestion.question}</p>
                   <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{refinementQuestion.helper}</p>
                   <div className="mt-3 flex flex-wrap gap-2" aria-label="빠른 답변">
-                    {refinementQuestion.quickReplies.map((reply) => <button className="min-h-10 rounded-full border border-[var(--border-default)] bg-white px-3 text-xs font-bold transition hover:border-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50" disabled={sending} type="button" key={reply.key} onClick={() => void answer(reply.label, reply.key)}>{reply.label}</button>)}
+                    {refinementQuestion.quickReplies.map((reply) => <button className="min-h-10 rounded-full border border-[var(--border-default)] bg-white px-3 text-xs font-bold transition hover:border-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50" disabled={sending} type="button" key={reply.key} onClick={() => void answer(reply.label, null)}>{reply.label}</button>)}
                   </div>
-                </> : <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">추가로 확인할 핵심 조건이 없어요. 지금 결과를 확인해 보세요.</p>}
+                  <p className="mt-3 text-xs font-semibold text-[var(--text-secondary)]">아래 입력창에 가족의 상황을 직접 적어도 좋아요.</p>
+                </> : null}
               </div>
             ) : null}
             {!conversation.readyForRecommendation ? (
