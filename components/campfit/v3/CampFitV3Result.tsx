@@ -146,10 +146,6 @@ export function CampFitV3Result({
             <p className="mt-3 text-sm font-semibold text-[var(--text-secondary)]">생성일 {reportDateLabel()}</p>
           </section>
 
-          <ReportSection title="우리 가족 조건" subtitle="상담에서 확인한 가족 조건을 한눈에 정리했습니다.">
-            <FamilyConditionGrid basicInfo={basicInfo} conversationState={conversationState} result={result} />
-          </ReportSection>
-
           <ReportSection title="이번 상담에서 중요하게 본 것" subtitle="상담에서 확인한 우선순위와 가족 조건을 육각형 그래프로 정리했습니다.">
             <div data-campfit-decision-criteria className="rounded-[22px] bg-[var(--surface-elevated)] p-4 sm:p-5">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center">

@@ -88,7 +88,7 @@ describe("CampFitV3Result UI component", () => {
 
     expect(markup).toContain("CampFit AI 추천 리포트")
     expect(markup).toContain("생성일")
-    expect(markup).toContain("우리 가족 조건")
+    expect(markup).not.toContain("우리 가족 조건")
     expect(markup).toContain("이번 상담에서 중요하게 본 것")
     expect(markup).toContain("AI 요약")
     expect(markup).toContain("추천 도시 Top3")
@@ -101,8 +101,6 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).toContain('data-campfit-export-root="true"')
     expect(markup).toContain('data-campfit-export-ignore="true"')
     expect(markup).not.toContain("프로그램 선택지")
-    expect(markup.indexOf("CampFit AI 추천 리포트")).toBeLessThan(markup.indexOf("우리 가족 조건"))
-    expect(markup.indexOf("우리 가족 조건")).toBeLessThan(markup.indexOf("이번 상담에서 중요하게 본 것"))
     expect(markup.indexOf("이번 상담에서 중요하게 본 것")).toBeLessThan(markup.indexOf("AI 요약"))
     expect(markup.indexOf("AI 요약")).toBeLessThan(markup.indexOf("추천 도시 Top3"))
     expect(markup.indexOf("추천 도시 Top3")).toBeLessThan(markup.indexOf("도시 비교"))

@@ -227,7 +227,7 @@ export function CampFitV3Flow() {
     <div
       data-campfit-flow="true"
       data-campfit-mode={mode}
-      className={`${stage === "chat" ? "h-dvh overflow-hidden" : "min-h-dvh overflow-x-hidden"} ${mode === "embedded" ? "bg-transparent" : "bg-[var(--surface-secondary)]"} text-[var(--text-primary)]`}
+      className={`${stage === "chat" ? "h-dvh overflow-hidden" : "min-h-dvh overflow-x-clip"} ${mode === "embedded" ? "bg-transparent" : "bg-[var(--surface-secondary)]"} text-[var(--text-primary)]`}
     >
       {content}
       {error ? <div className="fixed bottom-4 left-1/2 z-50 w-[min(92vw,560px)] -translate-x-1/2 rounded-2xl border border-[var(--border-default)] bg-white px-4 py-3 text-sm font-semibold text-[var(--status-error)] shadow-lg" role="alert">{error}</div> : null}
