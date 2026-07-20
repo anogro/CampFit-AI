@@ -136,6 +136,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
           <div className="border-t border-[var(--border-default)] px-4 py-3">
             <p className="mb-3 text-xs leading-5 text-[var(--text-secondary)]">{progressCopy}</p>
             {summary}
+            {conversation.readyForRecommendation ? <button className="mt-3 min-h-11 w-full rounded-full bg-[var(--accent-primary)] px-4 text-sm font-extrabold text-white" type="button" onClick={onResult}>지금 결과 보기</button> : null}
           </div>
         </details>
 
@@ -149,7 +150,10 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${conversation.progress}%` }} /></div>
             <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">{progressCopy}</p>
           </div>
-          <div className="mt-5 border-t border-[var(--border-default)] pt-4">{summary}</div>
+          <div className="mt-5 flex min-h-0 flex-1 flex-col border-t border-[var(--border-default)] pt-4">
+            {summary}
+            {conversation.readyForRecommendation ? <button className="mt-auto min-h-11 w-full rounded-full bg-[var(--accent-primary)] px-4 text-sm font-extrabold text-white" type="button" onClick={onResult}>지금 결과 보기</button> : null}
+          </div>
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-[var(--border-default)] bg-white/80 lg:h-full lg:rounded-[28px]">
@@ -200,7 +204,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
               <div className="mb-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3" role="status">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-black tracking-[.08em] text-[var(--accent-primary)]">추천 정교화 진행 중</p>
-                  <button className="min-h-9 rounded-full border border-[var(--accent-primary)]/30 bg-white px-3 text-xs font-extrabold text-[var(--accent-primary)]" type="button" onClick={onResult}>지금 결과 보기</button>
+                  <span className="text-xs font-semibold text-[var(--text-secondary)]">결과는 언제든 왼쪽에서 볼 수 있어요.</span>
                 </div>
                 {refinementQuestion ? <>
                   <p className="mt-2 text-sm font-extrabold leading-6 [word-break:keep-all]">{refinementQuestion.question}</p>
@@ -212,7 +216,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
                 </> : null}
               </div>
             ) : null}
-            {!conversation.readyForRecommendation ? (
+            {!conversation.readyForRecommendation || continuing ? (
               <>
                 {conversation.quickReplies.length ? <div className="mb-3 flex flex-wrap gap-2" aria-label="빠른 답변">{conversation.quickReplies.map((reply) => <button className="min-h-11 rounded-full border border-[var(--border-default)] bg-white px-4 text-sm font-bold transition hover:border-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50" disabled={sending} type="button" key={reply.key} onClick={() => void answer(reply.label, reply.key)}>{reply.label}</button>)}</div> : null}
                 {specialCare ? <p className="mb-2 text-xs font-semibold leading-5 text-[var(--status-warning)]">질환명이나 약 이름 등 상세정보는 입력하지 마세요. 자세한 내용은 프로그램 상담 시 별도로 확인합니다.</p> : null}
