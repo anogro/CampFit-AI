@@ -192,12 +192,22 @@ export function CampFitV3Result({
             {cityComparisons.length ? (
               <div className="grid gap-5 lg:grid-cols-3">
                 {cityComparisons.map((comparison, index) => (
-                  <CityCard comparison={comparison} index={index} basicInfo={basicInfo} conversationState={conversationState} result={result} showProgramCards={catalogPresentation.showProgramCards} key={comparison.city.cityId} />
+                  <CityCard comparison={comparison} index={index} basicInfo={basicInfo} conversationState={conversationState} result={result} key={comparison.city.cityId} />
                 ))}
               </div>
             ) : (
               <Empty text="현재 조건에서 실제로 비교할 도시를 찾지 못했어요. 출발 시기나 기간을 조금 넓히면 다시 비교할 수 있어요." />
             )}
+          </ReportSection>
+
+          <ReportSection title="추천 프로그램 Top3" subtitle="도시 순위와 별개로, 가족 조건에 가장 잘 맞는 프로그램을 골랐습니다.">
+            <div data-campfit-program-section="top3">
+              {catalogPresentation.showProgramCards && result.programCandidates.length ? (
+                <div className="grid gap-5 lg:grid-cols-3">
+                  {result.programCandidates.slice(0, 3).map((program, index) => <ProgramInlineCard program={program} index={index} key={program.programId} />)}
+                </div>
+              ) : <Empty text="현재 조건에 맞는 프로그램 후보를 확인하지 못했습니다." />}
+            </div>
           </ReportSection>
 
           <ReportSection title="도시 비교" subtitle="현재 결과에 포함된 도시별 비용과 선택 역할을 비교했습니다.">
@@ -309,16 +319,14 @@ function CityCard({
   basicInfo,
   conversationState,
   result,
-  showProgramCards,
 }: {
   readonly comparison: CampfitV3CityComparison
   readonly index: number
   readonly basicInfo: CampfitV3BasicInfo
   readonly conversationState: CampfitV3ConversationState
   readonly result: CampfitV3RecommendationResult
-  readonly showProgramCards: boolean
 }) {
-  const { city, programs, tripCost } = comparison
+  const { city, tripCost } = comparison
   const href = buildAnogroCityHref(city.cityName)
   const checks = cityCheckItems(city)
   const costDetails = cityCostDetails(city)
@@ -351,20 +359,6 @@ function CityCard({
           </div>
         ) : null}
         {tripCost ? <TripCostSummary cost={tripCost} /> : null}
-        <div className="mt-6 border-t border-[var(--border-default)] pt-5">
-          <h4 className="text-sm font-black">이 도시에서 볼 프로그램</h4>
-          {!showProgramCards ? (
-            <div className="mt-3 rounded-2xl bg-[var(--surface-tint-yellow)] p-4 text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]" role="alert">
-              프로그램 정보를 불러오지 못했어요. 잠시 후 최신 후보를 다시 확인해 주세요.
-            </div>
-          ) : programs.length ? (
-            <div className="mt-3 space-y-3">
-              {programs.map((program, programIndex) => <ProgramInlineCard program={program} index={programIndex} key={program.programId} />)}
-            </div>
-          ) : (
-            <p className="mt-3 rounded-2xl bg-[var(--surface-secondary)] p-4 text-sm leading-6 text-[var(--text-secondary)] [word-break:keep-all]">현재 조건에서 이 도시의 추천 프로그램은 확인되지 않았어요.</p>
-          )}
-        </div>
         <details className="group mt-5 border-t border-[var(--border-default)] pt-4">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-[var(--accent-primary)] [&::-webkit-details-marker]:hidden">
             <span>비용과 세부 정보 보기</span>

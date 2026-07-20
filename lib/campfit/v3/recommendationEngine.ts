@@ -97,13 +97,14 @@ export function buildRecommendation(input: {
   const eligiblePrograms = scoredPrograms.filter((item) => item.classification !== "excluded")
   const destinations = scoreDestinations(input.basicInfo, input.state, input.catalog.cities, eligiblePrograms, directions)
   const sortedEligiblePrograms = eligiblePrograms.sort(comparePrograms)
-  const programCandidates = destinations.flatMap((destination) => sortedEligiblePrograms
-    .filter((item) => normalize(item.program.city) === normalize(destination.cityName) && normalize(item.program.country) === normalize(destination.countryName))
+  // City and program recommendations are independent lists. A strong program
+  // in a city outside the city Top3 must still be eligible for the program Top3.
+  const programCandidates = sortedEligiblePrograms
     .slice(0, 3)
-    .map((item) => toProgramCandidate(item, input.basicInfo)))
+    .map((item) => toProgramCandidate(item, input.basicInfo))
   const limitedResult = missingRequired.length > 0
-    || destinations.length < 2
-    || programCandidates.length < 2
+    || destinations.length < 3
+    || programCandidates.length < 3
     || input.catalog.source !== "supabase"
   const primaryDirection = directions[0]
   return {
@@ -579,10 +580,7 @@ function scoreDestinations(
     const profileFit = 70
     return [{ city, cityPrograms, balance: regionFit * 0.12 + supply * 0.17 + programFit * 0.31 + costFit * 0.14 + parentFit * 0.14 + profileFit * 0.12, preference: regionFit * 0.4 + programFit * 0.4 + profileFit * 0.2, alternative: costFit * 0.55 + parentFit * 0.35 + profileFit * 0.1 }]
   })
-  const selected: typeof scored = []
-  takeUnique(selected, [...scored].sort((a, b) => b.balance - a.balance)[0])
-  takeUnique(selected, [...scored].sort((a, b) => b.preference - a.preference).find((item) => !selected.some((chosen) => chosen.city.id === item.city.id)))
-  takeUnique(selected, [...scored].sort((a, b) => b.alternative - a.alternative).find((item) => !selected.some((chosen) => chosen.city.id === item.city.id)))
+  const selected = [...scored].sort((a, b) => b.balance - a.balance).slice(0, 3)
   const roles: readonly CampfitV3DestinationRecommendation["role"][] = ["가장 균형 잡힌 선택", "원래 희망을 가장 잘 살리는 선택", "비용·부모 체류 관점의 대안"]
   return selected.map((item, index): CampfitV3DestinationRecommendation => ({
     cityId: item.city.id,
@@ -862,10 +860,6 @@ function exclusionCategories(programs: readonly ScoredProgram[]): readonly strin
 function directionSignalForScoring(signal: number, status?: ExperienceSignalStatus): number {
   if (status === "unknown") return 35
   return signal <= 15 ? 50 : signal
-}
-
-function takeUnique<T extends { readonly city: { readonly id: string } }>(items: T[], candidate: T | undefined): void {
-  if (candidate && !items.some((item) => item.city.id === candidate.city.id)) items.push(candidate)
 }
 
 function arrayValue(value: unknown): readonly string[] {

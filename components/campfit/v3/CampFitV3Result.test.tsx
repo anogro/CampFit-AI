@@ -96,7 +96,7 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).toContain("확인사항")
     expect(markup).toContain("추천 이유와 장점")
     expect(markup).toContain("Best Match")
-    expect(markup).toContain("이 도시에서 볼 프로그램")
+    expect(markup).toContain("추천 프로그램 Top3")
     expect(markup).toContain("도시별 총여행비와 추천 조건 비교")
     expect(markup).toContain('data-campfit-export-root="true"')
     expect(markup).toContain('data-campfit-export-ignore="true"')
