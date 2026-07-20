@@ -149,6 +149,10 @@ export function CampFitV3Flow() {
       : message
     const nextTranscript = appendOptimisticUserMessage(transcript, safeMessage, conversation.questionKey)
     setTranscript(nextTranscript)
+    if (conversation.readyForRecommendation && conversation.updatedState.currentQuestionKey === null && quickReplyKey === null) {
+      setTranscript([...nextTranscript, { role: "assistant", content: "추가로 말씀해주신 조건을 반영했어요. 더 답하거나 왼쪽의 결과 보기로 이동할 수 있어요." }])
+      return true
+    }
     try {
       const response = await postJson<CampfitV3ConversationResponse>("/api/campfit/v3/conversation/message", {
         transcript: nextTranscript,
