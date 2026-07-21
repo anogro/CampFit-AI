@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { useMemo, useState, type ReactNode } from "react"
+import { useMemo, useState, useRef, useEffect, type ReactNode } from "react"
+import { Calendar, ChevronDown } from "lucide-react"
 import { CampFitV3Frame, V3Header } from "@/components/campfit/v3/CampFitV3Frame"
 import {
   CAMPFIT_V3_MAX_DURATION_WEEKS,
@@ -27,6 +28,24 @@ export function CampFitV3Intake({ draft, onDraftChange, onBack, onSubmit }: Prop
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [childCountTouched, setChildCountTouched] = useState(() => draft.childCount !== countCompletedChildRows(draft))
+  const [departureYear, setDepartureYear] = useState(() => departureYearFromDraft(draft.departureWindow) ?? new Date().getFullYear())
+  const [showCalendar, setShowCalendar] = useState(false)
+  const calendarRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+        setShowCalendar(false)
+      }
+    }
+    if (showCalendar) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [showCalendar])
+
   const validation = useMemo(() => validateCampfitV3IntakeDraft(draft), [draft])
   const completedChildCount = useMemo(() => countCompletedChildRows(draft), [draft])
 
@@ -67,10 +86,14 @@ export function CampFitV3Intake({ draft, onDraftChange, onBack, onSubmit }: Prop
     updateDraft({ durationWeeks: null, durationMode: "custom", durationCustomWeeks: draft.durationCustomWeeks || "5" })
   }
 
-  function selectDepartureMonth(value: string): void {
-    if (!/^\d{4}-\d{2}$/.test(value)) return
-    const [year, month] = value.split("-")
-    updateDraft({ departureWindow: `${year}년 ${Number(month)}월` })
+  function selectDepartureMonth(month: number): void {
+    updateDraft({ departureWindow: `${departureYear}년 ${month}월` })
+  }
+
+  function updateDepartureText(value: string): void {
+    updateDraft({ departureWindow: value })
+    const year = departureYearFromDraft(value)
+    if (year !== null) setDepartureYear(year)
   }
 
   function markTouched(key: string): void {
@@ -147,26 +170,67 @@ export function CampFitV3Intake({ draft, onDraftChange, onBack, onSubmit }: Prop
             </Field>
 
             <Field id="departure" title="2. 출발 시기" helper="정확한 날짜가 아니어도 괜찮아요.">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                <input
-                  aria-describedby={showError("departureWindow") && validation.errors.departureWindow ? "departure-error" : undefined}
-                  aria-invalid={showError("departureWindow") && validation.errors.departureWindow !== null}
-                  aria-labelledby="departure-title"
-                  className="min-h-12 min-w-0 rounded-2xl border border-[var(--border-default)] bg-white px-4 outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]"
-                  maxLength={80}
-                  placeholder="예: 다음 여름방학, 2027년 1월"
-                  type="text"
-                  value={draft.departureWindow}
-                  onBlur={() => markTouched("departureWindow")}
-                  onChange={(event) => updateDraft({ departureWindow: event.target.value })}
-                />
-                <input
-                  aria-label="출발 시기 달력에서 선택"
-                  className="min-h-12 w-[9.5rem] rounded-2xl border border-[var(--border-default)] bg-white px-3 text-sm font-semibold outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]"
-                  type="month"
-                  onInput={(event) => selectDepartureMonth(event.currentTarget.value)}
-                  onChange={(event) => selectDepartureMonth(event.target.value)}
-                />
+              <div className="relative" ref={calendarRef}>
+                <div className="flex items-center gap-2">
+                  <input
+                    aria-describedby={showError("departureWindow") && validation.errors.departureWindow ? "departure-error" : undefined}
+                    aria-invalid={showError("departureWindow") && validation.errors.departureWindow !== null}
+                    aria-labelledby="departure-title"
+                    className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-white pl-4 pr-12 outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]"
+                    maxLength={80}
+                    placeholder="예: 다음 여름방학, 2027년 1월"
+                    type="text"
+                    value={draft.departureWindow}
+                    onBlur={() => markTouched("departureWindow")}
+                    onChange={(event) => updateDepartureText(event.target.value)}
+                    onFocus={() => setShowCalendar(true)}
+                  />
+                  <button
+                    aria-label="달력 열기"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 flex size-8 items-center justify-center rounded-xl text-[var(--text-secondary)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)]"
+                    type="button"
+                    onClick={() => setShowCalendar((prev) => !prev)}
+                  >
+                    <Calendar className="size-5" />
+                  </button>
+                </div>
+                
+                {showCalendar && (
+                  <div aria-label="출발 시기 달력에서 선택" className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 rounded-2xl border border-[var(--border-default)] bg-white p-3 shadow-lg sm:left-auto sm:right-0 sm:w-[17rem]">
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        aria-label="이전 해"
+                        className="grid size-9 place-items-center rounded-xl text-lg font-bold text-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--focus-ring)]"
+                        type="button"
+                        onClick={() => setDepartureYear((year: number) => Math.max(new Date().getFullYear(), year - 1))}
+                      >←</button>
+                      <span className="text-sm font-black">{departureYear}년</span>
+                      <button
+                        aria-label="다음 해"
+                        className="grid size-9 place-items-center rounded-xl text-lg font-bold text-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--focus-ring)]"
+                        type="button"
+                        onClick={() => setDepartureYear((year: number) => Math.min(new Date().getFullYear() + 5, year + 1))}
+                      >→</button>
+                    </div>
+                    <div className="mt-2 grid grid-cols-4 gap-1.5">
+                      {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => {
+                        const selected = draft.departureWindow === `${departureYear}년 ${month}월`
+                        return (
+                          <button
+                            aria-pressed={selected}
+                            className={`min-h-9 rounded-xl px-1 text-xs font-bold outline-none focus:ring-4 focus:ring-[var(--focus-ring)] ${selected ? "bg-[var(--accent-primary)] text-white" : "border border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--accent-soft)]"}`}
+                            key={month}
+                            type="button"
+                            onClick={() => {
+                              selectDepartureMonth(month)
+                              setShowCalendar(false)
+                            }}
+                          >{month}월</button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
               <ErrorText id="departure-error" show={showError("departureWindow")}>{validation.errors.departureWindow}</ErrorText>
             </Field>
@@ -213,19 +277,24 @@ export function CampFitV3Intake({ draft, onDraftChange, onBack, onSubmit }: Prop
             </Field>
 
             <Field id="budget" title="4. 가족 전체 예산" helper="항공·숙소·생활비를 포함한 범위를 선택해 주세요.">
-              <select
-                aria-describedby={showError("budget") && validation.errors.budget ? "budget-error" : undefined}
-                aria-invalid={showError("budget") && validation.errors.budget !== null}
-                aria-labelledby="budget-title"
-                className="min-h-12 w-full rounded-2xl border border-[var(--border-default)] bg-white px-4 font-semibold outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]"
-                value={draft.budgetMode}
-                onBlur={() => markTouched("budget")}
-                onChange={(event) => updateDraft({ budgetMode: event.target.value as CampfitV3IntakeDraft["budgetMode"] })}
-              >
-                <option value="" disabled>예산 범위를 선택해 주세요</option>
-                {campfitV3BudgetOptions.map((option) => <option value={option.key} key={option.key}>{option.label}</option>)}
-                <option value="custom">직접 입력</option>
-              </select>
+              <div className="relative">
+                <select
+                  aria-describedby={showError("budget") && validation.errors.budget ? "budget-error" : undefined}
+                  aria-invalid={showError("budget") && validation.errors.budget !== null}
+                  aria-labelledby="budget-title"
+                  className="appearance-none min-h-12 h-12 w-full rounded-2xl border border-[var(--border-default)] bg-white pl-4 pr-10 font-semibold outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]"
+                  value={draft.budgetMode}
+                  onBlur={() => markTouched("budget")}
+                  onChange={(event) => updateDraft({ budgetMode: event.target.value as CampfitV3IntakeDraft["budgetMode"] })}
+                >
+                  <option value="" disabled>예산 범위를 선택해 주세요</option>
+                  {campfitV3BudgetOptions.map((option) => <option value={option.key} key={option.key}>{option.label}</option>)}
+                  <option value="custom">직접 입력</option>
+                </select>
+                <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 flex items-center justify-center text-[var(--text-secondary)]">
+                  <ChevronDown className="size-5" />
+                </div>
+              </div>
               {draft.budgetMode === "custom" ? (
                 <div className="mt-2 grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2 text-sm">
                   <input aria-label="최소 예산" className="min-h-11 min-w-0 rounded-xl border border-[var(--border-default)] px-3 outline-none focus:border-[var(--accent-primary)] focus:ring-4 focus:ring-[var(--focus-ring)]" inputMode="numeric" min={0} placeholder="최소" step={1} type="number" value={draft.budgetMinManwon} onBlur={() => markTouched("budget")} onChange={(event) => updateDraft({ budgetMinManwon: event.target.value })} />
@@ -310,4 +379,9 @@ function Field({ id, title, helper, children }: { readonly id: string; readonly 
 function ErrorText({ id, show, children }: { readonly id: string; readonly show: boolean; readonly children: string | null }) {
   if (!show || children === null) return null
   return <p className="mt-1 text-xs font-semibold leading-5 text-[var(--status-error)]" id={id} role="alert">{children}</p>
+}
+
+function departureYearFromDraft(value: string): number | null {
+  const match = value.match(/20\d{2}/)
+  return match ? Number(match[0]) : null
 }
