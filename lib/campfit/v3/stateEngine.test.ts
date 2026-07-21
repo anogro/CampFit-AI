@@ -45,6 +45,11 @@ describe("CampFit v3 state and question engine", () => {
     expect(facts.find((fact) => fact.key === "koreanSupportNeed")).toBeUndefined()
   })
 
+  it("recognizes English levels described separately for multiple children", () => {
+    const facts = extractDeterministicFacts("첫째는 영어 수업 참여와 대화가 가능하고 둘째는 단어나 짧은 표현 정도예요.")
+    expect(facts.find((fact) => fact.key === "childEnglishLevel")?.value).toBe("beginner")
+  })
+
   it.each([
     ["5주 정도 생각하고 있어요.", 5],
     ["12주까지도 가능해요.", 12],

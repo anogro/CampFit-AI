@@ -189,7 +189,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
           </div>
 
           <div className="shrink-0 border-t border-[var(--border-default)] bg-white/80 px-4 py-3 sm:px-7 sm:py-4">
-            {conversation.warnings.map((warning) => <p className="mb-3 rounded-xl bg-[var(--surface-tint-yellow)] px-3 py-2 text-xs leading-5 text-[var(--status-warning)]" key={warning}>{warning}</p>)}
+            {conversation.warnings.filter((warning) => warning !== "말씀해주신 내용을 기준으로 상담을 이어갈게요.").map((warning) => <p className="mb-3 rounded-xl bg-[var(--surface-tint-yellow)] px-3 py-2 text-xs leading-5 text-[var(--status-warning)]" key={warning}>{warning}</p>)}
             {conversation.readyForRecommendation && !continuing ? (
               <div className="mb-4 rounded-2xl border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)] px-4 py-3" role="status">
                 <p className="text-sm font-extrabold">추천을 시작할 핵심 조건이 모였어요.</p>

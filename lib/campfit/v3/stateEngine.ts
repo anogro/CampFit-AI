@@ -246,9 +246,10 @@ export function extractDeterministicFacts(
     facts.push(createFact({ key, subject, value, source: "explicit_user_statement", evidence: evidence.slice(0, 240) }))
   }
 
-  if (/(아이|애).{0,12}(영어.{0,5})?(초급|처음|거의 못|낯설|첨|beginner)/iu.test(text)) push("childEnglishLevel", "child", "beginner")
-  else if (/(아이|애).{0,12}(영어.{0,5})?(중급|간단한 대화|일상 대화|intermediate)/iu.test(text)) push("childEnglishLevel", "child", "intermediate")
-  else if (/(아이|애).{0,12}(영어.{0,5})?(고급|수업.*무리|편하게|advanced)/iu.test(text)) push("childEnglishLevel", "child", "advanced")
+  const childEnglishText = /(아이|애|첫째|둘째|첫째 아이|둘째 아이).{0,40}(영어|수업|대화)|(?:영어 수업|영어로 대화|단어나 짧은 표현)/iu.test(text)
+  if (childEnglishText && /(초급|처음|거의 못|낯설|첨|단어나 짧은 표현|beginner)/iu.test(text)) push("childEnglishLevel", "child", "beginner")
+  else if (childEnglishText && /(중급|간단한 대화|일상 대화|수업 참여|대화.*가능|intermediate)/iu.test(text)) push("childEnglishLevel", "child", "intermediate")
+  else if (childEnglishText && /(고급|수업.*무리|편하게|advanced)/iu.test(text)) push("childEnglishLevel", "child", "advanced")
 
   if (/(저는|제가|부모|엄마|아빠|보호자).{0,24}(영어|basic\s*communication|소통).{0,20}(가능|할 수|괜찮|소통|돼|되)/iu.test(text)) push("parentEnglishCommunication", "parent", "possible")
   if (/(첫|처음).{0,8}(해외|캠프|교육)/.test(text)) push("isFirstOverseasEducationExperience", "child", true)
