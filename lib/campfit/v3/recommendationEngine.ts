@@ -95,7 +95,7 @@ export function buildRecommendation(input: {
 
   const scoredPrograms = scorePrograms(input.basicInfo, input.state, input.catalog, directions, parentPreferences, now)
   const eligiblePrograms = scoredPrograms.filter((item) => item.classification !== "excluded")
-  const destinations = scoreDestinations(input.basicInfo, input.state, input.catalog.cities, eligiblePrograms, directions)
+  const destinations = scoreDestinations(input.basicInfo, input.state, input.catalog.cities, scoredPrograms, directions)
   const sortedEligiblePrograms = eligiblePrograms.sort(comparePrograms)
   // City and program recommendations are independent lists. A strong program
   // in a city outside the city Top3 must still be eligible for the program Top3.
@@ -568,17 +568,15 @@ function scoreDestinations(
   const preferred = arrayValue(state.facts.preferredRegions?.value)
   const importance = String(state.facts.regionImportance?.value ?? "no_preference")
   const stayGoals = arrayValue(state.facts.parentStayGoals?.value)
+  const priorities = cityPriorityText(state)
   const scored = cities.flatMap((city) => {
-    const cityPrograms = programs.filter((item) => cityKey(item.program.city, item.program.country) === cityKey(city.name, city.country))
-    if (!cityPrograms.length) return []
     if (importance === "must" && preferred.length && !preferred.includes(city.regionGroup)) return []
-    const supply = Math.min(100, 45 + cityPrograms.length * 12)
-    const programFit = cityPrograms.slice(0, 3).reduce((sum, item) => sum + item.score, 0) / Math.min(3, cityPrograms.length)
     const regionFit = !preferred.length ? 70 : preferred.includes(city.regionGroup) ? 100 : importance === "strong" ? 35 : 60
-    const costFit = cityBudgetFit(city, cityPrograms[0]?.program ?? null, basicInfo)
+    const cityCostProgram = programs.find((item) => cityKey(item.program.city, item.program.country) === cityKey(city.name, city.country))?.program ?? null
+    const costFit = cityBudgetFit(city, cityCostProgram, basicInfo)
     const parentFit = parentStayFit(city, stayGoals)
-    const profileFit = 70
-    return [{ city, cityPrograms, balance: regionFit * 0.12 + supply * 0.17 + programFit * 0.31 + costFit * 0.14 + parentFit * 0.14 + profileFit * 0.12, preference: regionFit * 0.4 + programFit * 0.4 + profileFit * 0.2, alternative: costFit * 0.55 + parentFit * 0.35 + profileFit * 0.1 }]
+    const profileFit = cityProfileFit(city, priorities)
+    return [{ city, balance: regionFit * 0.12 + costFit * 0.18 + parentFit * 0.18 + profileFit * 0.52 }]
   })
   const selected = [...scored].sort((a, b) => b.balance - a.balance).slice(0, 3)
   const roles: readonly CampfitV3DestinationRecommendation["role"][] = ["가장 균형 잡힌 선택", "원래 희망을 가장 잘 살리는 선택", "비용·부모 체류 관점의 대안"]
@@ -588,9 +586,9 @@ function scoreDestinations(
     countryName: item.city.country,
     role: roles[index] ?? "가장 균형 잡힌 선택",
     imageUrl: item.city.imageUrl,
-    reason: cityReason(item.city, item.cityPrograms.length, preferred.includes(item.city.regionGroup)),
+    reason: cityReason(item.city, preferred.includes(item.city.regionGroup), priorities),
     verify: cityVerify(item.city, stayGoals),
-    costEstimate: estimateCityCost(item.city, item.cityPrograms[0]?.program ?? null, basicInfo),
+    costEstimate: estimateCityCost(item.city, programs.find((program) => cityKey(program.program.city, program.program.country) === cityKey(item.city.name, item.city.country))?.program ?? null, basicInfo),
   }))
 }
 
@@ -764,7 +762,49 @@ function directionExplanation(direction: ExperienceDirectionKey, readiness: numb
   return "학업 부담을 낮추고 활동과 문화 경험 속에서 자연스럽게 적응하는 방향입니다."
 }
 
-function cityReason(city: V3CatalogCity, programCount: number, preferred: boolean): string {
+function cityPriorityText(state: CampfitV3ConversationState): string {
+  return ["worries", "preferredActivities", "desiredOutcomes", "parentStayGoals", "destinationPreference"]
+    .flatMap((key) => arrayValue(state.facts[key as keyof CampfitV3ConversationState["facts"]]?.value))
+    .join(" ")
+    .toLowerCase()
+}
+
+function signalScore(level: "low" | "medium" | "high" | "unknown"): number {
+  return level === "high" ? 100 : level === "medium" ? 72 : level === "low" ? 35 : 62
+}
+
+function cityProfileFit(city: V3CatalogCity, priorities: string): number {
+  const profile = city.profile
+  if (!profile) return 62
+  const wantsMedical = /medical|hospital|health|emergency|\uBCD1\uC6D0|\uC758\uB8CC|\uC751\uAE09/i.test(priorities)
+  const wantsSafety = /safety|security|\uCE58\uC548|\uC548\uC804/i.test(priorities)
+  const wantsInternational = /international|multicultural|foreigner|racism|\uB2E4\uC778\uC885|\uC678\uAD6D\uC778|\uC778\uC885|\uCC28\uBCC4/i.test(priorities)
+  const wantsActivity = /activity|activities|tourism|culture|weekend|\uBCFC\uAC70\uB9AC|\uCCB4\uD5D8|\uAD00\uAD11|\uC8FC\uB9D0/i.test(priorities)
+  const wantsNature = /nature|beach|park|outdoor|\uC790\uC5F0|\uD574\uBCC0|\uACF5\uC6D0/i.test(priorities)
+  const weights: readonly (readonly [number, number])[] = [
+    [signalScore(profile.medicalLevel), wantsMedical ? 0.25 : 0.08],
+    [signalScore(profile.safetyLevel), wantsSafety ? 0.25 : 0.08],
+    [signalScore(profile.internationality), wantsInternational ? 0.18 : 0.06],
+    [signalScore(profile.activityStrength), wantsActivity ? 0.14 : 0.05],
+    [signalScore(profile.natureStrength), wantsNature ? 0.14 : 0.05],
+  ]
+  const totalWeight = weights.reduce((sum, [, weight]) => sum + weight, 0)
+  return weights.reduce((sum, [score, weight]) => sum + score * weight, 0) / totalWeight
+}
+
+function cityReason(city: V3CatalogCity, preferred: boolean, priorities: string): string {
+  const profile = city.profile
+  const parts: string[] = []
+  if (/medical|hospital|health|emergency|\uBCD1\uC6D0|\uC758\uB8CC|\uC751\uAE09/i.test(priorities)) parts.push(`응급 의료 접근성 ${profile?.medicalLevel === "high" ? "우수" : "확인이 필요한 편"}`)
+  if (/safety|security|\uCE58\uC548|\uC548\uC804/i.test(priorities)) parts.push(`치안 ${profile?.safetyLevel === "high" ? "우선 고려할 만함" : "세부 확인 필요"}`)
+  if (/international|multicultural|foreigner|racism|\uB2E4\uC778\uC885|\uC678\uAD6D\uC778|\uC778\uC885|\uCC28\uBCC4/i.test(priorities)) parts.push(`다문화·외국인 친화도 ${profile?.internationality === "high" ? "강점" : "확인 필요"}`)
+  if (/activity|activities|tourism|culture|weekend|\uBCFC\uAC70\uB9AC|\uCCB4\uD5D8|\uAD00\uAD11|\uC8FC\uB9D0/i.test(priorities)) parts.push(`퇴근 후·주말 활동 ${profile?.activityStrength === "high" ? "선택지가 넓음" : "확인 필요"}`)
+  if (/nature|beach|park|outdoor|\uC790\uC5F0|\uD574\uBCC0|\uACF5\uC6D0/i.test(priorities)) parts.push(`자연·야외 환경 ${profile?.natureStrength === "high" ? "강점" : "확인 필요"}`)
+  if (preferred) parts.push("선호 지역 조건과도 맞습니다.")
+  return parts.length ? `${city.name}의 도시 프로필을 기준으로 ${parts.join(", ")} 때문에 추천했습니다.` : `${city.name}의 도시 프로필과 체류 비용을 기준으로 추천했습니다.`
+}
+
+function legacyCityReason(city: V3CatalogCity, programCount: number, preferred: boolean): string {
   const parts = [`조건을 통과한 부모 체류 호환 프로그램 ${programCount}개가 실제 카탈로그에 있습니다.`]
   if (preferred) parts.push("사용자가 선택한 지역 선호와도 일치합니다.")
   return parts.join(" ")

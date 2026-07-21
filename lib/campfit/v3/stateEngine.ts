@@ -288,6 +288,15 @@ export function extractDeterministicFacts(
   if (/(코딩|coding)/i.test(text)) preferredActivities.push("coding")
   if (preferredActivities.length) push("preferredActivities", "preference", Array.from(new Set(preferredActivities)))
 
+  // City selection priorities are separate from the child's program direction.
+  // Keep them in the existing structured facts so extra consultation answers
+  // reach the city scorer instead of remaining transcript-only text.
+  const cityActivities = /activity|activities|tourism|culture|weekend|\uBCFC\uAC70\uB9AC|\uCCB4\uD5D8|\uAD00\uAD11|\uC8FC\uB9D0/iu.test(text)
+  const cityNature = /nature|beach|park|outdoor|\uC790\uC5F0|\uD574\uBCC0|\uACF5\uC6D0/iu.test(text)
+  if (cityActivities) preferredActivities.push("city_activities")
+  if (cityNature) preferredActivities.push("city_nature")
+  if (cityActivities || cityNature) push("preferredActivities", "preference", Array.from(new Set(preferredActivities)))
+
   const desiredOutcomes: string[] = []
   if (englishExposureContext) desiredOutcomes.push("english_exposure")
   if (/(영어.*(늘|성장|자신감)|영어를? 배우)/.test(text)) desiredOutcomes.push("english_confidence")
@@ -301,6 +310,9 @@ export function extractDeterministicFacts(
   }
 
   const worries: string[] = []
+  if (/medical|hospital|health|emergency|\uBCD1\uC6D0|\uC758\uB8CC|\uC751\uAE09/iu.test(text)) worries.push("medical_access")
+  if (/safety|security|\uCE58\uC548|\uC548\uC804/iu.test(text)) worries.push("city_safety")
+  if (/racism|discrimination|multicultural|foreigner|\uC778\uC885|\uCC28\uBCC4|\uB2E4\uC778\uC885|\uC678\uAD6D\uC778/iu.test(text)) worries.push("foreign_friendliness")
   if (/(걱정|불안|염려|우려)/.test(text)) {
     if (/(영어|소통|말)/.test(text)) worries.push("communication")
     if (/(적응|낯선|처음)/.test(text)) worries.push("initial_adaptation")

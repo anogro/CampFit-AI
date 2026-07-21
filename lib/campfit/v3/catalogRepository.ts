@@ -45,6 +45,19 @@ export type V3DemoCityProfile = {
   readonly strengths: readonly string[]
 }
 
+export type V3CitySignalLevel = "low" | "medium" | "high" | "unknown"
+
+export type V3CatalogCityProfile = {
+  readonly safetyLevel: V3CitySignalLevel
+  readonly medicalLevel: V3CitySignalLevel
+  readonly internationality: V3CitySignalLevel
+  readonly activityStrength: V3CitySignalLevel
+  readonly natureStrength: V3CitySignalLevel
+  readonly strengths: readonly string[]
+  /** Flattened evidence from the Supabase Cities row for auditable matching. */
+  readonly evidence: string
+}
+
 export type V3DemoProgramProfile = {
   readonly productCategory: "english" | "stem" | "sports" | "culture" | "schooling" | "project"
   readonly accommodationOptions: readonly string[]
@@ -151,6 +164,7 @@ export type V3CatalogCity = {
   readonly housingCostMonthlyKrw: number | null
   readonly catalogSource: "supabase" | "demo"
   readonly demoProfile?: V3DemoCityProfile
+  readonly profile?: V3CatalogCityProfile
 }
 
 export type V3Catalog = {
@@ -360,6 +374,14 @@ function mapCity(row: Row): readonly V3CatalogCity[] {
     readString(row, ["Local Insight / Notes"]),
     readString(row, ["Schools"]),
   ].filter(Boolean).join(" ") || null
+  const profileEvidence = Object.entries(row)
+    .flatMap(([key, value]) => {
+      if (typeof value === "string" && value.trim()) return [`${key}: ${value.trim()}`]
+      if (typeof value === "number" && Number.isFinite(value)) return [`${key}: ${value}`]
+      if (typeof value === "boolean") return [`${key}: ${value}`]
+      return []
+    })
+    .join(" | ")
   return [{
     id,
     slug: readString(row, ["slug", "city_slug"]) ?? null,
@@ -373,7 +395,35 @@ function mapCity(row: Row): readonly V3CatalogCity[] {
     livingCostMonthlyKrw: positiveNumber(readNumber(row, ["LivingCost KRW"])) ?? null,
     housingCostMonthlyKrw: positiveNumber(readNumber(row, ["HousingCost KRW"])) ?? null,
     catalogSource: "supabase",
+    profile: {
+      safetyLevel: readCitySignal(row, ["safety", "Safety", "safety_level", "Safety Level", "security", "Security"], profileEvidence, /safety|security|\uCE58\uC548|\uC548\uC804/iu),
+      medicalLevel: readCitySignal(row, ["medical", "Medical", "medical_level", "Medical Level", "hospital", "Hospital", "healthcare", "Healthcare"], profileEvidence, /medical|hospital|healthcare|health|emergency|\uBCD1\uC6D0|\uC758\uB8CC|\uC751\uAE09/iu),
+      internationality: readCitySignal(row, ["internationality", "Internationality", "international", "International", "multicultural", "Multicultural", "foreigner_friendly", "Foreigners"], profileEvidence, /international|multicultural|foreigner|diverse|racism|\uB2E4\uC778\uC885|\uC678\uAD6D\uC778|\uC778\uC885|\uCC28\uBCC4/iu),
+      activityStrength: readCitySignal(row, ["activities", "Activities", "activity_strength", "Activity Strength", "tourism", "Tourism", "weekend"], profileEvidence, /activities?|tourism|culture|entertainment|weekend|\uBCFC\uAC70\uB9AC|\uCCB4\uD5D8|\uAD00\uAD11|\uC8FC\uB9D0/iu),
+      natureStrength: readCitySignal(row, ["nature", "Nature", "nature_strength", "Nature Strength", "outdoors", "Outdoor"], profileEvidence, /nature|beach|park|outdoor|mountain|\uC790\uC5F0|\uD574\uBCC0|\uACF5\uC6D0/iu),
+      strengths: [description, readString(row, ["Local Insight / Notes"]), readString(row, ["style"])].filter((value): value is string => Boolean(value)),
+      evidence: profileEvidence,
+    },
   }]
+}
+
+function readCitySignal(row: Row, keys: readonly string[], evidence: string, categoryPattern: RegExp): V3CitySignalLevel {
+  for (const key of keys) {
+    const number = readNumber(row, [key])
+    if (number !== undefined) return number >= 75 ? "high" : number >= 45 ? "medium" : "low"
+    const value = readString(row, [key])
+    if (value) return levelFromText(value)
+  }
+  const categoryEvidence = evidence.split(" | ").filter((item) => categoryPattern.test(item)).join(" ")
+  if (!categoryEvidence) return "unknown"
+  return levelFromText(categoryEvidence)
+}
+
+function levelFromText(value: string): V3CitySignalLevel {
+  if (/(excellent|very\s*high|strong|best|high|excellent|\uB9E4\uC6B0\s*\uC88B|\uB192)/iu.test(value)) return "high"
+  if (/(low|poor|weak|limited|bad|\uB0AE|\uB0AE\uC74C|\uBD80\uC871)/iu.test(value)) return "low"
+  if (/(medium|moderate|average|balanced|\uBCF4\uD1B5|\uC911\uAC04)/iu.test(value)) return "medium"
+  return "medium"
 }
 
 function optionalRows(

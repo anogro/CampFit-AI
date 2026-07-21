@@ -18,6 +18,19 @@ const basicInfo: CampfitV3BasicInfo = {
 }
 
 describe("CampFit v3 recommendation engine", () => {
+  it("keeps three city recommendations when the independent program list is empty", () => {
+    const catalog = productionCatalog([])
+    const cities = [
+      city("Cebu", "Philippines", "southeast_asia"),
+      city("Auckland", "New Zealand", "oceania"),
+      city("Singapore", "Singapore", "southeast_asia"),
+    ]
+    const result = buildRecommendation({ basicInfo, state: stateFor("cultureActivity"), catalog: { ...catalog, cities }, now })
+
+    expect(result.destinationRecommendations).toHaveLength(3)
+    expect(result.programCandidates).toEqual([])
+  })
+
   it("scenario A selects a production-shaped Cebu culture program with DB provenance", () => {
     const result = recommend("cultureActivity", productionCatalog([
       program({ id: "culture-cebu", city: "Cebu", country: "Philippines", direction: "cultureActivity" }),
