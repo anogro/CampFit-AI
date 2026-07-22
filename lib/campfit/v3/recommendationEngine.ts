@@ -95,6 +95,11 @@ export function buildRecommendation(input: {
 
   const scoredPrograms = scorePrograms(input.basicInfo, input.state, input.catalog, directions, parentPreferences, now)
   const eligiblePrograms = scoredPrograms.filter((item) => item.classification !== "excluded")
+
+  console.log("DEBUG: Total scored programs:", scoredPrograms.length)
+  console.log("DEBUG: Eligible programs:", eligiblePrograms.map(p => `${p.program.name} (${p.program.city}) - class: ${p.classification}, score: ${p.score}`))
+  console.log("DEBUG: Excluded program reasons (sample):", scoredPrograms.filter(p => p.classification === "excluded").slice(0, 15).map(p => `${p.program.name} (${p.program.city}): ${p.excludedReasons.join(", ")} | durations: ${p.program.durationWeeks.join(",")} | age: ${p.program.ageMin}-${p.program.ageMax}`))
+
   const destinations = scoreDestinations(input.basicInfo, input.state, input.catalog.cities, scoredPrograms, directions)
   const sortedEligiblePrograms = eligiblePrograms.sort(comparePrograms)
   // City and program recommendations are independent lists. A strong program
