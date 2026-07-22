@@ -50,6 +50,16 @@ describe("CampFit v3 state and question engine", () => {
     expect(facts.find((fact) => fact.key === "childEnglishLevel")?.value).toBe("beginner")
   })
 
+  it("recognizes simple listening and speaking as basic child English", () => {
+    const facts = extractDeterministicFacts("아이에게는 간단한 영어 문장으로 이야기하고 듣는 게 가능해요.")
+    expect(facts.find((fact) => fact.key === "childEnglishLevel")?.value).toBe("basic")
+  })
+
+  it("recognizes being able to participate in English class as intermediate", () => {
+    const facts = extractDeterministicFacts("아이의 영어실력은 영어수업에 참여할 정도의 수준은 돼요.")
+    expect(facts.find((fact) => fact.key === "childEnglishLevel")?.value).toBe("intermediate")
+  })
+
   it.each([
     ["5주 정도 생각하고 있어요.", 5],
     ["12주까지도 가능해요.", 12],
@@ -381,6 +391,19 @@ describe("CampFit v3 state and question engine", () => {
     expect(facts.find((fact) => fact.key === "preferredRegions")?.value).toEqual([])
     expect(facts.find((fact) => fact.key === "regionImportance")?.value).toBe("no_preference")
     expect(facts.find((fact) => fact.key === "worries")?.value).toEqual(expect.arrayContaining(["medical_access", "city_safety"]))
+  })
+
+  it("keeps a region mentioned as too far out of the recommendation pool", () => {
+    const facts = extractDeterministicFacts("비행시간이 너무 길지 않았으면 좋겠어요. 유럽은 너무 멀어요.", basicInfo)
+    expect(facts.find((fact) => fact.key === "excludedRegions")?.value).toEqual(["europe"])
+    expect(facts.find((fact) => fact.key === "preferredRegions")?.value).toEqual([])
+    expect(facts.find((fact) => fact.key === "regionImportance")?.value).toBe("no_preference")
+  })
+
+  it("extracts program commute and meal constraints from natural language", () => {
+    const facts = extractDeterministicFacts("아이가 숙소에서 대중교통으로 캠프에 가는 게 힘들지 않았으면 좋겠고, 점심 도시락은 꼭 필요해요.", basicInfo)
+    expect(facts.find((fact) => fact.key === "programCommuteNeed")?.value).toBe("simple_only")
+    expect(facts.find((fact) => fact.key === "programMealNeed")?.value).toBe("lunch_required")
   })
 
   it("lets later natural language correct a quick-reply fact", async () => {

@@ -44,7 +44,7 @@ export function selectAccommodationVariant(
 export function calculateAccommodationCost(input: AccommodationCostInput, selection = selectAccommodationVariant(input.basicInfo, input.program)): TripCostLine {
   const packageInclusions = input.program.packageInclusions
   if (packageInclusions === undefined) {
-    return emptyLine("inquiry", ["확인 필요: 프로그램 가격에 숙소가 포함되는지 확인해야 중복 계산을 막을 수 있습니다."])
+    return emptyLine("inquiry", [])
   }
   if (packageInclusions.accommodationIncluded) {
     return {

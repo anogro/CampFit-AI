@@ -69,7 +69,9 @@ function logProviderResult(response: CampfitV3ConversationResponse): void {
   if (!shouldLogProviderResult() || response.diagnostics === undefined) return
 
   const selectedProvider = resolveAiProvider()
-  const selectedModel = (selectedProvider === "openai" ? process.env["OPENAI_MODEL"] : process.env["GEMINI_MODEL"])?.trim() || null
+  const selectedModel = (selectedProvider === "openai"
+    ? process.env["OPENAI_MODEL"]
+    : selectedProvider === "upstage" ? process.env["UPSTAGE_MODEL"] : process.env["GEMINI_MODEL"])?.trim() || null
   const diagnostics = response.diagnostics
   console.info(JSON.stringify({
     event: "campfit_v3_provider_result",

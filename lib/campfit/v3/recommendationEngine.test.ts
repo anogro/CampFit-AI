@@ -31,6 +31,22 @@ describe("CampFit v3 recommendation engine", () => {
     expect(result.programCandidates).toEqual([])
   })
 
+  it("removes cities whose one-month family living baseline exceeds the budget", () => {
+    const catalog = productionCatalog([
+      program({ id: "london-program", city: "London", country: "United Kingdom", direction: "cultureActivity" }),
+      program({ id: "cebu-program", city: "Cebu", country: "Philippines", direction: "cultureActivity" }),
+      program({ id: "osaka-program", city: "Osaka", country: "Japan", direction: "cultureActivity" }),
+    ])
+    const cities = catalog.cities.map((item) => item.name === "London"
+      ? { ...item, regionGroup: "europe" as const, flightCostKrw: 1_500_000, livingCostMonthlyKrw: 3_000_000, housingCostMonthlyKrw: 3_000_000 }
+      : item.name === "Osaka"
+        ? { ...item, regionGroup: "north_america" as const, flightCostKrw: 350_000, livingCostMonthlyKrw: 1_200_000, housingCostMonthlyKrw: 1_100_000 }
+        : item)
+    const result = buildRecommendation({ basicInfo, state: stateFor("cultureActivity"), catalog: { ...catalog, cities }, now })
+
+    expect(result.destinationRecommendations.map((item) => item.cityName)).not.toContain("London")
+  })
+
   it("scenario A selects a production-shaped Cebu culture program with DB provenance", () => {
     const result = recommend("cultureActivity", productionCatalog([
       program({ id: "culture-cebu", city: "Cebu", country: "Philippines", direction: "cultureActivity" }),
@@ -580,6 +596,14 @@ describe("CampFit v3 recommendation engine", () => {
     expect(result.verificationChecklist).toContain("DB read failed")
   })
 
+  it("raises programs with shuttle evidence when simple transport is important", () => {
+    const result = recommend("cultureActivity", productionCatalog([
+      program({ id: "no-shuttle", direction: "cultureActivity", shuttleAvailable: false, packageInclusions: { ...demoPackage, localTransportIncluded: false } }),
+      program({ id: "with-shuttle", direction: "cultureActivity", shuttleAvailable: true, packageInclusions: { ...demoPackage, localTransportIncluded: true } }),
+    ]), { programCommuteNeed: "shuttle_preferred" })
+    expect(result.programCandidates[0]?.programId).toBe("with-shuttle")
+  })
+
 
   it("does not render program cards when their public city rows are unavailable", () => {
     const catalog: V3Catalog = { programs: [program({ direction: "cultureActivity" })], cities: [], source: "supabase", warnings: ["도시 카탈로그 없음"] }
@@ -689,6 +713,10 @@ function program(input: {
   readonly hasSessionRows?: boolean
   readonly hasScheduledSessionRows?: boolean
   readonly catalogSource?: V3CatalogProgram["catalogSource"]
+  readonly commuteMinutes?: number | null
+  readonly commuteTransferCount?: number | null
+  readonly shuttleAvailable?: boolean | null
+  readonly packageInclusions?: V3CatalogProgram["packageInclusions"]
 }): V3CatalogProgram {
   const price = input.price ?? 3_000_000
   const signal = (key: ExperienceDirectionKey) => key === input.direction ? 95 : key === "englishIntensive" ? 45 : 15
@@ -716,6 +744,9 @@ function program(input: {
     koreanManager: true,
     koreanDailySupport: true,
     koreanEmergencySupport: true,
+    commuteMinutes: input.commuteMinutes ?? null,
+    commuteTransferCount: input.commuteTransferCount ?? null,
+    shuttleAvailable: input.shuttleAvailable ?? null,
     emergencySupport: true,
     beginnerClass: true,
     earlyAdaptationSupport: true,
@@ -734,5 +765,16 @@ function program(input: {
     status: "active",
     catalogSource: input.catalogSource ?? "supabase",
     updatedAt: "2026-07-01T00:00:00.000Z",
+    ...(input.packageInclusions === undefined ? {} : { packageInclusions: input.packageInclusions }),
   }
+}
+
+const demoPackage: NonNullable<V3CatalogProgram["packageInclusions"]> = {
+  accommodationIncluded: true,
+  mealPlan: "weekday_lunch",
+  localTransportIncluded: false,
+  airportTransferIncluded: false,
+  registrationFeeKrw: null,
+  additionalAdultSurchargeKrw: null,
+  additionalChildProgramPriceKrw: null,
 }

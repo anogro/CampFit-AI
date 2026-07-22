@@ -62,9 +62,9 @@ export function calculateLivingCost(input: {
       selectedVariant: mealPlan,
       travelerCount: input.basicInfo.adultCount + input.basicInfo.childCount,
       includedItems: [],
-      notes: ["Cities 생활비 월 기준을 체류 기간으로 환산한 참고값입니다.", ...(packageInclusions === undefined ? ["확인 필요: 프로그램·숙소 식사 포함 범위"] : [])],
+      notes: ["Cities 생활비 월 기준을 체류 기간으로 환산한 참고값입니다."],
       sourceAmounts: [amount],
     }
   }
-  return emptyLine("inquiry", ["확인 필요: 도시별 가족 생활비 estimate가 없습니다."])
+  return emptyLine("inquiry", [])
 }

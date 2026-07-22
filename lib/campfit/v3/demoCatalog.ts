@@ -20,7 +20,7 @@ export function loadDemoCatalog(referenceYear = new Date().getUTCFullYear()): V3
       name: city.name,
       country: city.country,
       regionGroup: inferCityRegionGroup(city.country),
-      imageUrl: null,
+      imageUrl: demoCityImageUrl(city.name),
       description: city.description,
       parentStayEvidence: city.parentStayEvidence,
       flightCostKrw: city.flightCostKrw,
@@ -41,6 +41,16 @@ export function loadDemoCatalog(referenceYear = new Date().getUTCFullYear()): V3
     source: "demo",
     warnings: [`${CAMPFIT_V3_DEMO_CATALOG_VERSION}: 실제 예약·운영·가격 확정 전 비교용 Demo Catalog입니다.`],
   }
+}
+
+const demoCityImageUrls: Readonly<Record<string, string>> = {
+  "Christchurch": "https://images.unsplash.com/photo-1507699622108-4be3abd695ad?auto=format&fit=crop&w=900&q=80",
+  "Osaka": "https://images.unsplash.com/photo-1590559899731-a382839e5549?auto=format&fit=crop&w=900&q=80",
+  "Johor Bahru": "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=900&q=80",
+}
+
+function demoCityImageUrl(cityName: string): string {
+  return demoCityImageUrls[cityName] ?? "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=900&q=80"
 }
 
 function mapDemoProgram(definition: (typeof demoProgramDefinitions)[number], year: number): V3CatalogProgram {

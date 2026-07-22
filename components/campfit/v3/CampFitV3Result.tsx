@@ -111,7 +111,15 @@ function importantCriteria(
   const directions = result.experienceDirections.slice(0, 2).map((direction) => direction.label.replace(/ 경험$/, ""))
   const stayGoals = state.facts.parentStayGoals?.value
   const parentGoal = Array.isArray(stayGoals) && stayGoals.length ? getAxisDetail("family", state) : null
-  return Array.from(new Set([...directions, parentGoal].filter((value): value is string => Boolean(value)))).slice(0, 3)
+  const commute = state.facts.programCommuteNeed?.value === "simple_only"
+    ? "프로그램 이동이 간단한 후보"
+    : state.facts.programCommuteNeed?.value === "shuttle_preferred" ? "셔틀·차량 이동"
+      : null
+  const meal = state.facts.programMealNeed?.value === "lunch_required"
+    ? "점심·식사 제공"
+    : state.facts.programMealNeed?.value === "meals_preferred" ? "식사 포함 여부"
+      : null
+  return Array.from(new Set([...directions, parentGoal, commute, meal].filter((value): value is string => Boolean(value)))).slice(0, 4)
 }
 
 export function CampFitV3Result({
@@ -345,9 +353,14 @@ function CityCard({
         {city.imageUrl ? <img className="h-20 w-24 rounded-2xl object-cover" src={city.imageUrl} alt="" /> : <div className="grid h-20 w-24 shrink-0 place-items-center rounded-2xl bg-[var(--accent-soft)] text-2xl font-black text-[var(--accent-primary)]" aria-hidden>{city.cityName.slice(0, 1)}</div>}
       </div>
       <div className="flex flex-1 flex-col p-5 sm:p-6">
+        {city.description ? (
+          <p className="mb-4 rounded-2xl bg-[var(--bg-secondary)] p-3 text-xs leading-5 text-[var(--text-secondary)] [word-break:keep-all]">
+            “ {city.description} ”
+          </p>
+        ) : null}
         <h4 className="text-sm font-black text-[var(--text-primary)]">추천 이유와 장점</h4>
         <ul className="mt-3 space-y-2.5">
-          {cityWhyBullets(city, basicInfo, conversationState, result).map((item) => (
+          {(city.bullets ?? cityWhyBullets(city, basicInfo, conversationState, result)).map((item) => (
             <li className="flex gap-2.5 text-sm leading-6 [word-break:keep-all]" key={item}>
               <span className="mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-xs font-black text-[var(--accent-primary)]" aria-hidden>✓</span>
               <span>{item}</span>
@@ -375,13 +388,38 @@ function CityCard({
 }
 
 function CityMonthlyCostSummary({ city }: { readonly city: CampfitV3DestinationRecommendation }) {
-  const total = city.cityStayMonthlyCostKrw ?? null
+  const flight = city.singleFlightCostKrw ?? null
+  const living = city.livingCostMonthlyKrw ?? null
+  const housing = city.housingCostMonthlyKrw ?? null
+
+  if (flight === null && living === null && housing === null) return null
+
   return (
-    <div className="mt-5 rounded-2xl bg-[var(--surface-tint-yellow)] p-4">
-      <h4 className="text-sm font-black text-[var(--status-warning)]">도시 한 달살기 예상비용</h4>
-      {total !== null ? <p className="mt-2 text-lg font-black">가족 기준 {formatKrw(total)}</p> : <p className="mt-2 text-sm font-semibold text-[var(--text-secondary)]">도시별 평균 비용 확인 필요</p>}
-      <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)] [word-break:keep-all]">가족 왕복 항공료 + 한 달 생활비 + 한 달 주거비 기준입니다.</p>
-      <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">Cities의 월 기준 참고값이며 프로그램 참가비·보험·비자는 포함하지 않습니다.</p>
+    <div className="mt-5 rounded-2xl bg-[var(--surface-tint-yellow)] p-4 text-xs font-semibold leading-6 text-[var(--text-secondary)]">
+      <h4 className="text-sm font-black text-[var(--status-warning)] mb-2">도시 체류 참고 기준</h4>
+      <ul className="space-y-1.5">
+        {flight !== null ? (
+          <li className="flex justify-between border-b border-dashed border-[var(--border-default)] pb-1.5 last:border-b-0 last:pb-0">
+            <span>왕복 항공료 (1인)</span>
+            <span className="font-bold text-[var(--text-primary)]">~{formatKrw(flight)}</span>
+          </li>
+        ) : null}
+        {living !== null ? (
+          <li className="flex justify-between border-b border-dashed border-[var(--border-default)] pb-1.5 last:border-b-0 last:pb-0">
+            <span>월 평균 생활비 (가족)</span>
+            <span className="font-bold text-[var(--text-primary)]">~{formatKrw(living)}</span>
+          </li>
+        ) : null}
+        {housing !== null ? (
+          <li className="flex justify-between border-b border-dashed border-[var(--border-default)] pb-1.5 last:border-b-0 last:pb-0">
+            <span>월 평균 주거비 (1BR)</span>
+            <span className="font-bold text-[var(--text-primary)]">~{formatKrw(housing)}</span>
+          </li>
+        ) : null}
+      </ul>
+      <p className="mt-2 text-[10px] leading-4 text-[var(--text-secondary)] [word-break:keep-all] opacity-80">
+        * 위 비용은 도시 평균에 기반한 참고 단가이며, 실제 예약 조건에 따라 달라질 수 있습니다.
+      </p>
     </div>
   )
 }

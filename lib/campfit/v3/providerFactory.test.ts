@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { createConversationProvider, resolveAiProvider } from "@/lib/campfit/v3/providerFactory"
 import { GeminiCampfitV3ProviderCore } from "@/lib/campfit/v3/geminiProviderCore"
 import { OpenAICampfitV3ProviderCore } from "@/lib/campfit/v3/openaiProviderCore"
+import { UpstageCampfitV3ProviderCore } from "@/lib/campfit/v3/upstageProviderCore"
 
 describe("CampFit provider factory", () => {
   afterEach(() => {
@@ -18,6 +19,12 @@ describe("CampFit provider factory", () => {
     vi.stubEnv("AI_PROVIDER", "gemini")
     expect(resolveAiProvider()).toBe("gemini")
     expect(createConversationProvider()).toBeInstanceOf(GeminiCampfitV3ProviderCore)
+  })
+
+  it("selects Upstage when AI_PROVIDER=upstage", () => {
+    vi.stubEnv("AI_PROVIDER", "upstage")
+    expect(resolveAiProvider()).toBe("upstage")
+    expect(createConversationProvider()).toBeInstanceOf(UpstageCampfitV3ProviderCore)
   })
 
   it("keeps Gemini as the safe default when AI_PROVIDER is unset", () => {
@@ -39,7 +46,11 @@ describe("CampFit provider factory", () => {
     vi.stubEnv("AI_PROVIDER", "gemini")
     const gemini = createConversationProvider() as unknown as { readonly timeoutMs: number }
 
+    vi.stubEnv("AI_PROVIDER", "upstage")
+    const upstage = createConversationProvider() as unknown as { readonly timeoutMs: number }
+
     expect(openai.timeoutMs).toBe(20_000)
     expect(gemini.timeoutMs).toBe(20_000)
+    expect(upstage.timeoutMs).toBe(20_000)
   })
 })

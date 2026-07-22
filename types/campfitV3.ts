@@ -25,8 +25,11 @@ export const campfitV3FactKeys = [
   "worries",
   "experienceGoals",
   "preferredRegions",
+  "excludedRegions",
   "regionImportance",
   "koreanSupportNeed",
+  "programCommuteNeed",
+  "programMealNeed",
   "parentCommunicationNeed",
   "beginnerSupportNeed",
   "initialAdaptationSupportNeed",
@@ -179,6 +182,11 @@ export type CampfitV3DestinationRecommendation = {
   readonly costEstimate: CampfitV3CostEstimate
   readonly cityStayFlightCostKrw?: number | null
   readonly cityStayMonthlyCostKrw?: number | null
+  readonly singleFlightCostKrw?: number | null
+  readonly livingCostMonthlyKrw?: number | null
+  readonly housingCostMonthlyKrw?: number | null
+  readonly description?: string | null
+  readonly bullets?: readonly string[]
   readonly tripCost?: CampfitV3TripCost | undefined
 }
 

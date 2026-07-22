@@ -417,6 +417,8 @@ function fallbackAcknowledgement(facts: readonly CampfitV3Fact[], userMessage: s
   if (worries.includes("medical_access")) parts.push("병원·의료 접근성")
   if (worries.includes("city_safety")) parts.push("도시 안전")
   if (worries.includes("foreign_friendliness")) parts.push("외국인 친화도")
+  if (facts.some((fact) => fact.key === "programCommuteNeed" && fact.value === "simple_only")) parts.push("프로그램 이동 편의")
+  if (facts.some((fact) => fact.key === "programMealNeed" && fact.value === "lunch_required")) parts.push("점심·도시락 조건")
   if (parts.length === 0 && facts.length > 0) return "말씀해주신 내용을 확인했어요."
   if (parts.length === 0) return "답변을 확인했어요."
   return `${joinKorean(parts)}을 확인했어요.`

@@ -27,8 +27,20 @@ export function attachTripCosts(input: {
     return { ...candidate, tripCost }
   })
   const destinationRecommendations = input.result.destinationRecommendations.map((destination) => {
-    const cityCandidate = programCandidates.find((candidate) => candidate.cityName === destination.cityName)
-    const tripCost = cityCandidate ? costsByProgramId.get(cityCandidate.programId) : undefined
+    let tripCost = programCandidates.find((candidate) => candidate.cityName === destination.cityName)?.tripCost
+    if (!tripCost) {
+      const program = input.catalog.programs.find((p) => cityKey(p.city, p.country) === cityKey(destination.cityName, destination.countryName))
+      const city = program ? cityByKey.get(cityKey(program.city, program.country)) : undefined
+      if (program && city) {
+        tripCost = calculateTotalTripCost({
+          basicInfo: input.basicInfo,
+          program,
+          city,
+          estimateProfile: input.catalog.source === "demo" ? demoCostEstimateForCity(city.name) : null,
+          calculatedAt: input.calculatedAt,
+        })
+      }
+    }
     return tripCost ? { ...destination, tripCost } : destination
   })
   return { ...input.result, destinationRecommendations, programCandidates }

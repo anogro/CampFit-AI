@@ -99,8 +99,24 @@ export function buildRecommendation(input: {
   const sortedEligiblePrograms = eligiblePrograms.sort(comparePrograms)
   // City and program recommendations are independent lists. A strong program
   // in a city outside the city Top3 must still be eligible for the program Top3.
-  const programCandidates = selectDiverseProgramCandidates(sortedEligiblePrograms, 3)
+  let programCandidates = selectDiverseProgramCandidates(sortedEligiblePrograms, 3)
     .map((item) => toProgramCandidate(item, input.basicInfo))
+
+  if (destinations.length > 0 && destinations[0]) {
+    const firstCityName = destinations[0].cityName
+    const hasFirstCityProgram = programCandidates.some((c) => c.cityName.toLowerCase() === firstCityName.toLowerCase())
+    if (!hasFirstCityProgram) {
+      const fallbackProgram = sortedEligiblePrograms.find((item) => item.program.city.toLowerCase() === firstCityName.toLowerCase())
+      if (fallbackProgram) {
+        const fallbackCandidate = toProgramCandidate(fallbackProgram, input.basicInfo)
+        programCandidates = [
+          programCandidates[0] ?? null,
+          programCandidates[1] ?? null,
+          fallbackCandidate,
+        ].filter((c): c is CampfitV3ProgramCandidate => c !== null)
+      }
+    }
+  }
   const limitedResult = missingRequired.length > 0
     || destinations.length < 3
     || programCandidates.length < 3
@@ -579,18 +595,57 @@ function scoreDestinations(
   })
   const selected = [...scored].sort((a, b) => b.balance - a.balance).slice(0, 3)
   const roles: readonly CampfitV3DestinationRecommendation["role"][] = ["가장 균형 잡힌 선택", "원래 희망을 가장 잘 살리는 선택", "비용·부모 체류 관점의 대안"]
-  return selected.map((item, index): CampfitV3DestinationRecommendation => ({
-    cityId: item.city.id,
-    cityName: item.city.name,
-    countryName: item.city.country,
-    role: roles[index] ?? "가장 균형 잡힌 선택",
-    imageUrl: item.city.imageUrl,
-    reason: cityReason(item.city, preferred.includes(item.city.regionGroup), priorities),
-    verify: cityVerify(item.city, stayGoals),
-    costEstimate: estimateCityCost(item.city, programs.find((program) => cityKey(program.program.city, program.program.country) === cityKey(item.city.name, item.city.country))?.program ?? null, basicInfo),
-    cityStayFlightCostKrw: cityStayFlightCost(item.city, basicInfo),
-    cityStayMonthlyCostKrw: cityStayMonthlyCost(item.city, basicInfo),
-  }))
+  return selected.map((item, index): CampfitV3DestinationRecommendation => {
+    const role = roles[index] ?? "가장 균형 잡힌 선택"
+    return {
+      cityId: item.city.id,
+      cityName: item.city.name,
+      countryName: item.city.country,
+      role,
+      imageUrl: item.city.imageUrl,
+      reason: cityReason(item.city, preferred.includes(item.city.regionGroup), priorities),
+      verify: cityVerify(item.city, stayGoals),
+      costEstimate: estimateCityCost(item.city, programs.find((program) => cityKey(program.program.city, program.program.country) === cityKey(item.city.name, item.city.country))?.program ?? null, basicInfo),
+      cityStayFlightCostKrw: cityStayFlightCost(item.city, basicInfo),
+      cityStayMonthlyCostKrw: cityStayMonthlyCost(item.city, basicInfo),
+      singleFlightCostKrw: item.city.flightCostKrw,
+      livingCostMonthlyKrw: item.city.livingCostMonthlyKrw,
+      housingCostMonthlyKrw: item.city.housingCostMonthlyKrw,
+      description: item.city.description,
+      bullets: buildCityWhyBullets(item.city, role, stayGoals),
+    }
+  })
+}
+
+function buildCityWhyBullets(city: V3CatalogCity, role: string, stayGoals: readonly string[]): readonly string[] {
+  const list: string[] = []
+  list.push(role)
+
+  const profile = city.profile
+  if (profile) {
+    if (profile.safetyLevel === "high") {
+      list.push("현지 치안 및 주변 안전 환경이 우수하여 가족 체류에 적합해요.")
+    }
+    if (profile.medicalLevel === "high") {
+      list.push("인근 종합병원 등 의료 인프라 접근성이 확보된 안전한 환경이에요.")
+    }
+  }
+
+  if (city.livingCostMonthlyKrw !== null && city.livingCostMonthlyKrw < 1500000) {
+    list.push("체류 생활비와 숙소 렌트 비용이 다른 대안 도시에 비해 합리적이에요.")
+  }
+
+  if (list.length < 3) {
+    if (stayGoals.includes("natureBeach")) {
+      list.push("휴양지 특유의 자연 경관 및 해변 활동 접근성이 매우 좋아요.")
+    } else if (stayGoals.includes("restWellness")) {
+      list.push("가족 모두 조용하고 여유롭게 휴식과 웰니스를 취하기 좋은 환경이에요.")
+    } else if (stayGoals.includes("remoteWork")) {
+      list.push("부모의 원격 업무 수행과 조용한 생활 인프라가 지원돼요.")
+    }
+  }
+
+  return Array.from(new Set(list)).slice(0, 3)
 }
 
 function cityStayFlightCost(city: V3CatalogCity, basicInfo: CampfitV3BasicInfo): number | null {
@@ -664,8 +719,9 @@ function estimateCityCost(city: V3CatalogCity, program: V3CatalogProgram | null,
     hasCompleteMaximum = false
   }
   if (city.flightCostKrw !== null) {
-    minComponents.push(city.flightCostKrw)
-    maxComponents.push(city.flightCostKrw)
+    const totalFlightCost = city.flightCostKrw * (basicInfo.adultCount + basicInfo.childCount)
+    minComponents.push(totalFlightCost)
+    maxComponents.push(totalFlightCost)
     included.push("항공비 참고값")
     missing.push("가족 항공권 실제 견적")
   } else missing.push("항공비")

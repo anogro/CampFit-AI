@@ -80,6 +80,16 @@ export function mergeFacts(
     facts[incoming.key] = value === incoming.value ? incoming : { ...incoming, value }
     if (incoming.status !== "tentative" && incoming.status !== "unknown" && incoming.source !== "ai_inference") resolved.add(incoming.key)
   }
+  const excludedRegions = facts.excludedRegions?.value
+  const preferredRegions = facts.preferredRegions?.value
+  if (Array.isArray(excludedRegions) && Array.isArray(preferredRegions)) {
+    const excluded = new Set(excludedRegions)
+    const filtered = preferredRegions.filter((region) => !excluded.has(region))
+    if (filtered.length !== preferredRegions.length) {
+      const preferredFact = facts.preferredRegions
+      if (preferredFact) facts.preferredRegions = { ...preferredFact, value: filtered }
+    }
+  }
   return {
     ...state,
     facts,
@@ -124,8 +134,11 @@ export function isSemanticallyValidModelFact(input: {
     worries: ["parent", "family"],
     experienceGoals: ["preference"],
     preferredRegions: ["preference"],
+    excludedRegions: ["preference"],
     regionImportance: ["preference"],
     koreanSupportNeed: ["constraint"],
+    programCommuteNeed: ["constraint"],
+    programMealNeed: ["constraint"],
     parentCommunicationNeed: ["constraint"],
     beginnerSupportNeed: ["constraint"],
     initialAdaptationSupportNeed: ["constraint"],
@@ -166,10 +179,16 @@ export function isSemanticallyValidModelFact(input: {
       return isExperienceGoals(input.value)
     case "preferredRegions":
       return isStringArray(input.value, 4, ["southeast_asia", "oceania", "north_america", "europe"])
+    case "excludedRegions":
+      return isStringArray(input.value, 4, ["southeast_asia", "oceania", "north_america", "europe"])
     case "regionImportance":
       return isOneOf(input.value, ["must", "strong", "soft", "no_preference"])
     case "koreanSupportNeed":
       return isOneOf(input.value, ["must_daily", "emergency_only", "preferred", "none"])
+    case "programCommuteNeed":
+      return isOneOf(input.value, ["simple_only", "shuttle_preferred", "any"])
+    case "programMealNeed":
+      return isOneOf(input.value, ["lunch_required", "meals_preferred", "any"])
     case "parentCommunicationNeed":
       return isOneOf(input.value, ["daily", "issue_only", "occasional", "not_important"])
     case "parentStayGoals":
@@ -248,7 +267,8 @@ export function extractDeterministicFacts(
 
   const childEnglishText = /(아이|애|첫째|둘째|첫째 아이|둘째 아이).{0,40}(영어|수업|대화)|(?:영어 수업|영어로 대화|단어나 짧은 표현)/iu.test(text)
   if (childEnglishText && /(초급|처음|거의 못|낯설|첨|단어나 짧은 표현|beginner)/iu.test(text)) push("childEnglishLevel", "child", "beginner")
-  else if (childEnglishText && /(중급|간단한 대화|일상 대화|수업 참여|대화.*가능|intermediate)/iu.test(text)) push("childEnglishLevel", "child", "intermediate")
+  else if (childEnglishText && /(간단한 문장|짧은 문장|듣고\s*말|이야기하고\s*듣|basic)/iu.test(text)) push("childEnglishLevel", "child", "basic")
+  else if (childEnglishText && /(중급|간단한 대화|일상 대화|수업\s*(?:에|을)?\s*참여|영어\s*수업.{0,10}참여|참여할\s*정도|대화.*가능|intermediate)/iu.test(text)) push("childEnglishLevel", "child", "intermediate")
   else if (childEnglishText && /(고급|수업.*무리|편하게|advanced)/iu.test(text)) push("childEnglishLevel", "child", "advanced")
 
   if (/(저는|제가|부모|엄마|아빠|보호자).{0,24}(영어|basic\s*communication|소통).{0,20}(가능|할 수|괜찮|소통|돼|되)/iu.test(text)) push("parentEnglishCommunication", "parent", "possible")
@@ -309,6 +329,20 @@ export function extractDeterministicFacts(
     push("initialAdaptationSupportNeed", "constraint", true)
   }
 
+  const commuteMentioned = /(?:통학|대중교통|환승|셔틀|이동\s*(?:시간|거리)|차량)/iu.test(text)
+  if (commuteMentioned) {
+    if (/(힘들|어렵|짧|가까|간단|혼자|환승\s*없|오래\s*걸리)/iu.test(text)) push("programCommuteNeed", "constraint", "simple_only")
+    else if (/(셔틀|차량|픽업)/iu.test(text)) push("programCommuteNeed", "constraint", "shuttle_preferred")
+    else if (/(상관없|괜찮|무관)/iu.test(text)) push("programCommuteNeed", "constraint", "any")
+  }
+
+  const mealMentioned = /(도시락|점심|식사|급식|중식)/iu.test(text)
+  if (mealMentioned) {
+    if (/(꼭|필수|반드시|필요|없으면\s*안)/iu.test(text)) push("programMealNeed", "constraint", "lunch_required")
+    else if (/(상관없|괜찮|무관)/iu.test(text)) push("programMealNeed", "constraint", "any")
+    else push("programMealNeed", "constraint", "meals_preferred")
+  }
+
   const worries: string[] = []
   if (/medical|hospital|health|emergency|\uBCD1\uC6D0|\uC758\uB8CC|\uC751\uAE09/iu.test(text)) worries.push("medical_access")
   if (/safety|security|\uCE58\uC548|\uC548\uC804/iu.test(text)) worries.push("city_safety")
@@ -336,18 +370,26 @@ export function extractDeterministicFacts(
   if (parentStayContext && /(원격근무|재택|일해야|일할 예정|일할 거|카페.{0,8}일)/.test(text)) stayGoals.push("remoteWork")
   if (stayGoals.length) push("parentStayGoals", "parent", Array.from(new Set(stayGoals)))
 
-  const regions: string[] = []
-  if (/(호주|뉴질랜드|오세아니아|오클랜드|Auckland)/i.test(text)) regions.push("oceania")
-  if (/(동남아|필리핀|세부|태국|치앙마이|싱가포르|말레이시아)/.test(text)) regions.push("southeast_asia")
-  if (/(북미|미국|캐나다)/.test(text)) regions.push("north_america")
-  if (/(유럽|영국|아일랜드|몰타)/.test(text)) regions.push("europe")
-  if (regions.length) {
-    push("preferredRegions", "preference", Array.from(new Set(regions)))
+  const regionMatchers: readonly [string, RegExp, RegExp][] = [
+    ["oceania", /(호주|뉴질랜드|오세아니아|오클랜드|Auckland)/iu, /(호주|뉴질랜드|오세아니아|오클랜드|Auckland).{0,20}(너무\s*멀|멀어서|비행시간|비행.*길|피하|제외|싫)/iu],
+    ["southeast_asia", /(동남아|필리핀|세부|태국|치앙마이|싱가포르|말레이시아)/iu, /(동남아|필리핀|세부|태국|치앙마이|싱가포르|말레이시아).{0,20}(너무\s*멀|멀어서|비행시간|비행.*길|피하|제외|싫)/iu],
+    ["north_america", /(북미|미국|캐나다)/iu, /(북미|미국|캐나다).{0,20}(너무\s*멀|멀어서|비행시간|비행.*길|피하|제외|싫)/iu],
+    ["europe", /(유럽|영국|아일랜드|몰타)/iu, /(유럽|영국|아일랜드|몰타).{0,20}(너무\s*멀|멀어서|비행시간|비행.*길|피하|제외|싫)/iu],
+  ]
+  const regions = regionMatchers.filter(([, matcher]) => matcher.test(text)).map(([region]) => region)
+  const excludedRegions = regionMatchers.filter(([, , excludedMatcher]) => excludedMatcher.test(text)).map(([region]) => region)
+  const preferredRegions = regions.filter((region) => !excludedRegions.includes(region))
+  if (excludedRegions.length) push("excludedRegions", "preference", Array.from(new Set(excludedRegions)))
+  if (preferredRegions.length) {
+    push("preferredRegions", "preference", Array.from(new Set(preferredRegions)))
     if (/(가장|우선|먼저).{0,16}(좋|보|원|선호)/.test(text) || /(가장 좋|우선).{0,24}다른 (지역|곳)도 괜찮/.test(text)) {
       push("regionImportance", "preference", "strong")
     } else if (/(다른 (지역|곳)|어디든|지역.*상관).{0,12}(괜찮|가능|상관없)/.test(text)) {
       push("regionImportance", "preference", "soft")
     }
+  } else if (excludedRegions.length) {
+    push("preferredRegions", "preference", [])
+    push("regionImportance", "preference", "no_preference")
   } else if (/(지역|나라는?).{0,8}(상관없|어디든)/.test(text)
     || /(^|[\s,])상관없(?:긴\s*한데|긴하지만|어도|어요|습니다)/.test(text)
     || /(딱히|특정).{0,16}(없|정하지|생각한 곳)/.test(text)
@@ -489,7 +531,10 @@ export function summarizeFacts(state: CampfitV3ConversationState): readonly stri
     childEnglishLevel: "아이 영어 수준",
     experienceGoals: "원하는 경험",
     preferredRegions: "희망 지역",
+    excludedRegions: "제외 지역",
     koreanSupportNeed: "한국어 지원",
+    programCommuteNeed: "프로그램 이동 조건",
+    programMealNeed: "식사·도시락 조건",
     parentCommunicationNeed: "부모 연락",
     parentStayGoals: "부모 체류 목적",
     specialCareFollowUp: "별도 확인 사항",

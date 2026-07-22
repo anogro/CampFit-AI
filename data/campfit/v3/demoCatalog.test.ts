@@ -30,6 +30,7 @@ describe("CampFit v3 Demo Catalog", () => {
     expect(catalog.cities).toHaveLength(37)
     expect(catalog.programs).toHaveLength(148)
     expect(catalog.programs.every((program) => program.sessionWindows.length > 0)).toBe(true)
+    expect(catalog.cities.every((city) => city.imageUrl !== null)).toBe(true)
     expect(catalog.programs.every((program) => program.priceOptions.some((option) => option.adultCount === 1 && option.childCount === 1 && option.durationWeeks === 4))).toBe(true)
     expect(catalog.programs.some((program) => program.priceOptions.some((option) => option.accommodationType === "Studio"))).toBe(true)
     const familyPriceVariants = catalog.programs[0]?.priceOptions.filter((option) => option.adultCount === 1 && option.childCount === 1 && option.durationWeeks === 4 && option.priceValue !== null)

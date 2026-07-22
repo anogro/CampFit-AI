@@ -1,5 +1,7 @@
 import "server-only"
 
+import { demoCityDefinitions } from "@/data/campfit/v3/demoCatalog"
+
 import {
   extractSessionWindowsFromText,
   inferDirectionSignals,
@@ -127,6 +129,10 @@ export type V3CatalogProgram = {
   readonly koreanManager: boolean | null
   readonly koreanDailySupport: boolean | null
   readonly koreanEmergencySupport: boolean | null
+  /** Optional commute evidence; absent means the catalog cannot verify school travel. */
+  readonly commuteMinutes?: number | null
+  readonly commuteTransferCount?: number | null
+  readonly shuttleAvailable?: boolean | null
   readonly emergencySupport: boolean | null
   readonly beginnerClass: boolean | null
   readonly earlyAdaptationSupport: boolean | null
@@ -254,7 +260,16 @@ export async function loadDemoCatalogFromSupabase(): Promise<V3Catalog> {
   const cityRows = optionalRows(cityResult, "Cities", warnings)
   const today = new Date().toISOString().slice(0, 10)
   const programs = mapDemoPrograms(rowsFrom(programResult.data), today)
-  const cities = cityRows.flatMap((row) => mapCity(row, "demo"))
+  const cities = cityRows.flatMap((row) => mapCity(row, "demo")).map((city) => {
+    const demoDef = demoCityDefinitions.find((d) => d.name.toLowerCase() === city.name.toLowerCase())
+    if (!demoDef) return city
+    return {
+      ...city,
+      flightCostKrw: city.flightCostKrw ?? demoDef.flightCostKrw,
+      livingCostMonthlyKrw: city.livingCostMonthlyKrw ?? demoDef.livingCostMonthlyKrw,
+      housingCostMonthlyKrw: city.housingCostMonthlyKrw ?? demoDef.housingCostMonthlyKrw,
+    }
+  })
   if (!cities.length) warnings.push("도시 카탈로그를 확인할 수 없어 프로그램 후보를 표시하지 않습니다.")
   return { programs, cities, source: "demo", warnings }
 }
@@ -357,6 +372,9 @@ function mapProductionProgram(input: {
     koreanManager: koreanSignals.daily ?? readBoolean(input.profile, ["korean_manager"]) ?? null,
     koreanDailySupport: koreanSignals.daily,
     koreanEmergencySupport: koreanSignals.emergency,
+    commuteMinutes: positiveNumber(readNumber(input.profile, ["commute_minutes", "estimated_commute_minutes", "travel_time_minutes"]) ?? readNumber(input.row, ["commute_minutes", "estimated_commute_minutes", "travel_time_minutes"])) ?? null,
+    commuteTransferCount: nonnegativeNumber(readNumber(input.profile, ["commute_transfer_count", "transfer_count", "transfers"]) ?? readNumber(input.row, ["commute_transfer_count", "transfer_count", "transfers"])) ?? null,
+    shuttleAvailable: readBoolean(input.profile, ["shuttle_available", "school_shuttle", "program_shuttle"]) ?? readBoolean(input.row, ["shuttle_available", "school_shuttle", "program_shuttle"]) ?? null,
     emergencySupport: readBoolean(input.row, ["emergency_support"]) ?? null,
     beginnerClass: readBoolean(input.profile, ["beginner_class"]) ?? null,
     earlyAdaptationSupport: readBoolean(input.profile, ["early_adaptation_support"]) ?? null,
@@ -815,9 +833,12 @@ function readNumber(row: Row | undefined, keys: readonly string[]): number | und
   for (const key of keys) {
     const value = row[key]
     if (typeof value === "number" && Number.isFinite(value)) return value
-    if (typeof value === "string" && /^\s*-?[\d,.]+\s*$/.test(value)) {
-      const parsed = Number(value.replace(/,/g, ""))
-      if (Number.isFinite(parsed)) return parsed
+    if (typeof value === "string") {
+      const cleaned = value.replace(/KRW|krw|[\s,]/g, "")
+      if (/^-?[\d.]+(?:e-?\d+)?$/.test(cleaned)) {
+        const parsed = Number(cleaned)
+        if (Number.isFinite(parsed)) return parsed
+      }
     }
   }
   return undefined
@@ -825,6 +846,10 @@ function readNumber(row: Row | undefined, keys: readonly string[]): number | und
 
 function positiveNumber(value: number | null | undefined): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined
+}
+
+function nonnegativeNumber(value: number | null | undefined): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined
 }
 
 function readBoolean(row: Row | undefined, keys: readonly string[]): boolean | undefined {
