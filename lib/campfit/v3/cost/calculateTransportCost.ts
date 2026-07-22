@@ -52,5 +52,5 @@ export function calculateTransportCost(input: {
       sourceAmounts: [amount],
     }
   }
-  return emptyLine("inquiry", ["확인 필요: 도시별 일상 이동비·공항 이동비 estimate가 없습니다."])
+  return emptyLine("inquiry", [])
 }

@@ -61,7 +61,7 @@ function otherCosts(): TripCostLine & { readonly items: readonly string[] } {
     selectedVariant: null,
     travelerCount: null,
     includedItems: [],
-    notes: ["확인 필요: 보험·비자·현지 필수 행정비는 상품과 가족 상황에 따라 달라집니다."],
+    notes: [],
     sourceAmounts: [],
     items: ["보험·비자", "현지 필수 행정비", "추가 옵션 비용"],
   }
