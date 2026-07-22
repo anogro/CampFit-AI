@@ -122,6 +122,10 @@ export class UpstageCampfitV3ProviderCore implements CampfitV3LLMProvider {
     const model = process.env["UPSTAGE_MODEL"]?.trim()
     if (!apiKey || !model) return unavailableResult()
     const baseUrl = process.env["UPSTAGE_BASE_URL"]?.trim() || DEFAULT_UPSTAGE_BASE_URL
+
+    const started = Date.now()
+    console.log(`🚀 [Upstage API] Sending request to Solar model: "${model}"`)
+
     const transport = await requestProviderJson({
       endpoint: `${baseUrl.replace(/\/+$/u, "")}/chat/completions`,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -130,6 +134,14 @@ export class UpstageCampfitV3ProviderCore implements CampfitV3LLMProvider {
     })
     const extracted = transport.code === "ok" ? extractChatResponseText(transport.body) : { text: null, envelopeValid: true }
     const code = transport.code !== "ok" ? transport.code : !extracted.envelopeValid ? "json_parse_failed" : extracted.text === null ? "empty_response" : "ok"
+
+    const elapsed = Date.now() - started
+    if (code === "ok") {
+      console.log(`✅ [Upstage API] Solar response successfully received and parsed. (Elapsed: ${elapsed}ms)`)
+    } else {
+      console.warn(`⚠️ [Upstage API] Response failed with code: "${code}". Status: ${transport.httpStatus} (Elapsed: ${elapsed}ms)`)
+    }
+
     return { ...transport, text: extracted.text, code }
   }
 }
