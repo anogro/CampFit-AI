@@ -129,14 +129,30 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
       <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden py-3 lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-4 lg:py-5">
         <details className="apple-glass-soft group shrink-0 rounded-2xl lg:hidden">
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-4 py-2 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-[var(--focus-ring)] [&::-webkit-details-marker]:hidden">
-            <AiAvatar className="h-10 w-10" />
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-3 text-xs font-bold">
-                <span className="truncate">CampFit AI · 추천 조건 정리 중</span>
-                <span className="tabular-nums text-[var(--accent-primary)]">{progressLabel}</span>
+            <AiAvatar className="h-10 w-10 shrink-0" />
+            {conversation.readyForRecommendation ? (
+              <div className="min-w-0 flex-1 pr-2">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    e.preventDefault()
+                    void onResult()
+                  }}
+                  className="w-full min-h-9 py-1 px-3 text-xs font-black rounded-full bg-[var(--accent-primary)] text-white hover:opacity-90 active:scale-[0.98] transition-all"
+                >
+                  지금 결과 보기 →
+                </button>
               </div>
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${conversation.progress}%` }} /></div>
-            </div>
+            ) : (
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3 text-xs font-bold">
+                  <span className="truncate">CampFit AI · 추천 조건 정리 중</span>
+                  <span className="tabular-nums text-[var(--accent-primary)]">{progressLabel}</span>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${conversation.progress}%` }} /></div>
+              </div>
+            )}
             <span className="text-sm text-[var(--text-tertiary)] transition-transform group-open:rotate-180" aria-hidden>⌄</span>
           </summary>
           <div className="border-t border-[var(--border-default)] px-4 py-3">
