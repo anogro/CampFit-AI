@@ -416,6 +416,7 @@ function mapDemoPrograms(rows: readonly Row[], today: string): readonly V3Catalo
     let payload: Record<string, any> = {}
     try {
       const rawPayload = row["detail_payload"]
+      console.log("DEBUG: rawRow name:", row["name"] || row["title"], "rawPayload exists:", !!rawPayload, "type:", typeof rawPayload, "rawRow keys:", Object.keys(row))
       if (typeof rawPayload === "string") {
         payload = JSON.parse(rawPayload) as Record<string, any>
       } else if (rawPayload && typeof rawPayload === "object") {
