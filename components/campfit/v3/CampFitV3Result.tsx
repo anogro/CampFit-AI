@@ -436,7 +436,11 @@ function ProgramInlineCard({ program, index }: { readonly program: CampfitV3Prog
           <h5 className="mt-1 text-base font-black leading-6 [word-break:keep-all]">{program.name}</h5>
           <p className="mt-1 text-xs text-[var(--text-secondary)]">{program.ageLabel} · {program.durationLabel}</p>
         </div>
-        {program.imageUrl ? <img className="h-14 w-16 shrink-0 rounded-xl object-cover" src={program.imageUrl} alt="" /> : null}
+        {program.imageUrl ? (
+          <img className="h-14 w-16 shrink-0 rounded-xl object-cover" src={program.imageUrl} alt="" />
+        ) : (
+          <img className="h-14 w-16 shrink-0 rounded-xl object-cover opacity-80 bg-[var(--accent-soft)]" src="/campfit/campfit-guide-illustration.png" alt="" />
+        )}
       </div>
       <div className="mt-3">
         <p className="text-xs font-black text-[var(--text-primary)]">추천 이유</p>
