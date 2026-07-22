@@ -412,7 +412,37 @@ function mapDemoPrograms(rows: readonly Row[], today: string): readonly V3Catalo
     const city = readString(row, ["location_city", "city"])
     const country = readString(row, ["location_country", "country"])
     if (!id || !name || !city || !country) return []
-    return [mapProductionProgram({ row, profile: undefined, priceOptions: [], sessionRows: [], id, name, city, country, today, catalogSource: "demo" })]
+
+    let payload: Record<string, any> = {}
+    try {
+      const rawPayload = row["detail_payload"]
+      if (typeof rawPayload === "string") {
+        payload = JSON.parse(rawPayload) as Record<string, any>
+      } else if (rawPayload && typeof rawPayload === "object") {
+        payload = rawPayload as Record<string, any>
+      }
+    } catch (e) {
+      console.error("Failed to parse detail_payload for demo program", id, e)
+    }
+
+    const durations = Array.isArray(payload["durations"]) ? payload["durations"].join(", ") : ""
+
+    const mergedRow = {
+      ...row,
+      ...payload,
+      duration: durations || readString(row, ["duration"]) || "",
+      duration_options: durations || readString(row, ["duration_options"]) || "",
+    }
+
+    const demoProfile = {
+      ...payload,
+      beginner_class: payload["beginnerClass"],
+      early_adaptation_support: payload["earlyAdaptationSupport"],
+      daily_parent_report: payload["dailyParentReport"],
+      special_care_support: payload["specialCareSupport"],
+    }
+
+    return [mapProductionProgram({ row: mergedRow, profile: demoProfile, priceOptions: [], sessionRows: [], id, name, city, country, today, catalogSource: "demo" })]
   })
 }
 
