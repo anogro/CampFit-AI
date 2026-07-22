@@ -9,6 +9,12 @@ export type CampfitV3Question = {
   readonly quickReplies: readonly CampfitV3QuickReply[]
   readonly completedBy: readonly string[]
   readonly priority: number
+  /**
+   * Some facts are useful when a family volunteers them, but do not justify
+   * interrupting the recommendation conversation. They are handled as
+   * provider-confirmation items instead of planner questions.
+   */
+  readonly askInPlanner?: boolean
   readonly shouldAsk?: (state: CampfitV3ConversationState) => boolean
 }
 
@@ -29,6 +35,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
     quickReplies: questionReplies([["none", "없어요"], ["required", "있어요. 상담할 때 별도로 확인할게요"], ["unknown", "아직 잘 모르겠어요"]]),
     completedBy: ["specialCareFollowUp"],
     priority: 95,
+    askInPlanner: false,
   },
   {
     key: "korean_support_need",
@@ -45,6 +52,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
     quickReplies: questionReplies([["daily", "매일 간단히 공유받고 싶어요"], ["issue_only", "문제가 있을 때 바로 연락받고 싶어요"], ["occasional", "가끔 소식을 받으면 충분해요"], ["not_important", "중요하지 않아요"]]),
     completedBy: ["parentCommunicationNeed"],
     priority: 88,
+    askInPlanner: false,
   },
   {
     key: "primary_experience_goal",
@@ -100,20 +108,20 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
 
 export function selectNextQuestion(state: CampfitV3ConversationState, suggestedQuestionKey: string | null = null): CampfitV3Question | null {
   const current = getQuestion(state.currentQuestionKey)
-  if (current !== null && shouldAsk(current, state) && !isQuestionCompleted(current, state)) return current
+  if (current !== null && canPlan(current, state) && !isQuestionCompleted(current, state)) return current
   const suggested = getQuestion(suggestedQuestionKey)
-  if (suggested !== null && shouldAsk(suggested, state) && !isQuestionCompleted(suggested, state)) return suggested
+  if (suggested !== null && canPlan(suggested, state) && !isQuestionCompleted(suggested, state)) return suggested
   const asked = new Set(state.askedQuestionKeys)
   const retry = [...campfitV3QuestionBank]
     .sort((left, right) => questionValue(right, state) - questionValue(left, state))
-    .find((question) => asked.has(question.key) && shouldAsk(question, state) && !isQuestionCompleted(question, state))
+    .find((question) => asked.has(question.key) && canPlan(question, state) && !isQuestionCompleted(question, state))
   if (retry !== undefined) return retry
   if (state.questionCount >= 10) return null
   return [...campfitV3QuestionBank]
     .sort((left, right) => questionValue(right, state) - questionValue(left, state))
     .find((question) => {
       if (asked.has(question.key)) return false
-      if (!shouldAsk(question, state)) return false
+      if (!canPlan(question, state)) return false
       return !isQuestionCompleted(question, state)
     }) ?? null
 }
@@ -124,7 +132,7 @@ export function getQuestion(key: string | null): CampfitV3Question | null {
 
 export function allowedQuestionKeys(state: CampfitV3ConversationState): readonly string[] {
   return campfitV3QuestionBank
-    .filter((question) => shouldAsk(question, state) && !isQuestionCompleted(question, state))
+    .filter((question) => canPlan(question, state) && !isQuestionCompleted(question, state))
     .map((question) => question.key)
 }
 
@@ -145,4 +153,8 @@ function questionValue(question: CampfitV3Question, state: CampfitV3Conversation
 
 function shouldAsk(question: CampfitV3Question, state: CampfitV3ConversationState): boolean {
   return question.shouldAsk === undefined || question.shouldAsk(state)
+}
+
+function canPlan(question: CampfitV3Question, state: CampfitV3ConversationState): boolean {
+  return question.askInPlanner !== false && shouldAsk(question, state)
 }

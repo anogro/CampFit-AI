@@ -99,8 +99,7 @@ export function buildRecommendation(input: {
   const sortedEligiblePrograms = eligiblePrograms.sort(comparePrograms)
   // City and program recommendations are independent lists. A strong program
   // in a city outside the city Top3 must still be eligible for the program Top3.
-  const programCandidates = sortedEligiblePrograms
-    .slice(0, 3)
+  const programCandidates = selectDiverseProgramCandidates(sortedEligiblePrograms, 3)
     .map((item) => toProgramCandidate(item, input.basicInfo))
   const limitedResult = missingRequired.length > 0
     || destinations.length < 3
@@ -589,7 +588,22 @@ function scoreDestinations(
     reason: cityReason(item.city, preferred.includes(item.city.regionGroup), priorities),
     verify: cityVerify(item.city, stayGoals),
     costEstimate: estimateCityCost(item.city, programs.find((program) => cityKey(program.program.city, program.program.country) === cityKey(item.city.name, item.city.country))?.program ?? null, basicInfo),
+    cityStayFlightCostKrw: cityStayFlightCost(item.city, basicInfo),
+    cityStayMonthlyCostKrw: cityStayMonthlyCost(item.city, basicInfo),
   }))
+}
+
+function cityStayFlightCost(city: V3CatalogCity, basicInfo: CampfitV3BasicInfo): number | null {
+  return city.flightCostKrw === null ? null : city.flightCostKrw * (basicInfo.adultCount + basicInfo.childCount)
+}
+
+function cityStayMonthlyCost(city: V3CatalogCity, basicInfo: CampfitV3BasicInfo): number | null {
+  const parts = [
+    cityStayFlightCost(city, basicInfo),
+    city.livingCostMonthlyKrw,
+    city.housingCostMonthlyKrw,
+  ]
+  return parts.every((value): value is number => value !== null) ? parts.reduce((sum, value) => sum + value, 0) : null
 }
 
 function toProgramCandidate(item: ScoredProgram, basicInfo: CampfitV3BasicInfo): CampfitV3ProgramCandidate {
@@ -708,8 +722,8 @@ function supportConditions(state: CampfitV3ConversationState): readonly string[]
 function requiredFactLabels(state: CampfitV3ConversationState): readonly string[] {
   const pairs = [
     ["childEnglishLevel", "아이 영어 수준 확인"], ["experienceGoals", "주요 경험 목표 확인"], ["preferredRegions", "희망 지역 확인"],
-    ["regionImportance", "지역 중요도 확인"], ["koreanSupportNeed", "한국어 지원 수준 확인"], ["parentCommunicationNeed", "부모 연락 기준 확인"],
-    ["parentStayGoals", "부모 체류 목적 확인"], ["specialCareFollowUp", "특별관리 후속 확인 여부"],
+    ["regionImportance", "지역 중요도 확인"], ["koreanSupportNeed", "한국어 지원 수준 확인"],
+    ["parentStayGoals", "부모 체류 목적 확인"],
   ] as const
   return pairs.filter(([key]) => state.facts[key] === undefined).map(([, label]) => label)
 }
@@ -746,6 +760,24 @@ function englishReadiness(state: CampfitV3ConversationState): number {
 
 function strengthScore(value: ExperienceGoalStrength): number {
   return value === "primary" ? 100 : value === "secondary" ? 72 : value === "mentioned" ? 42 : 20
+}
+
+function selectDiverseProgramCandidates(programs: readonly ScoredProgram[], limit: number): readonly ScoredProgram[] {
+  const selected: ScoredProgram[] = []
+  const selectedCities = new Set<string>()
+  for (const item of programs) {
+    const key = cityKey(item.program.city, item.program.country)
+    if (selectedCities.has(key)) continue
+    selected.push(item)
+    selectedCities.add(key)
+    if (selected.length >= limit) return selected
+  }
+  for (const item of programs) {
+    if (selected.some((selectedItem) => selectedItem.program.id === item.program.id)) continue
+    selected.push(item)
+    if (selected.length >= limit) break
+  }
+  return selected
 }
 
 function formatFit(direction: ExperienceDirectionKey, readiness: number): number {

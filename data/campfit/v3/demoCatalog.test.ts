@@ -3,15 +3,14 @@ import { demoCityDefinitions, demoProgramDefinitions } from "@/data/campfit/v3/d
 import { loadDemoCatalog } from "@/lib/campfit/v3/demoCatalog"
 
 describe("CampFit v3 Demo Catalog", () => {
-  it("contains varied city profiles and 24-36 product-level programs", () => {
-    expect(demoCityDefinitions).toHaveLength(8)
-    expect(demoProgramDefinitions.length).toBeGreaterThanOrEqual(24)
-    expect(demoProgramDefinitions.length).toBeLessThanOrEqual(36)
+  it("contains the production city profile set and four varied demo programs per city", () => {
+    expect(demoCityDefinitions).toHaveLength(37)
+    expect(demoProgramDefinitions).toHaveLength(148)
     expect(new Set(demoCityDefinitions.map((city) => city.profile.costLevel)).size).toBeGreaterThan(1)
     expect(new Set(demoCityDefinitions.map((city) => city.profile.medicalLevel)).size).toBeGreaterThan(1)
     expect(new Set(demoCityDefinitions.map((city) => city.profile.stemStrength)).size).toBeGreaterThan(1)
     expect(new Set(demoCityDefinitions.map((city) => city.profile.natureStrength)).size).toBeGreaterThan(1)
-    expect(new Set(demoProgramDefinitions.map((program) => program.city)).size).toBe(8)
+    expect(new Set(demoProgramDefinitions.map((program) => program.city)).size).toBe(37)
     expect(demoCityDefinitions.every((city) => demoProgramDefinitions.filter((program) => program.city === city.name).length >= 4)).toBe(true)
   })
 
@@ -25,11 +24,11 @@ describe("CampFit v3 Demo Catalog", () => {
     expect(new Set(demoProgramDefinitions.map((program) => program.priceQuality))).toEqual(new Set(["exact", "official_surcharge", "reference", "inquiry"]))
   })
 
-  it("maps the catalog into 32 scheduled products with family price variants", () => {
+  it("maps the catalog into 148 scheduled products with family price variants", () => {
     const catalog = loadDemoCatalog(2026)
     expect(catalog.source).toBe("demo")
-    expect(catalog.cities).toHaveLength(8)
-    expect(catalog.programs).toHaveLength(32)
+    expect(catalog.cities).toHaveLength(37)
+    expect(catalog.programs).toHaveLength(148)
     expect(catalog.programs.every((program) => program.sessionWindows.length > 0)).toBe(true)
     expect(catalog.programs.every((program) => program.priceOptions.some((option) => option.adultCount === 1 && option.childCount === 1 && option.durationWeeks === 4))).toBe(true)
     expect(catalog.programs.some((program) => program.priceOptions.some((option) => option.accommodationType === "Studio"))).toBe(true)

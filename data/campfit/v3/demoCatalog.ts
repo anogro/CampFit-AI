@@ -1,7 +1,7 @@
 import type { ExperienceDirectionKey } from "@/types/campfitV3"
 import type { Camp } from "@/types/campfit"
 
-export const CAMPFIT_V3_DEMO_CATALOG_VERSION = "campfit-v3-demo-2"
+export const CAMPFIT_V3_DEMO_CATALOG_VERSION = "campfit-v3-demo-3"
 
 export type DemoPriceQuality = "exact" | "official_surcharge" | "reference" | "inquiry"
 export type DemoParentMode = "family" | "day" | "child_only"
@@ -43,6 +43,8 @@ export type DemoCityDefinition = {
 
 export type DemoProgramDefinition = {
   readonly id: string
+  /** Optional real ANOGRO program slug. Leave null for synthetic demo-only programs. */
+  readonly anogroSlug?: string | null
   readonly name: string
   readonly city: string
   readonly country: string
@@ -69,7 +71,7 @@ export type DemoProgramDefinition = {
   readonly tradeoffs: readonly string[]
 }
 
-export const demoCityDefinitions: readonly DemoCityDefinition[] = [
+const coreDemoCityDefinitions: readonly DemoCityDefinition[] = [
   {
     id: "demo-city-chiang-mai",
     name: "Chiang Mai",
@@ -184,6 +186,115 @@ export const demoCityDefinitions: readonly DemoCityDefinition[] = [
   },
 ]
 
+type AdditionalCitySeed = {
+  readonly id: string
+  readonly name: string
+  readonly country: string
+  readonly costLevel: DemoCityDefinition["profile"]["costLevel"]
+  readonly livingEnvironment: DemoCityDefinition["profile"]["livingEnvironment"]
+  readonly medicalLevel: DemoCityDefinition["profile"]["medicalLevel"]
+  readonly safetyLevel: DemoCityDefinition["profile"]["safetyLevel"]
+  readonly englishEnvironment: DemoCityDefinition["profile"]["englishEnvironment"]
+  readonly stemStrength: DemoCityDefinition["profile"]["stemStrength"]
+  readonly natureStrength: DemoCityDefinition["profile"]["natureStrength"]
+  readonly internationality: DemoCityDefinition["profile"]["internationality"]
+  readonly flightCostKrw: number
+  readonly livingCostMonthlyKrw: number
+  readonly housingCostMonthlyKrw: number
+  readonly strengths: readonly string[]
+}
+
+type AdditionalCitySeedValue = readonly [
+  string,
+  string,
+  AdditionalCitySeed["costLevel"],
+  AdditionalCitySeed["livingEnvironment"],
+  AdditionalCitySeed["medicalLevel"],
+  AdditionalCitySeed["safetyLevel"],
+  AdditionalCitySeed["englishEnvironment"],
+  AdditionalCitySeed["stemStrength"],
+  AdditionalCitySeed["natureStrength"],
+  AdditionalCitySeed["internationality"],
+  number,
+  number,
+  number,
+  readonly string[],
+]
+
+const additionalCitySeedValues: readonly AdditionalCitySeedValue[] = [
+  ["Los Angeles", "USA", "high", "urban", "high", "medium", "high", "high", "medium", "high", 1_400_000, 2_100_000, 3_600_000, ["다문화 커뮤니티", "예술·기술 인프라", "해변과 도심 활동"]],
+  ["London", "UK", "high", "urban", "high", "high", "high", "medium", "medium", "high", 1_600_000, 2_000_000, 4_100_000, ["박물관·공원·공연", "다문화 생활권", "영어권 교육환경"]],
+  ["Barcelona", "Spain", "medium", "balanced", "high", "medium", "medium", "medium", "high", "high", 1_500_000, 1_400_000, 2_200_000, ["예술·해변 활동", "야외 체험", "국제학교 선택지"]],
+  ["Lisbon", "Portugal", "medium", "balanced", "high", "high", "medium", "medium", "high", "medium", 1_600_000, 1_300_000, 1_900_000, ["온화한 기후", "여유로운 생활", "대서양 자연환경"]],
+  ["Taipei", "Taiwan", "medium", "urban", "high", "high", "medium", "high", "medium", "high", 450_000, 1_300_000, 1_200_000, ["의료·교통 접근성", "안전한 생활환경", "도시와 자연의 근접성"]],
+  ["Paris", "France", "high", "urban", "high", "medium", "medium", "medium", "medium", "high", 1_500_000, 1_800_000, 2_500_000, ["예술·문화 체험", "국제적 생활환경", "박물관·공원 접근성"]],
+  ["Berlin", "Germany", "medium", "urban", "high", "high", "high", "medium", "medium", "high", 1_500_000, 1_600_000, 2_200_000, ["창작·프로젝트 문화", "대안교육 선택지", "공원과 박물관"]],
+  ["Nice", "France", "high", "balanced", "high", "high", "medium", "medium", "high", "medium", 1_600_000, 1_600_000, 1_700_000, ["해변과 온화한 기후", "차분한 생활", "예술·자연 활동"]],
+  ["Osaka", "Japan", "medium", "urban", "high", "high", "high", "medium", "medium", "medium", 350_000, 1_200_000, 1_100_000, ["한국과 가까운 생활권", "안정적인 치안", "도시·문화 체험"]],
+  ["Seattle", "USA", "high", "balanced", "high", "high", "high", "high", "high", "high", 1_300_000, 2_300_000, 3_300_000, ["기술·STEM 환경", "자연과 도시의 균형", "영어권 생활"]],
+  ["Valencia", "Spain", "medium", "balanced", "high", "high", "medium", "medium", "high", "medium", 1_500_000, 1_300_000, 1_600_000, ["해변·공원 활동", "온화한 기후", "차분한 가족 생활"]],
+  ["Copenhagen", "Denmark", "high", "balanced", "high", "high", "high", "high", "high", "high", 1_700_000, 2_000_000, 2_600_000, ["안전한 생활환경", "자전거·자연 활동", "아동 친화적 도시"]],
+  ["Saipan", "USA", "medium", "quiet", "medium", "high", "medium", "medium", "high", "medium", 800_000, 1_400_000, 1_800_000, ["해양·자연 체험", "작은 생활권", "영어 활동"]],
+  ["Guam", "USA", "high", "balanced", "high", "high", "medium", "high", "high", "high", 900_000, 1_700_000, 2_300_000, ["해양·야외 활동", "영어권 환경", "의료·생활 편의"]],
+  ["Honolulu", "USA", "high", "balanced", "high", "high", "medium", "high", "high", "high", 900_000, 1_800_000, 2_600_000, ["해양·자연 활동", "다문화 생활권", "영어권 환경"]],
+  ["Johor Bahru", "Malaysia", "medium", "balanced", "high", "high", "medium", "high", "medium", "high", 600_000, 1_200_000, 1_300_000, ["국제학교 접근성", "싱가포르 연계", "비용 균형"]],
+  ["Cape Town", "South Africa", "medium", "balanced", "medium", "medium", "medium", "high", "high", "high", 1_300_000, 1_100_000, 1_600_000, ["자연·해양 활동", "영어권 환경", "다양한 야외 체험"]],
+  ["Amsterdam", "Netherlands", "high", "urban", "high", "high", "high", "high", "medium", "high", 1_700_000, 1_900_000, 2_400_000, ["자전거·박물관 문화", "다문화 환경", "프로젝트형 교육"]],
+  ["Vancouver", "Canada", "high", "balanced", "high", "high", "high", "high", "high", "high", 1_300_000, 2_000_000, 2_700_000, ["다문화·영어 환경", "자연·야외 활동", "STEM·교육 인프라"]],
+  ["Melbourne", "Australia", "high", "urban", "high", "high", "high", "high", "medium", "high", 1_000_000, 1_900_000, 2_500_000, ["예술·스포츠 활동", "영어권 학교환경", "다문화 생활권"]],
+  ["San Diego", "USA", "high", "balanced", "high", "high", "high", "high", "high", "high", 1_300_000, 2_000_000, 3_000_000, ["해변·자연 활동", "영어권 환경", "온화한 기후"]],
+  ["Tokyo", "Japan", "high", "urban", "high", "high", "high", "high", "medium", "high", 350_000, 1_500_000, 2_000_000, ["안전·교통 인프라", "문화·기술 체험", "다양한 교육 선택지"]],
+  ["Munich", "Germany", "high", "balanced", "high", "high", "high", "high", "high", "high", 1_500_000, 1_800_000, 2_300_000, ["안정적인 생활", "과학·기술 환경", "호수·공원 활동"]],
+  ["Brisbane", "Australia", "high", "balanced", "high", "high", "high", "high", "high", "high", 1_000_000, 1_700_000, 2_300_000, ["자연·야외 활동", "영어권 환경", "온화한 기후"]],
+  ["Dublin", "Ireland", "high", "urban", "high", "high", "medium", "high", "medium", "high", 1_600_000, 1_800_000, 2_500_000, ["영어권 교육", "친근한 생활환경", "문화·공원 활동"]],
+  ["Calgary", "Canada", "high", "balanced", "high", "high", "high", "high", "high", "high", 1_300_000, 1_700_000, 2_200_000, ["자연·스포츠 활동", "안정적인 생활", "영어권 환경"]],
+  ["Christchurch", "New Zealand", "medium", "quiet", "high", "high", "high", "high", "high", "high", 1_200_000, 1_500_000, 1_900_000, ["자연·야외 활동", "차분한 가족 생활", "영어권 환경"]],
+  ["Sydney", "Australia", "high", "urban", "high", "high", "high", "high", "high", "high", 1_000_000, 2_000_000, 2_900_000, ["해변·문화 활동", "영어권 환경", "교육·의료 접근성"]],
+  ["Toronto", "Canada", "high", "urban", "high", "high", "high", "high", "medium", "high", 1_300_000, 1_900_000, 2_600_000, ["다문화 커뮤니티", "영어권 교육", "도시·자연 균형"]],
+]
+
+const additionalCitySeeds: readonly AdditionalCitySeed[] = additionalCitySeedValues.map(([name, country, costLevel, livingEnvironment, medicalLevel, safetyLevel, englishEnvironment, stemStrength, natureStrength, internationality, flightCostKrw, livingCostMonthlyKrw, housingCostMonthlyKrw, strengths]) => ({
+  id: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+  name,
+  country,
+  costLevel,
+  livingEnvironment,
+  medicalLevel,
+  safetyLevel,
+  englishEnvironment,
+  stemStrength,
+  natureStrength,
+  internationality,
+  flightCostKrw,
+  livingCostMonthlyKrw,
+  housingCostMonthlyKrw,
+  strengths,
+}))
+
+const additionalDemoCityDefinitions: readonly DemoCityDefinition[] = additionalCitySeeds.map((seed) => ({
+  id: `demo-city-${seed.id}`,
+  name: seed.name,
+  country: seed.country,
+  description: `${seed.name}의 생활환경과 가족 체류 조건을 비교하는 데모 도시 프로필입니다.`,
+  flightCostKrw: seed.flightCostKrw,
+  livingCostMonthlyKrw: seed.livingCostMonthlyKrw,
+  housingCostMonthlyKrw: seed.housingCostMonthlyKrw,
+  parentStayEvidence: `${seed.name} ${seed.strengths.join(" ")} remote work family stay medical hospital safety international community english environment culture tourism nature park weekend activities`,
+  profile: {
+    costLevel: seed.costLevel,
+    livingEnvironment: seed.livingEnvironment,
+    medicalLevel: seed.medicalLevel,
+    safetyLevel: seed.safetyLevel,
+    englishEnvironment: seed.englishEnvironment,
+    stemStrength: seed.stemStrength,
+    natureStrength: seed.natureStrength,
+    internationality: seed.internationality,
+    strengths: seed.strengths,
+  },
+}))
+
+export const demoCityDefinitions: readonly DemoCityDefinition[] = [...coreDemoCityDefinitions, ...additionalDemoCityDefinitions]
+
 const cityCountry: Readonly<Record<string, string>> = Object.fromEntries(demoCityDefinitions.map((city) => [city.name, city.country]))
 
 function demoProgram(input: Omit<DemoProgramDefinition, "country">): DemoProgramDefinition {
@@ -247,7 +358,7 @@ const childOnlyDefaults = {
   },
 }
 
-export const demoProgramDefinitions: readonly DemoProgramDefinition[] = [
+const coreDemoProgramDefinitions: readonly DemoProgramDefinition[] = [
   demoProgram({ id: "demo-cm-family-english", name: "Chiang Mai Family English & Nature", city: "Chiang Mai", programType: "family_esl", category: "english", ageMin: 6, ageMax: 12, durations: [2, 3, 4], seasons: ["summer", "year_round"], ...familyDefaults, primaryDirection: "englishIntensive", secondaryDirections: ["cultureActivity"], priceBaseKrw: 2_100_000, priceQuality: "exact", traits: ["영어", "자연", "가족캠프"], strengths: ["초급자도 참여하기 쉬운 영어 활동", "자연·문화 일정과 가족 체류의 균형"], tradeoffs: ["영어 몰입 강도는 전문 기숙형보다 낮을 수 있음"] }),
   demoProgram({ id: "demo-cm-maker-lab", name: "Chiang Mai Maker & Science Lab", city: "Chiang Mai", programType: "creative_daycamp", category: "stem", ageMin: 7, ageMax: 13, durations: [2, 3, 4], seasons: ["summer", "year_round"], ...dayDefaults, accommodations: ["Studio", "1BR", "Residence", "숙소미포함"], primaryDirection: "subjectProject", secondaryDirections: ["englishIntensive"], priceBaseKrw: 3_100_000, priceQuality: "official_surcharge", traits: ["STEM", "maker", "프로젝트"], strengths: ["만들기와 과학 실험 결과물이 분명함", "부모가 같은 도시에 머물며 일정 조정 가능"], tradeoffs: ["프로그램 외 숙소·이동을 별도로 확인해야 함"] }),
   demoProgram({ id: "demo-cm-school-break", name: "Chiang Mai International School Break", city: "Chiang Mai", programType: "schooling", category: "schooling", ageMin: 8, ageMax: 14, durations: [2, 3, 4], seasons: ["summer", "winter"], ...familyDefaults, accommodations: ["1BR", "2BR", "Hotel"], primaryDirection: "schoolSchooling", secondaryDirections: ["englishIntensive"], priceBaseKrw: 3_500_000, priceQuality: "reference", traits: ["국제학교", "학교 경험", "영어"], strengths: ["학교형 루틴과 또래 교류", "비교적 차분한 생활환경"], tradeoffs: ["정확한 학교 일정과 학년 배정을 확인해야 함"] }),
@@ -288,3 +399,34 @@ export const demoProgramDefinitions: readonly DemoProgramDefinition[] = [
   demoProgram({ id: "demo-dubai-sports-explorer", name: "Dubai English Sports Explorer", city: "Dubai", programType: "activity", category: "sports", ageMin: 6, ageMax: 12, durations: [1, 2, 3, 4], seasons: ["summer", "year_round"], ...familyDefaults, accommodations: ["Studio", "1BR", "Hotel"], primaryDirection: "englishIntensive", secondaryDirections: ["cultureActivity"], priceBaseKrw: 5_800_000, priceQuality: "reference", traits: ["스포츠", "영어", "도시 활동"], strengths: ["영어·스포츠·도시 활동을 짧게 경험", "실내 활동 선택 폭"], tradeoffs: ["야외활동과 기후 조건 확인 필요"] }),
   demoProgram({ id: "demo-dubai-young-leaders", name: "Dubai Young Leaders Residential", city: "Dubai", programType: "international_camp", category: "project", ageMin: 10, ageMax: 16, durations: [2, 3, 4, 6, 8], seasons: ["summer", "year_round"], ...childOnlyDefaults, primaryDirection: "englishIntensive", secondaryDirections: ["subjectProject"], priceBaseKrw: 8_200_000, priceQuality: "inquiry", traits: ["기숙형", "리더십", "국제학생"], strengths: ["국제 학생 리더십과 영어 몰입", "2~8주 장기 옵션"], tradeoffs: ["부모 동반형 숙소가 아니며 높은 비용을 확인해야 함"] }),
 ]
+
+const additionalDemoProgramDefinitions: readonly DemoProgramDefinition[] = additionalCitySeeds.flatMap((city) => {
+  const prefix = city.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+  const variants = [
+    { suffix: "family-english", label: "Family English & Culture", programType: "family_esl" as const, category: "english" as const, direction: "englishIntensive" as const, secondary: ["cultureActivity"] as const, defaults: familyDefaults, ageMin: 6, ageMax: 12, price: 3_900_000, traits: ["영어", "가족 체류", "문화"], strengths: ["가족이 함께 머물며 영어와 현지 문화를 경험합니다.", "부모 체류와 아이 프로그램을 함께 조정할 수 있습니다."] },
+    { suffix: "stem-lab", label: "STEM & Project Lab", programType: "creative_daycamp" as const, category: "stem" as const, direction: "subjectProject" as const, secondary: ["englishIntensive"] as const, defaults: dayDefaults, ageMin: 7, ageMax: 14, price: 4_600_000, traits: ["STEM", "프로젝트", "탐구"], strengths: ["과학·기술 주제의 프로젝트 결과물을 만들어 봅니다.", "부모 체류 중에도 낮 시간 프로그램으로 운영할 수 있습니다."] },
+    { suffix: "school-experience", label: "International School Experience", programType: "schooling" as const, category: "schooling" as const, direction: "schoolSchooling" as const, secondary: ["englishIntensive"] as const, defaults: familyDefaults, ageMin: 8, ageMax: 15, price: 5_200_000, traits: ["학교 경험", "영어", "또래 교류"], strengths: ["현지 학교형 루틴과 또래 교류를 경험합니다.", "도시의 교육환경과 가족 생활을 함께 비교할 수 있습니다."] },
+    { suffix: "outdoor-discovery", label: "Outdoor & Culture Discovery", programType: "activity" as const, category: "culture" as const, direction: "cultureActivity" as const, secondary: ["englishIntensive"] as const, defaults: dayDefaults, ageMin: 6, ageMax: 13, price: 3_700_000, traits: ["자연", "문화", "야외 활동"], strengths: ["주중·주말에 도시와 자연을 함께 탐색합니다.", "아이의 활동 선호에 따라 체험 일정을 조정할 수 있습니다."] },
+  ]
+  return variants.map((variant) => demoProgram({
+    id: `demo-${prefix}-${variant.suffix}`,
+    name: `${city.name} ${variant.label}`,
+    city: city.name,
+    programType: variant.programType,
+    category: variant.category,
+    ageMin: variant.ageMin,
+    ageMax: variant.ageMax,
+    durations: variant.suffix === "outdoor-discovery" ? [1, 2, 3, 4] : [2, 3, 4, 6],
+    seasons: ["summer", "year_round"],
+    ...variant.defaults,
+    primaryDirection: variant.direction,
+    secondaryDirections: variant.secondary,
+    priceBaseKrw: variant.price,
+    priceQuality: variant.suffix === "school-experience" ? "official_surcharge" : variant.suffix === "stem-lab" ? "reference" : "exact",
+    traits: variant.traits,
+    strengths: variant.strengths,
+    tradeoffs: ["데모 카탈로그 항목으로 실제 일정·가격·운영 여부는 ANOGRO 상세에서 확인이 필요합니다."],
+  }))
+})
+
+export const demoProgramDefinitions: readonly DemoProgramDefinition[] = [...coreDemoProgramDefinitions, ...additionalDemoProgramDefinitions]

@@ -180,12 +180,13 @@ export async function loadV3Catalog(): Promise<V3Catalog> {
   const client = createServerSupabaseClient()
   if (client === null) return unavailableCatalog("Supabase 연결 설정을 확인할 수 없습니다.")
 
-  const [programResult, priceResult, profileResult, cityResult, sessionResult] = await Promise.all([
+  const [programResult, priceResult, profileResult, cityResult, sessionResult, demoProgramResult] = await Promise.all([
     client.from("programs").select("*"),
     client.from("program_price_options").select("*"),
     client.from("campfit_program_profiles").select("*"),
     client.from("Cities").select("*"),
     client.from("program_sessions").select("*"),
+    client.from("campfit_demo_programs").select("*"),
   ])
 
   if (programResult.error) {
@@ -206,6 +207,7 @@ export async function loadV3Catalog(): Promise<V3Catalog> {
   const profileRows = optionalRows(profileResult, "campfit_program_profiles", warnings)
   const cityRows = optionalRows(cityResult, "Cities", warnings)
   const sessionRows = optionalRows(sessionResult, "program_sessions", warnings)
+  const demoProgramRows = optionalRows(demoProgramResult, "campfit_demo_programs", warnings)
   const activeProfiles = profileRows.filter((row) => readBoolean(row, ["active"]) === true)
   const profileById = new Map(activeProfiles.flatMap((row) => {
     const programId = readString(row, ["program_id"])
@@ -226,13 +228,35 @@ export async function loadV3Catalog(): Promise<V3Catalog> {
     const profile = profileById.get(id)
     const priceOptions = pricesById.get(id) ?? []
     const sessionRowsForProgram = sessionsById.get(id) ?? []
-    const mapped = mapProductionProgram({ row, profile, priceOptions, sessionRows: sessionRowsForProgram, id, name, city, country, today })
+    const mapped = mapProductionProgram({ row, profile, priceOptions, sessionRows: sessionRowsForProgram, id, name, city, country, today, catalogSource: "supabase" })
     return [mapped]
   })
+  const demoPrograms = mapDemoPrograms(demoProgramRows, today)
   const cities = cityRows.flatMap((row) => mapCity(row))
 
   if (!cities.length) warnings.push("도시 카탈로그를 확인할 수 없어 프로그램 후보를 표시하지 않습니다.")
-  return { programs, cities, source: "supabase", warnings }
+  return { programs: [...programs, ...demoPrograms], cities, source: "supabase", warnings }
+}
+
+/** Load the isolated demo table without ever mixing it into production mode. */
+export async function loadDemoCatalogFromSupabase(): Promise<V3Catalog> {
+  const client = createServerSupabaseClient()
+  if (client === null) return unavailableCatalog("Supabase 연결 설정을 확인할 수 없습니다.")
+  const [programResult, cityResult] = await Promise.all([
+    client.from("campfit_demo_programs").select("*"),
+    client.from("Cities").select("*"),
+  ])
+  if (programResult.error || !Array.isArray(programResult.data)) {
+    if (programResult.error) console.error("CampFit v3 demo programs read failed", programResult.error.message)
+    return unavailableCatalog("데모 프로그램 카탈로그를 불러오지 못했습니다.")
+  }
+  const warnings: string[] = []
+  const cityRows = optionalRows(cityResult, "Cities", warnings)
+  const today = new Date().toISOString().slice(0, 10)
+  const programs = mapDemoPrograms(rowsFrom(programResult.data), today)
+  const cities = cityRows.flatMap((row) => mapCity(row, "demo"))
+  if (!cities.length) warnings.push("도시 카탈로그를 확인할 수 없어 프로그램 후보를 표시하지 않습니다.")
+  return { programs, cities, source: "demo", warnings }
 }
 
 function mapProductionProgram(input: {
@@ -245,6 +269,7 @@ function mapProductionProgram(input: {
   readonly city: string
   readonly country: string
   readonly today: string
+  readonly catalogSource: "supabase" | "demo"
 }): V3CatalogProgram {
   const rowAgeMin = readNumber(input.row, ["age_min"])
   const rowAgeMax = readNumber(input.row, ["age_max"])
@@ -348,7 +373,7 @@ function mapProductionProgram(input: {
     sessionStatusNeedsConfirmation: sessionVariants.some((variant) => ["likely_available", "needs_inquiry", "unknown"].includes(variant.availabilityStatus)),
     imageUrl: readImage(input.row) ?? null,
     status: "active",
-    catalogSource: "supabase",
+    catalogSource: input.catalogSource,
     updatedAt: readString(input.row, ["last_verified_at", "updated_at"]) ?? null,
   }
 }
@@ -361,7 +386,19 @@ function isActivePublicProgram(row: Row, today: string): boolean {
   return isPublicV3ProgramRow(row, today)
 }
 
-function mapCity(row: Row): readonly V3CatalogCity[] {
+function mapDemoPrograms(rows: readonly Row[], today: string): readonly V3CatalogProgram[] {
+  return rows.flatMap((row): readonly V3CatalogProgram[] => {
+    if (!isActivePublicProgram(row, today)) return []
+    const id = readString(row, ["id"])
+    const name = readString(row, ["name", "title"])
+    const city = readString(row, ["location_city", "city"])
+    const country = readString(row, ["location_country", "country"])
+    if (!id || !name || !city || !country) return []
+    return [mapProductionProgram({ row, profile: undefined, priceOptions: [], sessionRows: [], id, name, city, country, today, catalogSource: "demo" })]
+  })
+}
+
+function mapCity(row: Row, catalogSource: "supabase" | "demo" = "supabase"): readonly V3CatalogCity[] {
   if (!isVisibleV3CityRow(row)) return []
   const id = readString(row, ["id"])
   const name = readString(row, ["City name", "name", "city_name", "title"])
@@ -394,7 +431,7 @@ function mapCity(row: Row): readonly V3CatalogCity[] {
     flightCostKrw: positiveNumber(readNumber(row, ["Flight Cost KRW"])) ?? null,
     livingCostMonthlyKrw: positiveNumber(readNumber(row, ["LivingCost KRW"])) ?? null,
     housingCostMonthlyKrw: positiveNumber(readNumber(row, ["HousingCost KRW"])) ?? null,
-    catalogSource: "supabase",
+    catalogSource,
     profile: {
       safetyLevel: readCitySignal(row, ["safety", "Safety", "safety_level", "Safety Level", "security", "Security"], profileEvidence, /safety|security|\uCE58\uC548|\uC548\uC804/iu),
       medicalLevel: readCitySignal(row, ["medical", "Medical", "medical_level", "Medical Level", "hospital", "Hospital", "healthcare", "Healthcare"], profileEvidence, /medical|hospital|healthcare|health|emergency|\uBCD1\uC6D0|\uC758\uB8CC|\uC751\uAE09/iu),

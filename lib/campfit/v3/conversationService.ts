@@ -137,7 +137,13 @@ export async function processConversationMessage(input: {
   const progress = ready ? 100 : Math.max(input.currentState.progress, calculatedProgress)
   state = { ...state, progress }
 
-  const targetUpdated = currentQuestion === null || state.completedQuestionKeys.includes(currentQuestion.key)
+  // A previously persisted optional/confirmation question may still be the
+  // current key after the planner policy changes. If the planner selected a
+  // different question, render that question instead of repeating the stale
+  // confirmation prompt.
+  const targetUpdated = currentQuestion === null
+    || state.currentQuestionKey !== currentQuestion.key
+    || state.completedQuestionKeys.includes(currentQuestion.key)
   const diagnostics = buildDiagnostics(input.quickReplyKey, model, providerDiagnostic, targetUpdated)
   const diagnosticWarning = warningForDiagnostics(diagnostics, targetUpdated, partialUnderstanding)
   if (diagnosticWarning !== null) warnings.push(diagnosticWarning)
@@ -394,8 +400,7 @@ function acknowledgement(
     : model.facts.some((fact) => fact.key === "specialCareFollowUp")
       ? "별도로 확인할 사항의 존재 여부만 반영했어요. 상세 내용은 프로그램 상담 단계에서 확인해 주세요."
       : cleanAcknowledgement(model.assistantMessage)
-  const previousAssistant = [...transcript].reverse().find((item) => item.role === "assistant")?.content
-  if (model !== null && previousAssistant !== undefined && normalizeMessage(candidate).includes(normalizeMessage(previousAssistant))) {
+  if (model !== null && transcript.some((item) => item.role === "assistant" && isNearDuplicate(candidate, item.content))) {
     return fallbackAcknowledgement(deterministicFacts, userMessage)
   }
   return dedupeMessage(candidate)
@@ -405,9 +410,13 @@ function fallbackAcknowledgement(facts: readonly CampfitV3Fact[], userMessage: s
   const parts: string[] = []
   const desiredOutcomes = stringArrayValue(facts.find((fact) => fact.key === "desiredOutcomes")?.value)
   const stayGoals = stringArrayValue(facts.find((fact) => fact.key === "parentStayGoals")?.value)
+  const worries = stringArrayValue(facts.find((fact) => fact.key === "worries")?.value)
   if (desiredOutcomes.includes("english_exposure")) parts.push("영어 환경 경험과 앞으로의 영어 노출 계획")
   if (/(보호자|엄마|아빠|부모).{0,20}(같이|동행|함께|머물|갈)/u.test(userMessage)) parts.push("보호자 동반")
   if (stayGoals.includes("remoteWork")) parts.push("현지 원격근무 계획")
+  if (worries.includes("medical_access")) parts.push("병원·의료 접근성")
+  if (worries.includes("city_safety")) parts.push("도시 안전")
+  if (worries.includes("foreign_friendliness")) parts.push("외국인 친화도")
   if (parts.length === 0 && facts.length > 0) return "말씀해주신 내용을 확인했어요."
   if (parts.length === 0) return "답변을 확인했어요."
   return `${joinKorean(parts)}을 확인했어요.`
@@ -429,6 +438,14 @@ function dedupeMessage(message: string): string {
 
 function normalizeMessage(message: string): string {
   return message.replace(/\s+/gu, " ").trim()
+}
+
+function isNearDuplicate(candidate: string, previous: string): boolean {
+  const candidateWords = normalizeMessage(candidate).split(" ").filter((word) => word.length >= 2)
+  const previousWords = new Set(normalizeMessage(previous).split(" ").filter((word) => word.length >= 2))
+  if (candidateWords.length < 5) return false
+  const shared = candidateWords.filter((word) => previousWords.has(word)).length
+  return shared >= 5 && shared / candidateWords.length >= 0.55
 }
 
 function stringArrayValue(value: unknown): readonly string[] {

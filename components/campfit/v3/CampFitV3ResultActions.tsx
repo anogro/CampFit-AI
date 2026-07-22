@@ -89,7 +89,7 @@ export function CampFitV3ResultActions({
   const actionBusy = exportBusy !== null || emailBusy
 
   return (
-    <section className="mt-8 border-t border-[var(--border-default)] pt-7" aria-labelledby="result-actions-title">
+    <section className="mt-8 border-t border-[var(--border-default)] pb-8 pt-7 sm:pb-12" aria-labelledby="result-actions-title">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-black tracking-[.12em] text-[var(--accent-primary)]">NEXT STEP</p>

@@ -195,7 +195,8 @@ export const CampfitV3RecommendationResultSchema = z.object({
   destinationRecommendations: z.array(z.object({
     cityId: z.string().min(1), cityName: z.string().min(1), countryName: z.string().min(1),
     role: z.enum(["가장 균형 잡힌 선택", "원래 희망을 가장 잘 살리는 선택", "비용·부모 체류 관점의 대안"]),
-    imageUrl: z.string().nullable(), reason: z.string(), verify: z.array(z.string()), costEstimate: CampfitV3CostEstimateSchema, tripCost: CampfitV3TripCostSchema.optional(),
+    imageUrl: z.string().nullable(), reason: z.string(), verify: z.array(z.string()), costEstimate: CampfitV3CostEstimateSchema,
+    cityStayFlightCostKrw: z.number().nonnegative().nullable(), cityStayMonthlyCostKrw: z.number().nonnegative().nullable(), tripCost: CampfitV3TripCostSchema.optional(),
   })).max(3),
   requiredSupportConditions: z.array(z.string()).max(30),
   programCandidates: z.array(z.object({

@@ -48,7 +48,7 @@ function mapDemoProgram(definition: (typeof demoProgramDefinitions)[number], yea
   const priceOptions = buildPriceOptions(definition.priceBaseKrw, definition.priceQuality, definition.durations, definition.accommodations)
   return {
     id: definition.id,
-    slug: null,
+    slug: definition.anogroSlug ?? null,
     name: definition.name,
     city: definition.city,
     country: definition.country,

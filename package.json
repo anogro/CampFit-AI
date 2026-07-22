@@ -12,7 +12,8 @@
     "campfit:v3:eval": "vite-node --config vitest.config.ts scripts/campfit/v3/counselingEvaluationCli.ts --mode=fallback",
     "campfit:v3:eval:fallback": "vite-node --config vitest.config.ts scripts/campfit/v3/counselingEvaluationCli.ts --mode=fallback",
     "campfit:v3:eval:mock": "vite-node --config vitest.config.ts scripts/campfit/v3/counselingEvaluationCli.ts --mode=mock",
-    "campfit:v3:eval:live": "vite-node --config vitest.config.ts scripts/campfit/v3/counselingEvaluationCli.ts --mode=live"
+    "campfit:v3:eval:live": "vite-node --config vitest.config.ts scripts/campfit/v3/counselingEvaluationCli.ts --mode=live",
+    "campfit:v3:seed:demo": "vite-node --config vitest.config.ts tools/seed-campfit-v3-demo-programs.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.50.0",

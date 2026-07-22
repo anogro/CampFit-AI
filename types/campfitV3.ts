@@ -177,6 +177,8 @@ export type CampfitV3DestinationRecommendation = {
   readonly reason: string
   readonly verify: readonly string[]
   readonly costEstimate: CampfitV3CostEstimate
+  readonly cityStayFlightCostKrw?: number | null
+  readonly cityStayMonthlyCostKrw?: number | null
   readonly tripCost?: CampfitV3TripCost | undefined
 }
 

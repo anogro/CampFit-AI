@@ -194,7 +194,7 @@ describe("CampFit v3 state and question engine", () => {
     const start = startConversation(basicInfo)
     const response = await processConversationMessage({ transcript: [], currentState: start.updatedState, basicInfo, userMessage: "아이 영어는 초급이에요", quickReplyKey: null, provider: nullProvider })
     expect(response.aiUsed).toBe(false)
-    expect(response.questionKey).toBe("special_care_follow_up")
+    expect(response.questionKey).toBe("korean_support_need")
     expect(response.updatedState.facts.childEnglishLevel?.value).toBe("beginner")
     expect(response.warnings).toContain("말씀해주신 내용을 기준으로 상담을 이어갈게요.")
     expect(response.warnings.join(" ")).not.toContain("같은 질문")
@@ -346,7 +346,7 @@ describe("CampFit v3 state and question engine", () => {
     expect(recovered.updatedState.facts.childEnglishLevel?.value).toBe("beginner")
     expect(recovered.updatedState.completedQuestionKeys).toContain("child_english_level")
     expect(recovered.updatedState.failedQuestionKeys).not.toContain("child_english_level")
-    expect(recovered.questionKey).toBe("special_care_follow_up")
+    expect(recovered.questionKey).toBe("korean_support_need")
   })
 
   it("applies conversational budget corrections to the returned basic info", async () => {
@@ -368,6 +368,19 @@ describe("CampFit v3 state and question engine", () => {
     const facts = extractDeterministicFacts("호주가 가장 좋지만 가족 전체 예산은 700만 원 정도라 다른 지역도 괜찮아요.", basicInfo)
     expect(facts.find((fact) => fact.key === "preferredRegions")?.value).toEqual(["oceania"])
     expect(facts.find((fact) => fact.key === "regionImportance")?.value).toBe("strong")
+  })
+
+  it("treats an explicit lack of a destination as no regional preference", () => {
+    const facts = extractDeterministicFacts("딱히 정해둔 도시는 없는데 안전이나 의료를 중요하게 생각해요.", basicInfo)
+    expect(facts.find((fact) => fact.key === "preferredRegions")?.value).toEqual([])
+    expect(facts.find((fact) => fact.key === "regionImportance")?.value).toBe("no_preference")
+  })
+
+  it("understands a no-region answer even when it starts with 상관없긴한데", () => {
+    const facts = extractDeterministicFacts("상관없긴한데 가능하면 의료 선진국이 좋을 것 같아요. 그리고 치안도 중요해요.", basicInfo)
+    expect(facts.find((fact) => fact.key === "preferredRegions")?.value).toEqual([])
+    expect(facts.find((fact) => fact.key === "regionImportance")?.value).toBe("no_preference")
+    expect(facts.find((fact) => fact.key === "worries")?.value).toEqual(expect.arrayContaining(["medical_access", "city_safety"]))
   })
 
   it("lets later natural language correct a quick-reply fact", async () => {

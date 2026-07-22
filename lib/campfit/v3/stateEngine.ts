@@ -348,7 +348,10 @@ export function extractDeterministicFacts(
     } else if (/(다른 (지역|곳)|어디든|지역.*상관).{0,12}(괜찮|가능|상관없)/.test(text)) {
       push("regionImportance", "preference", "soft")
     }
-  } else if (/(지역|나라는?).{0,8}(상관없|어디든)/.test(text)) {
+  } else if (/(지역|나라는?).{0,8}(상관없|어디든)/.test(text)
+    || /(^|[\s,])상관없(?:긴\s*한데|긴하지만|어도|어요|습니다)/.test(text)
+    || /(딱히|특정).{0,16}(없|정하지|생각한 곳)/.test(text)
+    || /(마음에 두고 있는|정해 둔).{0,12}(곳|도시|나라).{0,8}(없|아직)/.test(text)) {
     push("preferredRegions", "preference", [])
     push("regionImportance", "preference", "no_preference")
   }

@@ -8,13 +8,12 @@ const weightedSlots: readonly { readonly key: CampfitV3FactKey; readonly weight:
   { key: "preferredRegions", weight: 6 },
   { key: "regionImportance", weight: 4 },
   { key: "koreanSupportNeed", weight: 6 },
-  { key: "parentCommunicationNeed", weight: 6 },
   { key: "parentStayGoals", weight: 10 },
-  { key: "specialCareFollowUp", weight: 6 },
 ]
 
 export function calculateProgress(basicInfo: CampfitV3BasicInfo, state: CampfitV3ConversationState): number {
   const basicCredit = basicInfo.childAges.length && basicInfo.adultCount >= 1 ? 35 : 0
+  if (basicCredit > 0 && isReadyForRecommendation(state)) return 100
   const factCredit = weightedSlots.reduce((sum, slot) => {
     const fact = state.facts[slot.key]
     if (slot.key === "dayProgramSeparationReadiness" && state.facts.isFirstOverseasEducationExperience?.value === false) return sum + slot.weight
@@ -31,7 +30,6 @@ export function isReadyForRecommendation(state: CampfitV3ConversationState): boo
     "experienceGoals",
     "preferredRegions",
     "parentStayGoals",
-    "specialCareFollowUp",
   ]
   return core.every((key) => {
     const fact = state.facts[key]

@@ -11,7 +11,7 @@ type Props = {
   readonly basicInfo: CampfitV3BasicInfo
   readonly conversation: CampfitV3ConversationResponse
   readonly transcript: readonly CampfitV3TranscriptMessage[]
-  readonly onAnswer: (message: string, quickReplyKey: string | null) => Promise<boolean>
+  readonly onAnswer: (message: string, quickReplyKey: string | null, refinementPrompt?: string | null) => Promise<boolean>
   readonly onEditBasic: () => void
   readonly onResult: () => Promise<void>
 }
@@ -73,9 +73,15 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
   const compositionRef = useRef(false)
   const sendLockRef = useRef(false)
   const specialCare = conversation.questionKey === "special_care_follow_up"
-  const refinementQuestion = cityRefinementQuestions[refinementIndex % cityRefinementQuestions.length]
+  const refinementQuestion = cityRefinementQuestions[refinementIndex]
   const progressLabel = conversation.progress >= 100 ? "추천 가능 조건 100%" : `${conversation.progress}%`
   const progressCopy = continuing ? "추천 정교화 진행 중 · 추가 답변은 결과를 더 정확하게 만드는 데 반영돼요." : conversation.progressMessage
+  const refinementOpening = "추가로 고려하고 계신 사항이 있으시면 편하게 알려주세요."
+  const visibleTranscript = continuing
+    ? [...transcript, { role: "assistant" as const, content: refinementIndex === 0
+      ? `${refinementOpening}\n\n${refinementQuestion?.question ?? "더 궁금한 사항 있으신가요?"}`
+      : refinementQuestion?.question ?? "더 궁금한 사항 있으신가요?" }]
+    : transcript
 
   useEffect(() => {
     const messageList = messageListRef.current
@@ -86,7 +92,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
     })
 
     return () => window.cancelAnimationFrame(frame)
-  }, [sending, transcript])
+  }, [continuing, refinementIndex, sending, transcript])
 
   async function answer(content: string, quickReplyKey: string | null): Promise<void> {
     const trimmedContent = content.trim()
@@ -96,7 +102,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
     setSending(true)
     setMessage("")
     try {
-      const accepted = await onAnswer(trimmedContent, quickReplyKey)
+      const accepted = await onAnswer(trimmedContent, quickReplyKey, continuing ? (refinementQuestion?.question ?? "더 궁금한 사항 있으신가요?") : null)
       if (!accepted) return
       if (continuing) setRefinementIndex((index) => index + 1)
     } finally {
@@ -174,7 +180,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
               shouldAutoScrollRef.current = isChatNearBottom(event.currentTarget)
             }}
           >
-            {transcript.map((item, index) => (
+            {visibleTranscript.map((item, index) => (
               <div className={`flex items-end gap-2 ${item.role === "user" ? "justify-end" : "justify-start"}`} key={`${item.role}-${index}`}>
                 {item.role === "assistant" ? <AiAvatar className="h-10 w-10 shrink-0" /> : null}
                 <div
@@ -200,17 +206,17 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
                 </div>
               </div>
             ) : null}
-            {conversation.readyForRecommendation && continuing ? (
+            {false && conversation.readyForRecommendation && continuing && refinementQuestion ? (
               <div className="mb-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3" role="status">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-black tracking-[.08em] text-[var(--accent-primary)]">추천 정교화 진행 중</p>
                   <span className="text-xs font-semibold text-[var(--text-secondary)]">결과는 언제든 왼쪽에서 볼 수 있어요.</span>
                 </div>
                 {refinementQuestion ? <>
-                  <p className="mt-2 text-sm font-extrabold leading-6 [word-break:keep-all]">{refinementQuestion.question}</p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{refinementQuestion.helper}</p>
+                  <p className="mt-2 text-sm font-extrabold leading-6 [word-break:keep-all]">{refinementQuestion!.question}</p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{refinementQuestion!.helper}</p>
                   <div className="mt-3 flex flex-wrap gap-2" aria-label="빠른 답변">
-                    {refinementQuestion.quickReplies.map((reply) => <button className="min-h-10 rounded-full border border-[var(--border-default)] bg-white px-3 text-xs font-bold transition hover:border-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50" disabled={sending} type="button" key={reply.key} onClick={() => void answer(reply.label, null)}>{reply.label}</button>)}
+                    {refinementQuestion!.quickReplies.map((reply) => <button className="min-h-10 rounded-full border border-[var(--border-default)] bg-white px-3 text-xs font-bold transition hover:border-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50" disabled={sending} type="button" key={reply.key} onClick={() => void answer(reply.label, null)}>{reply.label}</button>)}
                   </div>
                   <p className="mt-3 text-xs font-semibold text-[var(--text-secondary)]">아래 입력창에 가족의 상황을 직접 적어도 좋아요.</p>
                 </> : null}
@@ -219,6 +225,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
             {!conversation.readyForRecommendation || continuing ? (
               <>
                 {conversation.quickReplies.length ? <div className="mb-3 flex flex-wrap gap-2" aria-label="빠른 답변">{conversation.quickReplies.map((reply) => <button className="min-h-11 rounded-full border border-[var(--border-default)] bg-white px-4 text-sm font-bold transition hover:border-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50" disabled={sending} type="button" key={reply.key} onClick={() => void answer(reply.label, reply.key)}>{reply.label}</button>)}</div> : null}
+                {continuing && refinementQuestion ? <div className="mb-3 flex flex-wrap gap-2" aria-label="추가로 고려할 조건">{refinementQuestion.quickReplies.map((reply) => <button className="min-h-11 rounded-full border border-[var(--border-default)] bg-white px-4 text-sm font-bold transition hover:border-[var(--accent-primary)] hover:bg-[var(--accent-soft)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)] disabled:opacity-50" disabled={sending} type="button" key={reply.key} onClick={() => void answer(reply.label, null)}>{reply.label}</button>)}</div> : null}
                 {specialCare ? <p className="mb-2 text-xs font-semibold leading-5 text-[var(--status-warning)]">질환명이나 약 이름 등 상세정보는 입력하지 마세요. 자세한 내용은 프로그램 상담 시 별도로 확인합니다.</p> : null}
                 <form className="flex items-end gap-2" onSubmit={(event) => { event.preventDefault(); void answer(message, null) }}>
                   <label className="sr-only" htmlFor="campfit-v3-chat-answer">상담 답변</label>

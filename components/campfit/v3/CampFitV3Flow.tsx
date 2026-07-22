@@ -140,17 +140,20 @@ export function CampFitV3Flow() {
     }
   }
 
-  async function submitAnswer(message: string, quickReplyKey: string | null): Promise<boolean> {
+  async function submitAnswer(message: string, quickReplyKey: string | null, refinementPrompt: string | null = null): Promise<boolean> {
     if (!basicInfo || !conversation) return false
     setError("")
     const sensitiveQuestion = conversation.questionKey === "special_care_follow_up"
     const safeMessage = quickReplyKey === null
       ? sanitizeConversationInput(message, sensitiveQuestion).safeMessage
       : message
-    const nextTranscript = appendOptimisticUserMessage(transcript, safeMessage, conversation.questionKey)
+    const promptTranscript = refinementPrompt
+      ? [...transcript, { role: "assistant" as const, content: refinementPrompt }]
+      : transcript
+    const nextTranscript = appendOptimisticUserMessage(promptTranscript, safeMessage, conversation.questionKey)
     setTranscript(nextTranscript)
     if (conversation.readyForRecommendation && conversation.updatedState.currentQuestionKey === null && quickReplyKey === null) {
-      setTranscript([...nextTranscript, { role: "assistant", content: "추가로 말씀해주신 조건을 반영했어요. 더 답하거나 왼쪽의 결과 보기로 이동할 수 있어요." }])
+      setTranscript([...nextTranscript, { role: "assistant", content: `“${safeMessage}”라고 말씀해주셨군요. 이 조건도 기록해둘게요.` }])
       return true
     }
     try {

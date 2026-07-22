@@ -2,12 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const loadV3Catalog = vi.hoisted(() => vi.fn())
 const loadDemoCatalog = vi.hoisted(() => vi.fn())
+const loadDemoCatalogFromSupabase = vi.hoisted(() => vi.fn())
 const isReadyForRecommendation = vi.hoisted(() => vi.fn())
 const buildRecommendation = vi.hoisted(() => vi.fn())
 const explainRecommendation = vi.hoisted(() => vi.fn())
 const createConversationProvider = vi.hoisted(() => vi.fn(() => ({ explainRecommendation })))
 
-vi.mock("@/lib/campfit/v3/catalogRepository", () => ({ loadV3Catalog }))
+vi.mock("@/lib/campfit/v3/catalogRepository", () => ({ loadV3Catalog, loadDemoCatalogFromSupabase }))
 vi.mock("@/lib/campfit/v3/demoCatalog", () => ({ loadDemoCatalog }))
 vi.mock("@/lib/campfit/v3/progress", () => ({ isReadyForRecommendation }))
 vi.mock("@/lib/campfit/v3/recommendationEngine", () => ({ buildRecommendation }))
@@ -62,6 +63,7 @@ describe("CampFit v3 recommendation route", () => {
   beforeEach(() => {
     isReadyForRecommendation.mockReturnValue(true)
     loadV3Catalog.mockResolvedValue({ programs: [], cities: [], source: "supabase", warnings: [] })
+    loadDemoCatalogFromSupabase.mockResolvedValue({ programs: [], cities: [], source: "demo", warnings: [] })
     loadDemoCatalog.mockReturnValue({ programs: [], cities: [], source: "demo", warnings: [] })
     buildRecommendation.mockReturnValue(result)
     explainRecommendation.mockResolvedValue(null)
@@ -89,7 +91,8 @@ describe("CampFit v3 recommendation route", () => {
     const payload = await response.json() as Record<string, unknown>
 
     expect(response.status).toBe(200)
-    expect(loadDemoCatalog).toHaveBeenCalledTimes(1)
+    expect(loadDemoCatalogFromSupabase).toHaveBeenCalledTimes(1)
+    expect(loadDemoCatalog).not.toHaveBeenCalled()
     expect(loadV3Catalog).not.toHaveBeenCalled()
     expect(buildRecommendation).toHaveBeenCalledWith(expect.objectContaining({ catalog: expect.objectContaining({ source: "demo" }) }))
     expect(payload["catalogSource"]).toBe("demo")
