@@ -43,10 +43,8 @@ export function selectAccommodationVariant(
 
 export function calculateAccommodationCost(input: AccommodationCostInput, selection = selectAccommodationVariant(input.basicInfo, input.program)): TripCostLine {
   const packageInclusions = input.program.packageInclusions
-  if (packageInclusions === undefined) {
-    return emptyLine("inquiry", [])
-  }
-  if (packageInclusions.accommodationIncluded) {
+  const accommodationIncluded = packageInclusions?.accommodationIncluded === true
+  if (accommodationIncluded) {
     return {
       low: 0,
       high: 0,
@@ -58,7 +56,7 @@ export function calculateAccommodationCost(input: AccommodationCostInput, select
       sourceAmounts: [],
     }
   }
-  if (selection.needsConfirmation) {
+  if (selection.needsConfirmation && packageInclusions !== undefined) {
     return emptyLine("inquiry", ["확인 필요: 가족 인원에 맞는 숙소 variant 또는 객실 업그레이드가 없습니다."])
   }
   if (input.estimateProfile === null) {
