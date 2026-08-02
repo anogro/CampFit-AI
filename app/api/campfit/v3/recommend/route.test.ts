@@ -252,5 +252,6 @@ describe("CampFit v3 recommendation route", () => {
     expect(payload.programCandidates).toHaveLength(1)
     expect(payload.programCandidates[0].programId).toBe("prog-4w")
     expect(payload.programCandidates[0].durationLabel).toContain("4주")
+    expect(payload.destinationRecommendations[0].livingCostMonthlyKrw).toBe(1_000_000)
   })
 })

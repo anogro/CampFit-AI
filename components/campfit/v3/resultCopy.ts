@@ -14,7 +14,7 @@ export function cityWhyBullets(
 ): readonly string[] {
   const primary = result.experienceDirections[0]?.label
   const stayGoal = stayGoalLabel(state)
-  const costFit = cityCostFit(city, basicInfo)
+  const costFit = cityCostFit(city)
   const roleReason = city.role === "가장 균형 잡힌 선택"
     ? "아이와 부모의 조건을 가장 균형 있게 반영했어요."
     : city.role === "원래 희망을 가장 잘 살리는 선택"
@@ -64,12 +64,9 @@ export function rankLabel(index: number): string {
   return index === 0 ? "Best Match" : "Alternative Recommendation"
 }
 
-function cityCostFit(city: CampfitV3DestinationRecommendation, basicInfo: CampfitV3BasicInfo): string {
-  const max = city.costEstimate.estimatedTotalMaxKrw
-  const min = city.costEstimate.estimatedTotalMinKrw
-  if (max !== null && max <= basicInfo.budgetMaxKrw) return "입력한 전체 예산 안에서 비교 가능한 구간이 있어요."
-  if (min !== null && min <= basicInfo.budgetMaxKrw) return "예산 안에서 시작할 수 있는 비용 구간이 있어요."
-  return "총비용은 항공·숙소 조건까지 함께 확인해야 해요."
+function cityCostFit(city: CampfitV3DestinationRecommendation): string {
+  if (city.livingCostMonthlyKrw !== null) return "도시 평균 생활비와 부모 체류 조건을 함께 살펴봤어요."
+  return "도시 평균 생활비는 최신 정보 확인이 필요해요."
 }
 
 function stayGoalLabel(state: CampfitV3ConversationState): string | null {

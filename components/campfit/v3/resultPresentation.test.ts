@@ -139,7 +139,7 @@ function destination(cityName: string): CampfitV3RecommendationResult["destinati
     imageUrl: null,
     reason: "테스트 도시",
     verify: [],
-    costEstimate: { estimatedTotalMinKrw: null, estimatedTotalMaxKrw: null, includedComponents: [], missingComponents: [], confidence: "low", label: "비교용 추정" },
+    costEstimate: { estimatedTotalMinKrw: null, estimatedTotalMaxKrw: null, includedComponents: [], missingComponents: [], confidence: "low", label: "체류 비용 참고" },
   }
 }
 

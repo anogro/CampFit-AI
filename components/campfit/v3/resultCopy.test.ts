@@ -38,13 +38,14 @@ const city: CampfitV3DestinationRecommendation = {
   reason: "technical reason",
   verify: ["프로그램과 숙소 사이 실제 이동시간", "항공료의 왕복·출발지·시즌 기준"],
   costEstimate: {
-    label: "비교용 추정",
+    label: "체류 비용 참고",
     estimatedTotalMinKrw: 8_000_000,
     estimatedTotalMaxKrw: 11_000_000,
     confidence: "medium",
     includedComponents: ["프로그램비", "항공비 참고값"],
     missingComponents: ["현지 교통비", "보험·비자"],
   },
+  livingCostMonthlyKrw: 1_800_000,
 }
 
 const program: CampfitV3ProgramCandidate = {
@@ -68,7 +69,7 @@ describe("CampFit v3 result copy", () => {
   it("puts parent-readable reasons before cost and catalog details", () => {
     const bullets = cityWhyBullets(city, basicInfo, state, result)
     expect(bullets).toContain("4주 가족 체류를 기준으로 비교했어요.")
-    expect(bullets).toContain("입력한 전체 예산 안에서 비교 가능한 구간이 있어요.")
+    expect(bullets).toContain("도시 평균 생활비와 부모 체류 조건을 함께 살펴봤어요.")
     expect(bullets.join(" ")).not.toContain("프로그램 개수")
     expect(bullets.join(" ")).not.toContain("조건을 통과")
   })

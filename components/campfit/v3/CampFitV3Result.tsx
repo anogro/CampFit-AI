@@ -14,13 +14,11 @@ import {
   safeProgramDetailHref,
 } from "@/components/campfit/v3/resultPresentation"
 import {
-  cityCostDetails,
   cityWhyBullets,
   programCautions,
   programStrengths,
   rankLabel,
 } from "@/components/campfit/v3/resultCopy"
-import type { CampfitV3TripCost } from "@/lib/campfit/v3/cost/types"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationState,
@@ -28,7 +26,7 @@ import type {
   CampfitV3ProgramCandidate,
   CampfitV3RecommendationResult,
 } from "@/types/campfitV3"
-import type { CampfitV3CityComparison, CampfitV3CityCostSummary } from "@/components/campfit/v3/resultPresentation"
+import type { CampfitV3CityComparison } from "@/components/campfit/v3/resultPresentation"
 
 type CampFitV3ResultProps = {
   readonly result: CampfitV3RecommendationResult
@@ -155,32 +153,23 @@ export function CampFitV3Result({
           </section>
 
           <ReportSection title="이번 상담에서 중요하게 본 것" subtitle="상담에서 확인한 우선순위와 가족 조건을 육각형 그래프로 정리했습니다.">
-            <div data-campfit-decision-criteria className="rounded-[22px] bg-[var(--surface-elevated)] p-4 sm:p-5">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                <div className="w-full shrink-0 sm:w-[36%] lg:w-[320px]"><CampFitV3DecisionRadar axes={axes} /></div>
-                <div className="flex w-full flex-col gap-3 border-t border-[var(--border-default)] pt-4 sm:border-t-0 sm:pt-0">
+            <div data-campfit-decision-criteria className="rounded-[22px] bg-[var(--surface-elevated)] p-5 sm:p-8 lg:p-10">
+              <div className="mx-auto flex w-full max-w-[960px] flex-col gap-8 lg:flex-row lg:items-center lg:justify-center lg:gap-20">
+                <div className="mx-auto w-full max-w-[360px] shrink-0 lg:w-[360px]"><CampFitV3DecisionRadar axes={axes} /></div>
+                <div className="mx-auto flex w-full max-w-[520px] flex-col gap-3 border-t border-[var(--border-default)] pt-6 lg:pt-0 lg:border-t-0">
                   {axes.map((axis) => (
-                    <div key={axis.key} className="flex flex-col justify-between gap-1 border-b border-[var(--border-default)] pb-2 text-sm sm:flex-row sm:items-center">
+                    <div key={axis.key} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-1 border-b border-[var(--border-default)] pb-2 text-sm">
                       <span className="font-extrabold text-[var(--text-secondary)]">{axis.label}</span>
-                      <span className="font-bold text-[var(--text-primary)]">{getAxisDetail(axis.key, conversationState)}</span>
+                      <span className="text-right font-bold text-[var(--text-primary)]">{getAxisDetail(axis.key, conversationState)}</span>
                     </div>
                   ))}
                   <p className="mt-2 text-xs font-semibold leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{decisionAxesSummary(axes)}</p>
                 </div>
               </div>
-              {result.requiredSupportConditions.length ? (
-                <div className="mt-6 border-t border-[var(--border-default)] pt-5">
-                  <ListCard title="꼭 필요한 지원 조건" items={result.requiredSupportConditions} />
-                </div>
-              ) : null}
-              {result.alternatives.length ? (
-                <div className="mt-6 border-t border-[var(--border-default)] pt-5">
-                  <h3 className="text-lg font-bold">조건을 조정하면 가능한 대안</h3>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    {result.alternatives.map((alternative) => <p className="rounded-2xl border border-[var(--border-default)] bg-white px-4 py-3 text-sm leading-6 [word-break:keep-all]" key={alternative}>{alternative}</p>)}
-                  </div>
-                </div>
-              ) : null}
+              <div className="mt-6 grid gap-5 border-t border-[var(--border-default)] pt-5 lg:grid-cols-2">
+                <SupportConditionPanel items={result.requiredSupportConditions} />
+                <AlternativePanel items={result.alternatives} />
+              </div>
             </div>
           </ReportSection>
 
@@ -215,10 +204,6 @@ export function CampFitV3Result({
                 </div>
               ) : <Empty text="현재 조건에 맞는 프로그램 후보를 확인하지 못했습니다." />}
             </div>
-          </ReportSection>
-
-          <ReportSection title="도시 비교" subtitle="현재 결과에 포함된 도시별 비용과 선택 역할을 비교했습니다.">
-            <CityComparisonTable cityComparisons={cityComparisons} basicInfo={basicInfo} />
           </ReportSection>
 
           <ReportSection title="확인사항" subtitle="신청 전에 최신 운영 조건과 실제 가족 비용을 확인하세요.">
@@ -288,41 +273,36 @@ function FamilyConditionGrid({
   )
 }
 
-function CityComparisonTable({
-  cityComparisons,
-  basicInfo,
-}: {
-  readonly cityComparisons: readonly CampfitV3CityComparison[]
-  readonly basicInfo: CampfitV3BasicInfo
-}) {
-  if (!cityComparisons.length) return <Empty text="비교할 도시가 아직 없습니다." />
-
+function SupportConditionPanel({ items }: { readonly items: readonly string[] }) {
   return (
-    <div data-campfit-report-section="city-comparison" className="overflow-x-auto rounded-[22px] border border-[var(--border-default)] bg-[var(--surface-elevated)]">
-      <table className="min-w-[640px] w-full text-left text-sm">
-        <caption className="sr-only">도시별 총여행비와 추천 조건 비교</caption>
-        <thead className="border-b border-[var(--border-default)] text-xs font-black text-[var(--text-secondary)]">
-          <tr>
-            <th className="px-4 py-4 sm:px-5" scope="col">도시</th>
-            <th className="px-4 py-4 sm:px-5" scope="col">총여행비</th>
-            <th className="px-4 py-4 sm:px-5" scope="col">선택 역할</th>
-            <th className="px-4 py-4 sm:px-5" scope="col">추천 기간</th>
-            <th className="px-4 py-4 sm:px-5" scope="col">실제 프로그램</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cityComparisons.map(({ city, programs, tripCost }, index) => (
-            <tr className="border-b border-[var(--border-default)] last:border-b-0" key={city.cityId}>
-              <th className="px-4 py-4 font-black sm:px-5" scope="row">{index + 1}. {city.cityName}</th>
-              <td className="px-4 py-4 font-bold sm:px-5">{tripCost ? tripCostLabel(tripCost.totalLow, tripCost.totalHigh) : "금액 확인 필요"}</td>
-              <td className="px-4 py-4 leading-6 text-[var(--text-secondary)] sm:px-5">{city.role}</td>
-              <td className="px-4 py-4 text-[var(--text-secondary)] sm:px-5">{basicInfo.durationWeeks}주</td>
-              <td className="px-4 py-4 text-[var(--text-secondary)] sm:px-5">{programs.length}개</td>
-            </tr>
+    <article className="rounded-[22px] border border-[var(--border-default)] bg-white p-5 sm:p-6">
+      <h3 className="text-lg font-bold [word-break:keep-all]">꼭 필요한 지원 조건</h3>
+      {items.length ? (
+        <ul className="mt-4 space-y-3">
+          {items.map((item) => (
+            <li className="flex gap-3 text-sm leading-6 [word-break:keep-all]" key={item}>
+              <span className="mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--accent-soft)] text-xs font-black text-[var(--accent-primary)]" aria-hidden>✓</span>
+              <span>{item}</span>
+            </li>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </ul>
+      ) : <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)]">현재 상담에서 별도로 확인된 필수 지원 조건은 없습니다.</p>}
+    </article>
+  )
+}
+
+function AlternativePanel({ items }: { readonly items: readonly string[] }) {
+  return (
+    <article className="rounded-[22px] border border-[var(--border-default)] bg-white p-5 sm:p-6">
+      <h3 className="text-lg font-bold [word-break:keep-all]">조건을 조정하면 가능한 대안</h3>
+      {items.length ? (
+        <ul className="mt-4 space-y-3">
+          {items.map((alternative) => (
+            <li className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-sm leading-6 [word-break:keep-all]" key={alternative}>{alternative}</li>
+          ))}
+        </ul>
+      ) : <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)]">현재 조건에서 별도로 제안할 대안은 없습니다.</p>}
+    </article>
   )
 }
 
@@ -339,9 +319,8 @@ function CityCard({
   readonly conversationState: CampfitV3ConversationState
   readonly result: CampfitV3RecommendationResult
 }) {
-  const { city, tripCost } = comparison
+  const { city } = comparison
   const href = buildAnogroCityHref(city.cityName)
-  const costDetails = cityCostDetails(city)
   return (
     <article data-campfit-city-card data-city-name={city.cityName} className="apple-glass-soft flex flex-col overflow-hidden rounded-[22px]">
       <div className="flex items-start justify-between gap-3 p-5 pb-0 sm:p-6 sm:pb-0">
@@ -367,59 +346,23 @@ function CityCard({
             </li>
           ))}
         </ul>
-        <CityMonthlyCostSummary city={city} />
-        {tripCost ? <TripCostSummary cost={tripCost} /> : null}
-        <details className="group mt-5 border-t border-[var(--border-default)] pt-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-bold text-[var(--accent-primary)] [&::-webkit-details-marker]:hidden">
-            <span>비용과 세부 정보 보기</span>
-            <span className="text-lg transition-transform group-open:rotate-45" aria-hidden>＋</span>
-          </summary>
-          <div className="mt-3 rounded-2xl bg-white p-4 text-sm">
-            <p className="font-bold">{city.costEstimate.label} · 신뢰도 {confidenceLabel(city.costEstimate.confidence)}</p>
-            <p className="mt-1 text-lg font-black">{costLabel(city.costEstimate.estimatedTotalMinKrw, city.costEstimate.estimatedTotalMaxKrw)}</p>
-            {costDetails.included.length ? <p className="mt-3 leading-6 text-[var(--text-secondary)] [word-break:keep-all]">포함된 참고값: {costDetails.included.join(" · ")}</p> : null}
-            {costDetails.missing.length ? <p className="mt-2 leading-6 text-[var(--text-secondary)] [word-break:keep-all]">추가 확인: {costDetails.missing.join(" · ")}</p> : null}
-          </div>
-        </details>
+        <CityLivingCostSummary city={city} />
         {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" aria-label={`${city.cityName} 도시 자세히 보기 (새 창 열림)`}>도시 자세히 보기<span className="ml-1.5" aria-hidden>↗</span></a> : null}
       </div>
     </article>
   )
 }
 
-function CityMonthlyCostSummary({ city }: { readonly city: CampfitV3DestinationRecommendation }) {
-  const flight = city.singleFlightCostKrw ?? null
+function CityLivingCostSummary({ city }: { readonly city: CampfitV3DestinationRecommendation }) {
   const living = city.livingCostMonthlyKrw ?? null
-  const housing = city.housingCostMonthlyKrw ?? null
 
-  if (flight === null && living === null && housing === null) return null
+  if (living === null) return null
 
   return (
     <div className="mt-5 rounded-2xl bg-[var(--surface-tint-yellow)] p-4 text-xs font-semibold leading-6 text-[var(--text-secondary)]">
-      <h4 className="text-sm font-black text-[var(--status-warning)] mb-2">도시 체류 참고 기준</h4>
-      <ul className="space-y-1.5">
-        {flight !== null ? (
-          <li className="flex justify-between border-b border-dashed border-[var(--border-default)] pb-1.5 last:border-b-0 last:pb-0">
-            <span>왕복 항공료 (1인)</span>
-            <span className="font-bold text-[var(--text-primary)]">~{formatKrw(flight)}</span>
-          </li>
-        ) : null}
-        {living !== null ? (
-          <li className="flex justify-between border-b border-dashed border-[var(--border-default)] pb-1.5 last:border-b-0 last:pb-0">
-            <span>월 평균 생활비 (가족)</span>
-            <span className="font-bold text-[var(--text-primary)]">~{formatKrw(living)}</span>
-          </li>
-        ) : null}
-        {housing !== null ? (
-          <li className="flex justify-between border-b border-dashed border-[var(--border-default)] pb-1.5 last:border-b-0 last:pb-0">
-            <span>월 평균 주거비 (1BR)</span>
-            <span className="font-bold text-[var(--text-primary)]">~{formatKrw(housing)}</span>
-          </li>
-        ) : null}
-      </ul>
-      <p className="mt-2 text-[10px] leading-4 text-[var(--text-secondary)] [word-break:keep-all] opacity-80">
-        * 위 비용은 도시 평균에 기반한 참고 단가이며, 실제 예약 조건에 따라 달라질 수 있습니다.
-      </p>
+      <h4 className="text-sm font-black text-[var(--status-warning)]">도시 평균 생활비</h4>
+      <p className="mt-1 text-lg font-black text-[var(--text-primary)]">월 약 {formatKrw(living)}</p>
+      <p className="mt-1 text-[10px] leading-4 text-[var(--text-secondary)] [word-break:keep-all] opacity-80">도시 기준 월 평균 참고값이며, 가족 구성과 생활 방식에 따라 달라질 수 있어요.</p>
     </div>
   )
 }
@@ -445,7 +388,10 @@ function ProgramInlineCard({ program, index }: { readonly program: CampfitV3Prog
       <div className="mt-3">
         <p className="text-xs font-black text-[var(--text-primary)]">추천 이유</p>
         <p className="mt-1 text-sm leading-6 [word-break:keep-all]">{strengths[0]}</p>
-        {program.tripCost ? <TripCostSummary cost={program.tripCost} /> : null}
+        <div className="mt-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
+          <p className="text-xs font-black tracking-[.08em] text-[var(--accent-primary)]">프로그램 가격</p>
+          <p className="mt-1 text-xl font-black tracking-[-.02em]">{program.priceLabel}</p>
+        </div>
         <div className="mt-3 grid gap-2 text-xs leading-5 text-[var(--text-secondary)]">
           <p><span className="font-black text-[var(--status-success)]">좋은 점</span> · {strengths.slice(1).join(" · ") || "조건에 맞는 기본 정보를 확인했어요."}</p>
           <p><span className="font-black text-[var(--status-warning)]">아쉬운 점</span> · {cautions.join(" · ")}</p>
@@ -456,9 +402,7 @@ function ProgramInlineCard({ program, index }: { readonly program: CampfitV3Prog
             <span className="text-lg transition-transform group-open:rotate-45" aria-hidden>＋</span>
           </summary>
           <div className="mt-3 rounded-2xl bg-white p-4 text-sm leading-6 [word-break:keep-all]">
-            <p className="mt-1 font-bold">{program.priceLabel}</p>
             {program.verify.length ? <p className="mt-3 text-[var(--text-secondary)]">추가 확인: {program.verify.join(" · ")}</p> : null}
-            {program.tripCost ? <TripCostDetails cost={program.tripCost} /> : null}
           </div>
         </details>
         {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" aria-label={`${program.name} 프로그램 살펴보기 (새 창 열림)`}>프로그램 살펴보기<span className="ml-1.5" aria-hidden>↗</span></a> : null}
@@ -484,86 +428,6 @@ function budgetLabel(min: number, max: number): string {
   return `${Math.round(min / 10_000).toLocaleString("ko-KR")}만~${Math.round(max / 10_000).toLocaleString("ko-KR")}만 원`
 }
 
-function costLabel(min: number | null, max: number | null): string {
-  if (min === null || max === null) return "일부 비용 확인 필요"
-  return `${Math.round(min / 10_000).toLocaleString("ko-KR")}만~${Math.round(max / 10_000).toLocaleString("ko-KR")}만 원`
-}
-
 function formatKrw(value: number): string {
   return `${Math.round(value / 10_000).toLocaleString("ko-KR")}만 원`
-}
-
-function TripCostSummary({ cost }: { readonly cost: CampfitV3TripCost | CampfitV3CityCostSummary }) {
-  const includedLabels = "breakdown" in cost ? tripCostIncludedLabels(cost) : []
-  return (
-    <div className="mt-5 rounded-2xl border border-[var(--border-default)] bg-white p-4">
-      <p className="text-xs font-black tracking-[.08em] text-[var(--accent-primary)]">우리 가족 예상 총여행비</p>
-      <p className="mt-1 text-xl font-black tracking-[-.02em]">{tripCostLabel(cost.totalLow, cost.totalHigh)}</p>
-      <p className="mt-1 text-xs font-semibold leading-5 text-[var(--text-secondary)]">{tripPriceStatusLabel(cost.priceStatus)} · 신뢰도 {confidenceLabel(cost.confidence)}</p>
-      {includedLabels.length ? <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)] [word-break:keep-all]">계산에 반영: {includedLabels.join(" · ")}</p> : null}
-      {cost.unresolvedItems.length ? <p className="mt-2 text-xs font-semibold leading-5 text-[var(--status-warning)] [word-break:keep-all]">확인 필요: {cost.unresolvedItems.slice(0, 2).join(" · ")}</p> : null}
-    </div>
-  )
-}
-
-function TripCostDetails({ cost }: { readonly cost: CampfitV3TripCost }) {
-  const lines = [
-    ["프로그램", cost.breakdown.program],
-    ["숙소", cost.breakdown.accommodation],
-    ["항공", cost.breakdown.flights],
-    ["생활", cost.breakdown.living],
-    ["현지 교통", cost.breakdown.localTransport],
-    ["기타", cost.breakdown.other],
-  ] as const
-  return (
-    <div className="mt-4 border-t border-[var(--border-default)] pt-3">
-      <p className="text-xs font-black text-[var(--text-primary)]">총여행비 구성</p>
-      <ul className="mt-2 space-y-1.5 text-xs leading-5 text-[var(--text-secondary)]">
-        {lines.map(([label, line]) => (
-          <li className="flex justify-between gap-3" key={label}>
-            <span>{label} · {tripLineStatusLabel(line.status)}</span>
-            <span className="font-bold text-[var(--text-primary)]">{tripCostLabel(line.low, line.high)}</span>
-          </li>
-        ))}
-      </ul>
-      {cost.assumptions.length ? <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)] [word-break:keep-all]">기준: {cost.assumptions.slice(0, 3).join(" · ")}</p> : null}
-    </div>
-  )
-}
-
-function tripCostLabel(low: number | null, high: number | null): string {
-  if (low === null || high === null) return "금액 확인 필요"
-  if (low === high) return `${Math.round(low / 10_000).toLocaleString("ko-KR")}만 원`
-  return `${Math.round(low / 10_000).toLocaleString("ko-KR")}만~${Math.round(high / 10_000).toLocaleString("ko-KR")}만 원`
-}
-
-function tripPriceStatusLabel(value: CampfitV3TripCost["priceStatus"]): string {
-  if (value === "exact") return "확인된 가격 중심"
-  if (value === "partial") return "일부 항목 확인 필요"
-  if (value === "estimated") return "일부 추정 포함"
-  return "일부 비용 문의 필요"
-}
-
-function tripLineStatusLabel(value: CampfitV3TripCost["breakdown"]["program"]["status"]): string {
-  if (value === "included") return "포함"
-  if (value === "exact") return "확인됨"
-  if (value === "partial") return "일부 확인"
-  if (value === "estimated") return "추정"
-  if (value === "not_available") return "사용 불가"
-  return "문의"
-}
-
-function tripCostIncludedLabels(cost: CampfitV3TripCost): readonly string[] {
-  const lines = [
-    ["프로그램", cost.breakdown.program],
-    ["숙소", cost.breakdown.accommodation],
-    ["항공", cost.breakdown.flights],
-    ["생활", cost.breakdown.living],
-    ["교통", cost.breakdown.localTransport],
-  ] as const
-  return lines.filter(([, line]) => line.low !== null || line.high !== null).map(([label]) => label)
-}
-
-function confidenceLabel(value: "low" | "medium" | "high"): string {
-  return value === "high" ? "높음" : value === "medium" ? "보통" : "낮음"
 }

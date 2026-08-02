@@ -168,7 +168,7 @@ export type CampfitV3CostEstimate = {
   readonly includedComponents: readonly string[]
   readonly missingComponents: readonly string[]
   readonly confidence: "low" | "medium" | "high"
-  readonly label: "비교용 추정"
+  readonly label: "체류 비용 참고"
 }
 
 export type CampfitV3DestinationRecommendation = {
@@ -180,13 +180,13 @@ export type CampfitV3DestinationRecommendation = {
   readonly reason: string
   readonly verify: readonly string[]
   readonly costEstimate: CampfitV3CostEstimate
-  readonly cityStayFlightCostKrw?: number | null
-  readonly cityStayMonthlyCostKrw?: number | null
-  readonly singleFlightCostKrw?: number | null
-  readonly livingCostMonthlyKrw?: number | null
-  readonly housingCostMonthlyKrw?: number | null
-  readonly description?: string | null
-  readonly bullets?: readonly string[]
+  readonly cityStayFlightCostKrw?: number | null | undefined
+  readonly cityStayMonthlyCostKrw?: number | null | undefined
+  readonly singleFlightCostKrw?: number | null | undefined
+  readonly livingCostMonthlyKrw?: number | null | undefined
+  readonly housingCostMonthlyKrw?: number | null | undefined
+  readonly description?: string | null | undefined
+  readonly bullets?: readonly string[] | undefined
   readonly tripCost?: CampfitV3TripCost | undefined
 }
 

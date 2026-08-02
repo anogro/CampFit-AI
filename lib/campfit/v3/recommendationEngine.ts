@@ -670,7 +670,7 @@ function toProgramCandidate(item: ScoredProgram, basicInfo: CampfitV3BasicInfo):
   const priceLabel = item.exactPrice?.priceValue !== null && item.exactPrice?.priceValue !== undefined && item.exactPrice.priceValue > 0
     ? `${formatNumber(item.exactPrice.priceValue)} ${item.exactPrice.currency ?? "통화 미확인"}${item.exactPrice.adultCount === 0 ? ` · 아이 ${basicInfo.childAges.length}명 프로그램비` : ""}`
     : item.program.budgetMinKrw !== null && item.program.budgetMinKrw > 0
-      ? `${formatNumber(item.program.budgetMinKrw)}원부터 · 비교용`
+      ? `${formatNumber(item.program.budgetMinKrw)}원부터`
       : "가격 확인 필요"
   const group: CampfitV3ProgramCandidate["group"] = item.classification === "main"
     ? "우선 살펴볼 프로그램"
@@ -751,7 +751,7 @@ function estimateCityCost(city: V3CatalogCity, program: V3CatalogProgram | null,
     includedComponents: included,
     missingComponents: Array.from(new Set(missing)),
     confidence: missing.length ? "low" : exactPrice?.currency?.toUpperCase() === "KRW" ? "medium" : "low",
-    label: "비교용 추정",
+    label: "체류 비용 참고",
   }
 }
 

@@ -39,7 +39,7 @@ export function loadDemoCatalog(referenceYear = new Date().getUTCFullYear()): V3
       },
     })),
     source: "demo",
-    warnings: [`${CAMPFIT_V3_DEMO_CATALOG_VERSION}: 실제 예약·운영·가격 확정 전 비교용 Demo Catalog입니다.`],
+    warnings: [`${CAMPFIT_V3_DEMO_CATALOG_VERSION}: 실제 예약·운영·가격 확정 전 참고용 Demo Catalog입니다.`],
   }
 }
 
@@ -196,7 +196,7 @@ function demoSessionWindows(seasons: readonly DemoSeason[], durations: readonly 
 }
 
 function priceQualityNote(quality: DemoPriceQuality): string {
-  if (quality === "exact") return "가족 구성·기간·숙소 variant 기준의 비교용 가격"
+  if (quality === "exact") return "가족 구성·기간·숙소 variant 기준 가격"
   if (quality === "official_surcharge") return "기준 가격에 공식 추가요금이 있을 수 있어 최종 견적 확인 필요"
   if (quality === "reference") return "기준 가격만 확인된 참고값"
   return "가족 구성·기간·숙소별 실제 가격 문의 필요"

@@ -62,7 +62,7 @@ const result: CampfitV3RecommendationResult = {
     { key: "cultureActivity", label: "문화·활동 경험", fitLabel: "현재 우선순위가 낮음", score: 20, explanation: "낮은 우선순위 설명" },
   ],
   destinationRecommendations: [
-    { cityId: "singapore", cityName: "싱가포르", countryName: "싱가포르", role: "가장 균형 잡힌 선택", imageUrl: null, reason: "이유", verify: [], costEstimate: { label: "비교용 추정", estimatedTotalMinKrw: 5000000, estimatedTotalMaxKrw: 8000000, confidence: "medium", includedComponents: [], missingComponents: [] }, tripCost }
+    { cityId: "singapore", cityName: "싱가포르", countryName: "싱가포르", role: "가장 균형 잡힌 선택", imageUrl: null, reason: "이유", verify: [], costEstimate: { label: "체류 비용 참고", estimatedTotalMinKrw: 5000000, estimatedTotalMaxKrw: 8000000, confidence: "medium", includedComponents: [], missingComponents: [] }, livingCostMonthlyKrw: 2_000_000, tripCost }
   ],
   requiredSupportConditions: ["지원조건"],
   programCandidates: [
@@ -92,21 +92,24 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).toContain("이번 상담에서 중요하게 본 것")
     expect(markup).toContain("AI 요약")
     expect(markup).toContain("추천 도시 Top3")
-    expect(markup).toContain("도시 비교")
+    expect(markup).not.toContain("도시 비교")
     expect(markup).toContain("확인사항")
     expect(markup).toContain("추천 이유와 장점")
     expect(markup).toContain("Best Match")
     expect(markup).toContain("추천 프로그램 Top3")
-    expect(markup).toContain("도시별 총여행비와 추천 조건 비교")
+    expect(markup).not.toContain("도시별 총여행비와 추천 조건 비교")
     expect(markup).toContain('data-campfit-export-root="true"')
     expect(markup).toContain('data-campfit-export-ignore="true"')
     expect(markup).not.toContain("프로그램 선택지")
     expect(markup.indexOf("이번 상담에서 중요하게 본 것")).toBeLessThan(markup.indexOf("AI 요약"))
     expect(markup.indexOf("AI 요약")).toBeLessThan(markup.indexOf("추천 도시 Top3"))
-    expect(markup.indexOf("추천 도시 Top3")).toBeLessThan(markup.indexOf("도시 비교"))
-    expect(markup.indexOf("도시 비교")).toBeLessThan(markup.indexOf("확인사항"))
+    expect(markup.indexOf("추천 도시 Top3")).toBeLessThan(markup.indexOf("확인사항"))
     expect(markup.indexOf("결과를 저장해두세요")).toBeGreaterThan(markup.indexOf("확인사항"))
-    expect(markup).toContain("비용과 세부 정보 보기")
+    expect(markup).toContain("도시 평균 생활비")
+    expect(markup).toContain("월 약 200만 원")
+    expect(markup).toContain("프로그램 가격")
+    expect(markup).toContain("lg:grid-cols-2")
+    expect(markup).not.toContain("비교용")
     expect(markup).toContain("영어 경험")
     expect(markup).toContain("가족 체류 현실성")
     expect(markup).not.toContain("판단 근거와 세부 확인사항 보기")
@@ -144,7 +147,7 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).not.toContain("기본 회화 가능")
   })
 
-  it("shows a family total trip cost and keeps its breakdown inside details", () => {
+  it("shows city living cost and program price without a family total trip cost", () => {
     const markup = renderToStaticMarkup(
       createElement(CampFitV3Result, {
         result,
@@ -155,10 +158,11 @@ describe("CampFitV3Result UI component", () => {
       })
     )
 
-    expect(markup).toContain("우리 가족 예상 총여행비")
-    expect(markup).toContain("800만~1,000만 원")
-    expect(markup).toContain("일부 추정 포함")
-    expect(markup).toContain("총여행비 구성")
+    expect(markup).toContain("도시 평균 생활비")
+    expect(markup).toContain("프로그램 가격")
+    expect(markup).toContain("300만원")
+    expect(markup).not.toContain("우리 가족 예상 총여행비")
+    expect(markup).not.toContain("총여행비 구성")
   })
 
   it("renders the email CTA button with corrected copy", () => {
