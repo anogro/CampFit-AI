@@ -104,10 +104,10 @@ export function buildRecommendation(input: {
     .map((item) => toProgramCandidate(item, input.basicInfo))
 
   if (destinations.length > 0 && destinations[0]) {
-    const firstCityName = destinations[0].cityName
-    const hasFirstCityProgram = programCandidates.some((c) => c.cityName.toLowerCase() === firstCityName.toLowerCase())
+    const firstCityName = destinations[0].cityName.trim().toLowerCase()
+    const hasFirstCityProgram = programCandidates.some((c) => c.cityName.trim().toLowerCase() === firstCityName)
     if (!hasFirstCityProgram) {
-      const fallbackProgram = sortedEligiblePrograms.find((item) => item.program.city.toLowerCase() === firstCityName.toLowerCase())
+      const fallbackProgram = scoredPrograms.find((item) => item.program.city.trim().toLowerCase() === firstCityName)
       if (fallbackProgram) {
         const fallbackCandidate = toProgramCandidate(fallbackProgram, input.basicInfo)
         programCandidates = [

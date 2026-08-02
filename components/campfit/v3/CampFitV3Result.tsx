@@ -388,10 +388,48 @@ function ProgramInlineCard({ program, index }: { readonly program: CampfitV3Prog
       <div className="mt-3">
         <p className="text-xs font-black text-[var(--text-primary)]">추천 이유</p>
         <p className="mt-1 text-sm leading-6 [word-break:keep-all]">{strengths[0]}</p>
-        <div className="mt-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
-          <p className="text-xs font-black tracking-[.08em] text-[var(--accent-primary)]">프로그램 가격</p>
-          <p className="mt-1 text-xl font-black tracking-[-.02em]">{program.priceLabel}</p>
-        </div>
+        {(() => {
+          const tripCost = program.tripCost
+          let estimatedTotalText = program.priceLabel
+          let hasTotalSum = false
+
+          if (tripCost && tripCost.breakdown) {
+            const prog = tripCost.breakdown.program
+            const flight = tripCost.breakdown.flights
+            const living = tripCost.breakdown.living
+
+            if (prog.low !== null && flight.low !== null && living.low !== null) {
+              const low = prog.low + flight.low + living.low
+              const high = (prog.high ?? prog.low) + (flight.high ?? flight.low) + (living.high ?? living.low)
+              
+              const lowMan = Math.round(low / 10_000)
+              if (low === high) {
+                estimatedTotalText = `약 ${lowMan.toLocaleString("ko-KR")}만 원~`
+              } else {
+                const highMan = Math.round(high / 10_000)
+                estimatedTotalText = `약 ${lowMan.toLocaleString("ko-KR")}만~${highMan.toLocaleString("ko-KR")}만 원`
+              }
+              hasTotalSum = true
+            }
+          }
+
+          return (
+            <div className="mt-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
+              <p className="flex items-center gap-1.5 text-xs font-black tracking-[.08em] text-[var(--accent-primary)]">
+                <span>{hasTotalSum ? "총 예상 금액" : "프로그램 가격"}</span>
+                {hasTotalSum && (
+                  <span 
+                    className="inline-grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-[var(--text-tertiary)]/20 text-[9px] font-black text-[var(--text-secondary)] cursor-help" 
+                    title="프로그램 비용 + 생활비 + 항공료 포함"
+                  >
+                    ?
+                  </span>
+                )}
+              </p>
+              <p className="mt-1 text-xl font-black tracking-[-.02em]">{estimatedTotalText}</p>
+            </div>
+          )
+        })()}
         <div className="mt-3 grid gap-2 text-xs leading-5 text-[var(--text-secondary)]">
           <p><span className="font-black text-[var(--status-success)]">좋은 점</span> · {strengths.slice(1).join(" · ") || "조건에 맞는 기본 정보를 확인했어요."}</p>
           <p><span className="font-black text-[var(--status-warning)]">아쉬운 점</span> · {cautions.join(" · ")}</p>
@@ -430,4 +468,10 @@ function budgetLabel(min: number, max: number): string {
 
 function formatKrw(value: number): string {
   return `${Math.round(value / 10_000).toLocaleString("ko-KR")}만 원`
+}
+
+function tripCostLabel(low: number | null, high: number | null): string {
+  if (low === null || high === null) return "금액 확인 필요"
+  if (low === high) return `${Math.round(low / 10_000).toLocaleString("ko-KR")}만 원`
+  return `${Math.round(low / 10_000).toLocaleString("ko-KR")}만~${Math.round(high / 10_000).toLocaleString("ko-KR")}만 원`
 }
