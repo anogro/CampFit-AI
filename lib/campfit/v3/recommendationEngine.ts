@@ -6,6 +6,7 @@ import {
 import type { ExperienceSignalStatus, V3ParentStayPreferences } from "@/lib/campfit/v3/catalogPolicy"
 import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
 import { assessEnglishRequirementMatch, type EnglishRequirementMatch } from "@/lib/campfit/v3/englishRequirement"
+import { hasParentExperienceNeeds } from "@/lib/campfit/v3/parentExperienceNeeds"
 import type {
   V3Catalog,
   V3CatalogCity,
@@ -803,8 +804,10 @@ function requiredFactLabels(state: CampfitV3ConversationState): readonly string[
     ["regionImportance", "지역 중요도 확인"], ["koreanSupportNeed", "한국어 지원 수준 확인"],
     ["parentStayGoals", "부모 체류 목적 확인"],
   ] as const
-  const labels = pairs.filter(([key]) => state.facts[key] === undefined).map(([, label]) => label)
-  if (!assessEnglishReadiness(state).sufficientForRecommendation) return ["아이 영어 준비도 확인", ...labels]
+  const labels = pairs.filter(([key]) => key !== "experienceGoals" || !hasParentExperienceNeeds(state.facts.parentExperienceNeeds?.value))
+    .filter(([key]) => state.facts[key] === undefined)
+    .map(([, label]) => label)
+  if (!assessEnglishReadiness(state).recommendationSufficiency) return ["아이 영어 준비도 확인", ...labels]
   return labels
 }
 

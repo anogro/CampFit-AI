@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS, campfitV3EnglishAssessmentTypes, campfitV3EnglishEnvironmentTypes, campfitV3EnglishExperienceTypes, campfitV3EnglishReadinessValues, campfitV3FactKeys, campfitV3FactSources, campfitV3FactStatuses, campfitV3FactSubjects } from "@/types/campfitV3"
+import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS, campfitV3EnglishAssessmentTypes, campfitV3EnglishEnvironmentTypes, campfitV3EnglishExperienceTypes, campfitV3EnglishReadinessValues, campfitV3FactKeys, campfitV3FactSources, campfitV3FactStatuses, campfitV3FactSubjects, campfitV3ParentExperienceNeedAxes, campfitV3ParentNeedImportanceValues } from "@/types/campfitV3"
 
 export const CampfitV3BasicInfoSchema = z
   .object({
@@ -249,6 +249,7 @@ const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], read
   socialPreference: ["child", "preference"],
   desiredOutcomes: ["preference"],
   worries: ["parent", "family"],
+  parentExperienceNeeds: ["preference"],
   experienceGoals: ["preference"],
   preferredRegions: ["preference"],
   excludedRegions: ["preference"],
@@ -269,6 +270,13 @@ const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], read
 }
 
 const goalStrengthSchema = z.enum(["primary", "secondary", "mentioned", "none"])
+const parentExperienceNeedSchema = z.object({
+  importance: z.enum(campfitV3ParentNeedImportanceValues),
+  evidence: z.array(z.string().trim().min(1).max(240)).max(3),
+})
+const parentExperienceNeedsSchema = z.object(
+  Object.fromEntries(campfitV3ParentExperienceNeedAxes.map((axis) => [axis, parentExperienceNeedSchema])) as Record<(typeof campfitV3ParentExperienceNeedAxes)[number], typeof parentExperienceNeedSchema>,
+)
 const englishExperienceSchema = z.array(z.object({
   type: z.enum(campfitV3EnglishExperienceTypes),
   durationYears: z.number().min(0).max(20).nullable(),
@@ -297,6 +305,7 @@ const valueSchemas: Readonly<Record<(typeof campfitV3FactKeys)[number], z.ZodTyp
   socialPreference: z.array(z.string().trim().min(1).max(80)).max(8),
   desiredOutcomes: z.array(z.string().trim().min(1).max(120)).max(8),
   worries: z.array(z.string().trim().min(1).max(120)).max(8),
+  parentExperienceNeeds: parentExperienceNeedsSchema,
   experienceGoals: z.object({
     schoolSchooling: goalStrengthSchema,
     englishIntensive: goalStrengthSchema,

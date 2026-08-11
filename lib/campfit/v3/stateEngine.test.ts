@@ -27,7 +27,8 @@ const nullProvider: CampfitV3LLMProvider = {
 describe("CampFit v3 state and question engine", () => {
   it("opens with conversation-first guidance instead of a slot-style prompt", () => {
     const firstQuestion = campfitV3QuestionBank[0]
-    expect(firstQuestion?.title).toContain("아이의 영어 경험과 좋아하는 활동")
+    expect(firstQuestion?.title).toContain("아이의 영어 실력은 어느 정도인가요?")
+    expect(firstQuestion?.title).toContain("캠프 추천에 필요한 내용")
     expect(firstQuestion?.title).toContain("부모가 현지에서 어떻게 지내고 싶은지")
     expect(firstQuestion?.title).not.toContain("아이 영어 수준은 어느 정도인지도")
   })

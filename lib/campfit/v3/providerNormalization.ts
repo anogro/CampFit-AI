@@ -1,6 +1,6 @@
 import { CampfitV3ModelResponseSchema } from "@/lib/campfit/v3/schemas"
 import { isSemanticallyValidModelFact } from "@/lib/campfit/v3/stateEngine"
-import { campfitV3FactKeys } from "@/types/campfitV3"
+import { campfitV3FactKeys, campfitV3ParentExperienceNeedAxes } from "@/types/campfitV3"
 import type { CampfitV3ModelResponse } from "@/lib/campfit/v3/provider"
 
 export type StructuredProviderParseResult =
@@ -98,6 +98,9 @@ function normalizeModelFactShape(value: unknown): Record<string, unknown> | null
     fact["value"] = normalized
     if (normalized.length === 0) return null
   }
+  if (key === "parentExperienceNeeds") {
+    fact["value"] = normalizeParentExperienceNeeds(fact["value"], fact["evidence"])
+  }
   if (["childEnglishListening", "childEnglishSpeaking", "childEnglishReading", "childEnglishWriting", "englishReadiness"]
     .includes(key) && Array.isArray(fact["value"]) && fact["value"].length === 1) {
     fact["value"] = fact["value"][0]
@@ -108,6 +111,28 @@ function normalizeModelFactShape(value: unknown): Record<string, unknown> | null
   if (key === "childEnglishReading" && !["phonics_only", "reads_simple_text", "reads_english_books", "understands_english_books", "unknown"].includes(fact["value"] as string)) return null
   if (key === "childEnglishWriting" && !["simple_words", "simple_sentences", "can_explain_in_english", "unknown"].includes(fact["value"] as string)) return null
   return fact
+}
+
+function normalizeParentExperienceNeeds(value: unknown, factEvidence: unknown): unknown {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value
+  const record = value as Record<string, unknown>
+  const evidence = typeof factEvidence === "string" && factEvidence.trim().length > 0 ? factEvidence.trim().slice(0, 240) : null
+  return Object.fromEntries(campfitV3ParentExperienceNeedAxes.map((axis) => {
+    const item = record[axis]
+    if (typeof item === "string") {
+      return [axis, { importance: item, evidence: item === "unspecified" || evidence === null ? [] : [evidence] }]
+    }
+    if (typeof item === "object" && item !== null && !Array.isArray(item)) {
+      const normalized = item as Record<string, unknown>
+      return [axis, {
+        ...normalized,
+        evidence: Array.isArray(normalized["evidence"])
+          ? normalized["evidence"]
+          : normalized["importance"] === "unspecified" || evidence === null ? [] : [evidence],
+      }]
+    }
+    return [axis, item]
+  }))
 }
 
 function normalizeExperienceItem(value: unknown): Record<string, unknown> | null {

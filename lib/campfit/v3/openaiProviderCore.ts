@@ -70,6 +70,18 @@ export const campfitModelResponseJsonSchema = {
                 type: "object",
                 additionalProperties: false,
                 properties: {
+                  english_growth: { type: "object", additionalProperties: false, properties: { importance: { type: "string", enum: ["primary", "important", "nice_to_have", "unspecified", "avoid"] }, evidence: { type: "array", maxItems: 3, items: { type: "string", minLength: 1, maxLength: 240 } } }, required: ["importance", "evidence"] },
+                  peer_interaction: { type: "object", additionalProperties: false, properties: { importance: { type: "string", enum: ["primary", "important", "nice_to_have", "unspecified", "avoid"] }, evidence: { type: "array", maxItems: 3, items: { type: "string", minLength: 1, maxLength: 240 } } }, required: ["importance", "evidence"] },
+                  global_experience: { type: "object", additionalProperties: false, properties: { importance: { type: "string", enum: ["primary", "important", "nice_to_have", "unspecified", "avoid"] }, evidence: { type: "array", maxItems: 3, items: { type: "string", minLength: 1, maxLength: 240 } } }, required: ["importance", "evidence"] },
+                  independence_confidence: { type: "object", additionalProperties: false, properties: { importance: { type: "string", enum: ["primary", "important", "nice_to_have", "unspecified", "avoid"] }, evidence: { type: "array", maxItems: 3, items: { type: "string", minLength: 1, maxLength: 240 } } }, required: ["importance", "evidence"] },
+                  school_learning_experience: { type: "object", additionalProperties: false, properties: { importance: { type: "string", enum: ["primary", "important", "nice_to_have", "unspecified", "avoid"] }, evidence: { type: "array", maxItems: 3, items: { type: "string", minLength: 1, maxLength: 240 } } }, required: ["importance", "evidence"] },
+                },
+                required: ["english_growth", "peer_interaction", "global_experience", "independence_confidence", "school_learning_experience"],
+              },
+              {
+                type: "object",
+                additionalProperties: false,
+                properties: {
                   schoolSchooling: { type: "string", enum: ["primary", "secondary", "mentioned", "none"] },
                   englishIntensive: { type: "string", enum: ["primary", "secondary", "mentioned", "none"] },
                   subjectProject: { type: "string", enum: ["primary", "secondary", "mentioned", "none"] },

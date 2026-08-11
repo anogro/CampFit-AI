@@ -3,11 +3,9 @@ import type { AnalyzeConversationInput } from "@/lib/campfit/v3/provider"
 
 export function buildConversationPrompt(input: AnalyzeConversationInput): string {
   const responseExample = {
-    assistantMessage: "아이와 부모님의 영어 상황, 희망 지역을 함께 이해했어요. 부모님이 영어로 소통할 수 있다는 점도 반영했습니다.",
+    assistantMessage: "아이에게 영어를 실제로 사용해보는 경험과 또래와 어울리는 시간이 모두 중요하군요.",
     facts: [
-      { key: "childEnglishLevel", subject: "child", value: "beginner", source: "explicit_user_statement", confidence: 1, evidence: "사용자가 아이의 영어 수준을 초급이라고 말함" },
-      { key: "parentEnglishCommunication", subject: "parent", value: "possible", source: "explicit_user_statement", confidence: 1, evidence: "사용자가 본인은 영어로 소통할 수 있다고 말함" },
-      { key: "destinationPreference", subject: "preference", value: ["Singapore", "New Zealand"], source: "explicit_user_statement", confidence: 1, evidence: "사용자가 싱가포르와 뉴질랜드를 언급함" },
+      { key: "parentExperienceNeeds", subject: "preference", value: { english_growth: { importance: "important", evidence: ["영어를 실제로 사용해보는 경험"] }, peer_interaction: { importance: "important", evidence: ["또래와 어울리는 시간"] }, global_experience: { importance: "unspecified", evidence: [] }, independence_confidence: { importance: "unspecified", evidence: [] }, school_learning_experience: { importance: "unspecified", evidence: [] } }, source: "explicit_user_statement", confidence: 1, evidence: "영어와 또래 경험을 기대한다고 말함" },
     ],
     unresolved: ["koreanSupportNeed"],
     conflicts: [],
@@ -21,6 +19,12 @@ export function buildConversationPrompt(input: AnalyzeConversationInput): string
     "현재 사용자 발화에서 사용자가 직접 말한 사실만 추출하고, 아이와 부모의 주체를 분리하세요. 말하지 않은 값은 만들지 말고 facts에서 생략해 unresolved에 남기세요.",
     "질문지를 순서대로 채우지 말고 상담사처럼 한 발화에서 관련된 여러 사실을 모두 추출하세요. 현재 질문과 직접 관련 없는 예산·지역·부모 영어·아이 성향·걱정·기대 효과도 버리지 마세요.",
     "표현이 스키마의 라벨과 달라도 의미를 이해해 정규화하세요. 영어유치원·영어 수업 경험은 경험 evidence로, 간단한 대화·수업 참여 가능은 실제 듣기·말하기 evidence로 기록하세요. 원문에 beginner/basic/intermediate 같은 단어가 없다는 이유로 evidence를 unresolved에 남기거나 같은 질문을 반복하지 마세요.",
+    "부모의 기대를 parentExperienceNeeds 하나의 fact로 구조화하세요. 축은 english_growth(실제 영어 사용·성장), peer_interaction(현지·다양한 국적의 또래 교류), global_experience(새로운 문화·환경·해외 경험), independence_confidence(새 환경에서의 자신감·독립성), school_learning_experience(해외 학교·국제학교·현지 수업 방식 경험)입니다.",
+    "한 발화에서 여러 축을 함께 추출하고, 문맥상 상대적인 중요도를 비교해 primary|important|nice_to_have|unspecified|avoid 중 하나로 정규화하세요. '가장 중요·제일 중요·무엇보다·꼭'은 해당 축의 primary 후보, '중요·많이·하고 싶다'는 important 후보, '되면 좋고·있으면 좋고·가능하면'은 nice_to_have 후보입니다. 단순 언급만으로 모든 축을 primary로 만들지 마세요.",
+    "부정 표현의 범위를 구분하세요. '공부시키려는 건 아니고'는 영어 성장 자체의 avoid가 아니라 학업 중심 방식에 대한 거리감일 수 있습니다. '국제학교는 굳이 안 가도 돼요'처럼 축 자체를 원하지 않는 경우에만 school_learning_experience=avoid로 기록하세요.",
+    "스쿨링·영어캠프·STEM은 부모 니즈 5축과 같은 층위의 fact가 아닙니다. 상품 형태나 아이 활동 선호를 부모 니즈 축으로 억지로 변환하지 말고, 기존 preferredActivities 또는 experienceGoals에 명시적 근거가 있을 때만 별도로 기록하세요.",
+    "'아이가 낯을 가려서 자신감이 생겼으면 좋겠다'처럼 현재 아이 특성과 부모가 원하는 변화를 분리하세요. 현재 상태를 independence_confidence의 낮은 점수로 저장하지 말고, 부모 목표만 parentExperienceNeeds.independence_confidence=primary로 기록하세요.",
+    "parentExperienceNeeds 각 축의 evidence 배열에는 사용자 발화에서 확인한 짧은 원문 또는 의미를 보존한 근거만 넣으세요. 말하지 않은 가족 정보, 부모 능력, 이주 확정, 프로그램 적합성은 만들지 마세요.",
     "아이 영어 정보는 하나의 등급으로 축약하지 말고 evidence를 분리해 추출하세요. 영어유치원·영어학원·영어 수업·몰입 경험은 childEnglishExperience, 국제학교·해외학교·해외캠프·해외거주는 childEnglishEnvironment, AR·Lexile·영어시험·학교 영어 수준은 childEnglishAssessment에 기록하세요.",
     "듣기는 childEnglishListening, 말하기는 childEnglishSpeaking, 읽기는 childEnglishReading, 쓰기는 childEnglishWriting, 외국인과 대화·질문 답변·먼저 말하기 같은 실제 행동은 childEnglishUsage로 기록하세요. receptive ability(듣기·읽기)와 expressive ability(말하기·쓰기)를 섞지 마세요.",
     "AR·Lexile·영어유치원·국제학교 경험 하나만으로 childEnglishLevel이나 학업 준비를 추론하지 마세요. 수업 설명을 이해하고, 영어로 말하고, 읽고 쓰는 실제 능력이 명시된 경우에만 해당 evidence를 각각 기록하세요.",
@@ -63,6 +67,7 @@ export function buildConversationPrompt(input: AnalyzeConversationInput): string
       socialPreference: { subject: "child", type: "string[]", description: "아이의 또래·사회적 선호" },
       desiredOutcomes: { subject: "preference", type: "string[]", description: "상담에서 기대하는 변화" },
       worries: { subject: "parent", type: "string[]", description: "부모가 말한 일반적인 걱정" },
+      parentExperienceNeeds: { subject: "preference", shape: { english_growth: "{importance, evidence[]}", peer_interaction: "{importance, evidence[]}", global_experience: "{importance, evidence[]}", independence_confidence: "{importance, evidence[]}", school_learning_experience: "{importance, evidence[]}" }, description: "부모가 기대하는 경험 5축과 상대적 중요도" },
       experienceGoals: { subject: "preference", shape: { schoolSchooling: "primary|secondary|mentioned|none", englishIntensive: "primary|secondary|mentioned|none", subjectProject: "primary|secondary|mentioned|none", cultureActivity: "primary|secondary|mentioned|none" } },
       preferredRegions: { subject: "preference", values: ["southeast_asia", "oceania", "north_america", "europe"], type: "array" },
       excludedRegions: { subject: "preference", values: ["southeast_asia", "oceania", "north_america", "europe"], type: "array", description: "사용자가 너무 멀거나 원하지 않는다고 명시한 지역" },

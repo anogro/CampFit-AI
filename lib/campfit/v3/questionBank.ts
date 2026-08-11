@@ -2,6 +2,7 @@ import type { CampfitV3ConversationState, CampfitV3QuickReply } from "@/types/ca
 import { questionReplies } from "@/lib/campfit/v3/stateEngine"
 import { isEnglishReadinessSufficient } from "@/lib/campfit/v3/progress"
 import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
+import { hasParentExperienceNeeds } from "@/lib/campfit/v3/parentExperienceNeeds"
 
 export type CampfitV3Question = {
   readonly key: string
@@ -23,7 +24,7 @@ export type CampfitV3Question = {
 export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
   {
     key: "child_english_level",
-    title: "기본 조건은 확인했어요. 이제 아이와 해외 캠프를 고민하게 된 상황을 편하게 말씀해주세요. 아이의 영어 경험과 좋아하는 활동, 캠프에서 기대하는 변화, 부모가 현지에서 어떻게 지내고 싶은지, 관심 있는 지역도 함께 말씀해주세요.",
+    title: "기본 조건은 확인했어요. 이제 아이와 해외 캠프를 고민하게 된 상황을 편하게 말씀해주세요. 아이의 영어 실력은 어느 정도인가요? 아이가 좋아하는 활동, 캠프에서 기대하는 변화, 부모가 현지에서 어떻게 지내고 싶은지, 관심 있는 지역 등 캠프 추천에 필요한 내용을 편하게 이야기해주세요.",
     followUpTitle: "현재 아이가 영어로 어느 정도 소통할 수 있는지만 조금 더 알려주세요. 선생님 설명 이해, 간단한 질문에 답하기, 영어책 읽기처럼 편한 예를 들어주셔도 좋아요.",
     helper: "한 가지씩 답하지 않아도 괜찮아요. 떠오르는 내용을 자유롭게 적어주세요.",
     quickReplies: questionReplies([["beginner", "영어가 거의 낯설어요"], ["basic", "단어·짧은 표현 정도예요"], ["intermediate", "간단한 일상 대화가 가능해요"], ["advanced", "영어 수업도 참여할 수 있어요"]]),
@@ -64,6 +65,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
     quickReplies: questionReplies([["schoolSchooling", "국제학교·스쿨링 경험"], ["englishIntensive", "영어 자신감과 집중 노출"], ["subjectProject", "STEM·예술·프로젝트"], ["cultureActivity", "문화·활동과 즐거운 경험"]]),
     completedBy: ["experienceGoals"],
     priority: 80,
+    shouldAsk: (state) => !hasParentExperienceNeeds(state.facts.parentExperienceNeeds?.value),
   },
   {
     key: "preferred_region",
@@ -142,6 +144,7 @@ export function allowedQuestionKeys(state: CampfitV3ConversationState): readonly
 export function isQuestionCompleted(question: CampfitV3Question, state: CampfitV3ConversationState): boolean {
   if (state.completedQuestionKeys.includes(question.key)) return true
   if (question.key === "child_english_level") return isEnglishReadinessSufficient(state)
+  if (question.key === "primary_experience_goal" && hasParentExperienceNeeds(state.facts.parentExperienceNeeds?.value)) return true
   return question.completedBy.every((key) => {
     const fact = state.facts[key as keyof typeof state.facts]
     if (fact === undefined || fact.status === "unknown" || fact.status === "tentative") return false

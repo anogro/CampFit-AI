@@ -382,7 +382,7 @@ describe("CampFit v3 conversational counselor flow", () => {
     }
   })
 
-  it("does not apply deterministic English extraction after a valid provider response", async () => {
+  it("keeps the provider evidence gate while accepting grounded English supplements", async () => {
     const start = startConversation(basicInfo)
     const provider: CampfitV3LLMProvider = {
       ...fallbackProvider,
@@ -406,8 +406,89 @@ describe("CampFit v3 conversational counselor flow", () => {
     })
 
     expect(response.aiUsed).toBe(true)
-    expect(response.updatedState.facts.childEnglishSpeaking).toBeUndefined()
-    expect(response.updatedState.unresolved).toContain("childEnglishSpeaking")
+    expect(response.updatedState.facts.childEnglishSpeaking?.value).toBe("can_converse")
+    expect(response.updatedState.facts.englishReadiness?.value).toBe("beginner_friendly")
+    expect(response.updatedState.unresolved).not.toContain("childEnglishSpeaking")
+  })
+
+  it("closes English questioning when a partial provider response is completed by grounded responsive-speaking evidence", async () => {
+    const start = startConversation(basicInfo)
+    const provider: CampfitV3LLMProvider = {
+      ...fallbackProvider,
+      analyzeConversation: async () => ({
+        assistantMessage: "영어 설명은 이해하는 편이에요.",
+        facts: [{
+          key: "childEnglishListening",
+          subject: "child",
+          value: "understands_class_explanation",
+          source: "explicit_user_statement",
+          confidence: 1,
+          evidence: "선생님 설명을 이해하고 대답할 수 있어요.",
+        }],
+        unresolved: ["childEnglishSpeaking"],
+        conflicts: [],
+        suggestedNextQuestionKey: "child_english_level",
+        nextAction: "ask",
+        readyForRecommendation: false,
+      }),
+    }
+    const response = await processConversationMessage({
+      transcript: [{ role: "assistant", content: start.assistantMessage, questionKey: start.questionKey ?? undefined }],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "선생님 설명을 이해하고 대답할 수 있어요.",
+      quickReplyKey: null,
+      provider,
+    })
+
+    expect(response.updatedState.facts.childEnglishListening?.value).toBe("understands_class_explanation")
+    expect(response.updatedState.facts.childEnglishSpeaking?.value).toBe("answers_simple_questions")
+    expect(response.updatedState.facts.englishReadiness?.value).toBe("beginner_friendly")
+    expect(response.updatedState.completedQuestionKeys).toContain("child_english_level")
+    expect(response.questionKey).not.toBe("child_english_level")
+    expect(response.questionKey).not.toBe("korean_support_need")
+    expect(response.assistantMessage).toContain("영어로 진행되는 수업을 이해하고 질문에도 답할 수 있는 편이군요.")
+    expect(response.assistantMessage).not.toContain("간단한 질문에 답하거나 먼저 영어로 말하는 건 어떤가요?")
+    expect(response.acknowledgementEvidence?.map((item) => item.factKey)).toEqual(expect.arrayContaining([
+      "childEnglishListening",
+      "childEnglishSpeaking",
+    ]))
+  })
+
+  it("prioritizes peer interaction and moves to region after English becomes sufficient", async () => {
+    const start = startConversation(basicInfo)
+    const parentMessage = "영어유치원에 2년간 다녀서 영어수업환경에 익숙해요. 영어도 늘면 좋지만 제일 중요한 건 외국 친구들이랑 어울려보는 거예요."
+    const first = await processConversationMessage({
+      transcript: [{ role: "assistant", content: start.assistantMessage, questionKey: start.questionKey ?? undefined }],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: parentMessage,
+      quickReplyKey: null,
+      provider: fallbackProvider,
+    })
+    const second = await processConversationMessage({
+      transcript: [
+        { role: "assistant", content: start.assistantMessage, questionKey: start.questionKey ?? undefined },
+        { role: "user", content: parentMessage },
+        { role: "assistant", content: first.assistantMessage, questionKey: first.questionKey ?? undefined },
+      ],
+      currentState: first.updatedState,
+      basicInfo,
+      userMessage: "선생님 설명을 이해하고 대답할 수 있어요.",
+      quickReplyKey: null,
+      provider: fallbackProvider,
+    })
+
+    expect(first.updatedState.facts.parentExperienceNeeds?.value).toMatchObject({
+      peer_interaction: { importance: "primary" },
+      english_growth: { importance: "nice_to_have" },
+    })
+    expect(second.updatedState.facts.childEnglishSpeaking?.value).toBe("answers_simple_questions")
+    expect(second.updatedState.completedQuestionKeys).toContain("child_english_level")
+    expect(second.questionKey).toBe("preferred_region")
+    expect(second.questionKey).not.toBe("korean_support_need")
+    expect(second.assistantMessage).toContain("영어로 진행되는 수업을 이해하고 질문에도 답할 수 있는 편이군요.")
+    expect(second.assistantMessage).toContain("마음에 두고 있는 나라나 도시")
   })
 
   it("does not infer current English level from English-kindergarten experience alone", async () => {

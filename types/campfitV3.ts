@@ -32,6 +32,7 @@ export const campfitV3FactKeys = [
   "socialPreference",
   "desiredOutcomes",
   "worries",
+  "parentExperienceNeeds",
   "experienceGoals",
   "preferredRegions",
   "excludedRegions",
@@ -90,6 +91,32 @@ export type CampfitV3EnglishAssessment = {
   readonly type: CampfitV3EnglishAssessmentType
   readonly value: number | string
 }
+
+export const campfitV3ParentExperienceNeedAxes = [
+  "english_growth",
+  "peer_interaction",
+  "global_experience",
+  "independence_confidence",
+  "school_learning_experience",
+] as const
+export type CampfitV3ParentExperienceNeedAxis = (typeof campfitV3ParentExperienceNeedAxes)[number]
+
+export const campfitV3ParentNeedImportanceValues = [
+  "primary",
+  "important",
+  "nice_to_have",
+  "unspecified",
+  "avoid",
+] as const
+export type CampfitV3ParentNeedImportance = (typeof campfitV3ParentNeedImportanceValues)[number]
+
+export type CampfitV3ParentExperienceNeed = {
+  readonly importance: CampfitV3ParentNeedImportance
+  /** Short user-grounded snippets retained for semantic synthesis and audit. */
+  readonly evidence: readonly string[]
+}
+
+export type CampfitV3ParentExperienceNeeds = Readonly<Record<CampfitV3ParentExperienceNeedAxis, CampfitV3ParentExperienceNeed>>
 
 export const campfitV3FactStatuses = ["known", "unknown", "tentative", "confirmed"] as const
 export type CampfitV3FactStatus = (typeof campfitV3FactStatuses)[number]

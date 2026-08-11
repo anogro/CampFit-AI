@@ -1,5 +1,6 @@
 import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/types/campfitV3"
 import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
+import { extractParentExperienceNeedsValue, isParentExperienceNeedsValue } from "@/lib/campfit/v3/parentExperienceNeeds"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationState,
@@ -115,7 +116,7 @@ export function syncEnglishReadiness(state: CampfitV3ConversationState): Campfit
     value: assessment.readiness,
     source: "ai_inference",
     confidence: assessment.confidence,
-    status: assessment.sufficientForRecommendation ? "known" : "tentative",
+    status: assessment.recommendationSufficiency ? "known" : "tentative",
     evidence: assessment.reason,
   })
   const merged = mergeFacts(state, [readinessFact])
@@ -131,13 +132,13 @@ export function syncEnglishReadiness(state: CampfitV3ConversationState): Campfit
     "childEnglishWriting",
     "childEnglishUsage",
   ]
-  const unresolved = assessment.sufficientForRecommendation
+  const unresolved = assessment.recommendationSufficiency
     ? merged.unresolved.filter((key) => !englishKeys.includes(key))
     : Array.from(new Set([
       ...merged.unresolved,
       ...(assessment.readiness === "unknown" ? ["englishReadiness" as const] : []),
     ]))
-  const completedQuestionKeys = assessment.sufficientForRecommendation
+  const completedQuestionKeys = assessment.recommendationSufficiency
     ? merged.completedQuestionKeys
     : merged.completedQuestionKeys.filter((key) => key !== "child_english_level")
   return { ...merged, unresolved, completedQuestionKeys }
@@ -186,6 +187,7 @@ export function isSemanticallyValidModelFact(input: {
     socialPreference: ["child", "preference"],
     desiredOutcomes: ["preference"],
     worries: ["parent", "family"],
+    parentExperienceNeeds: ["preference"],
     experienceGoals: ["preference"],
     preferredRegions: ["preference"],
     excludedRegions: ["preference"],
@@ -247,6 +249,8 @@ export function isSemanticallyValidModelFact(input: {
       return isStringArray(input.value, 8)
     case "worries":
       return isStringArray(input.value, 8)
+    case "parentExperienceNeeds":
+      return isParentExperienceNeedsValue(input.value)
     case "experienceGoals":
       return isExperienceGoals(input.value)
     case "preferredRegions":
@@ -389,6 +393,9 @@ export function extractDeterministicFacts(
   if (/(저는|제가|부모|엄마|아빠|보호자).{0,24}(영어|basic\s*communication|소통).{0,20}(가능|할 수|괜찮|소통|돼|되)/iu.test(text)) push("parentEnglishCommunication", "parent", "possible")
   if (/(첫|처음).{0,8}(해외|캠프|교육)/.test(text)) push("isFirstOverseasEducationExperience", "child", true)
   if (/(첫 경험이 아니|해외.*경험.*있)/.test(text)) push("isFirstOverseasEducationExperience", "child", false)
+
+  const parentExperienceNeeds = extractParentExperienceNeedsValue(text)
+  if (parentExperienceNeeds !== null) push("parentExperienceNeeds", "preference", parentExperienceNeeds)
 
   const goals: Partial<Record<ExperienceDirectionKey, ExperienceGoalStrength>> = {}
   const englishExposureContext = /(영어유치원|영어\s*환경|영어를?\s*(?:자연스럽게|계속|자주)\s*(?:접|배우)|영어\s*노출|영어\s*사용\s*기회|영어\s*경험|영어\s*감|영어.{0,12}(?:유지|확대|늘리))/iu.test(text)
@@ -675,7 +682,7 @@ function speakingEvidence(text: string): "answers_simple_questions" | "can_conve
   if (/(?:외국인|원어민).{0,24}대화.{0,32}(?:문제(?:는)?\s*없|무리\s*없|가능)/iu.test(text)) return "can_converse"
   if (/(먼저\s*말|자발적으로\s*영어로\s*말|스스로\s*말)/iu.test(text)) return "initiates_speech"
   if (/(영어로\s*곧잘\s*말|영어로\s*편하게\s*(?:말|대화)|유창하게\s*말|영어로\s*대화가?\s*(?:잘\s*)?가능)/iu.test(text)) return "can_converse"
-  if (/(간단한\s*(?:질문|대화)|질문에\s*(?:답|대답)|짧은\s*대화|대화가?\s*가능|간단히\s*대답)/iu.test(text)) return "answers_simple_questions"
+  if (/(간단한\s*(?:질문|대화)|질문에\s*(?:답|대답)|짧은\s*대화|대화가?\s*가능|간단히\s*대답|대답(?:은|을)?\s*(?:할\s*수|가능|할\s*수\s*있))/iu.test(text)) return "answers_simple_questions"
   if (/실제로\s*말.{0,16}(?:안\s*(?:나오|나와)|잘\s*안\s*(?:나오|나와))/iu.test(text)) return "rarely_speaks"
   if (/(영어는\s*거의\s*(?:처음|못)|영어로\s*말을?\s*거의\s*안)/iu.test(text)) return "rarely_speaks"
   return null
@@ -768,6 +775,7 @@ function parseDurationWeeks(text: string): number | null {
 export function summarizeFacts(state: CampfitV3ConversationState): readonly string[] {
   const labels: Partial<Record<CampfitV3FactKey, string>> = {
     childEnglishLevel: "아이 영어 수준",
+    parentExperienceNeeds: "부모가 기대하는 경험",
     experienceGoals: "원하는 경험",
     preferredRegions: "희망 지역",
     excludedRegions: "제외 지역",

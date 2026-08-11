@@ -1,5 +1,6 @@
 import type { CampfitV3BasicInfo, CampfitV3ConversationState, CampfitV3FactKey } from "@/types/campfitV3"
 import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
+import { hasParentExperienceNeeds } from "@/lib/campfit/v3/parentExperienceNeeds"
 
 const weightedSlots: readonly { readonly key: CampfitV3FactKey; readonly weight: number }[] = [
   { key: "childEnglishLevel", weight: 7 },
@@ -16,7 +17,9 @@ export function calculateProgress(basicInfo: CampfitV3BasicInfo, state: CampfitV
   const basicCredit = basicInfo.childAges.length && basicInfo.adultCount >= 1 ? 35 : 0
   if (basicCredit > 0 && isReadyForRecommendation(state)) return 100
   const factCredit = weightedSlots.reduce((sum, slot) => {
-    const fact = state.facts[slot.key]
+    const fact = slot.key === "experienceGoals" && hasParentExperienceNeeds(state.facts.parentExperienceNeeds?.value)
+      ? state.facts.parentExperienceNeeds
+      : state.facts[slot.key]
     if (slot.key === "dayProgramSeparationReadiness" && state.facts.isFirstOverseasEducationExperience?.value === false) return sum + slot.weight
     if (slot.key === "childEnglishLevel" && !isEnglishReadinessSufficient(state)) return sum
     if (state.conflicts.some((conflict) => conflict.key === slot.key)) return sum
@@ -35,7 +38,9 @@ export function isReadyForRecommendation(state: CampfitV3ConversationState): boo
     "parentStayGoals",
   ]
   const coreReady = core.every((key) => {
-    const fact = state.facts[key]
+    const fact = key === "experienceGoals" && hasParentExperienceNeeds(state.facts.parentExperienceNeeds?.value)
+      ? state.facts.parentExperienceNeeds
+      : state.facts[key]
     return fact !== undefined
       && fact.status !== "unknown"
       && fact.status !== "tentative"
@@ -45,7 +50,7 @@ export function isReadyForRecommendation(state: CampfitV3ConversationState): boo
 }
 
 export function isEnglishReadinessSufficient(state: CampfitV3ConversationState): boolean {
-  return assessEnglishReadiness(state).sufficientForRecommendation
+  return assessEnglishReadiness(state).recommendationSufficiency
 }
 
 export function progressMessage(progress: number): string {

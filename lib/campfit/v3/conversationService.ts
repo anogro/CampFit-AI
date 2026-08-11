@@ -1,6 +1,7 @@
 import { allowedQuestionKeys, getQuestion, isQuestionCompleted, selectNextQuestion } from "@/lib/campfit/v3/questionBank"
 import { calculateProgress, isReadyForRecommendation, progressMessage } from "@/lib/campfit/v3/progress"
 import { englishEvidenceGap } from "@/lib/campfit/v3/englishReadiness"
+import { parentExperienceNeedsAcknowledgement, parentNeedEvidenceIsGrounded, hasParentExperienceNeeds } from "@/lib/campfit/v3/parentExperienceNeeds"
 import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/types/campfitV3"
 import {
   applyQuickReply,
@@ -112,6 +113,13 @@ export async function processConversationMessage(input: {
     if (model !== null) {
       acceptedModelFacts = acceptedFactsFromModel(state, model, safeUserMessage)
       state = mergeModelResponse(state, model, acceptedModelFacts)
+      // Solar remains the semantic extractor on the normal path, but grounded
+      // deterministic English evidence supplements omitted model fields. A
+      // partial provider response must not reopen an English question when the
+      // user's wording already contains enough recommendation evidence.
+      const acceptedKeys = new Set(acceptedModelFacts.map((fact) => fact.key))
+      deterministicFacts = privacySafeFacts.filter((fact) => isEnglishEvidenceKey(fact.key) && !acceptedKeys.has(fact.key))
+      state = mergeFacts(state, deterministicFacts)
     } else {
       deterministicFacts = privacySafeFacts
       const deterministic = markChangedExplicitFactsAsCorrections(
@@ -201,6 +209,7 @@ function acceptedFactsFromModel(
     if (fact.key === "englishReadiness") return []
     if (fact.key === "parentEnglishCommunication" && !mentionsParentEnglishCommunication(userMessage)) return []
     if (isEnglishEvidenceKey(fact.key) && !isEnglishModelFactSupportedByUserText(fact, userMessage)) return []
+    if (fact.key === "parentExperienceNeeds" && !parentNeedEvidenceIsGrounded(fact.value, fact.evidence, userMessage)) return []
     if (!isSemanticallyValidModelFact(fact)) return []
     const existing = state.facts[fact.key]
     if (existing !== undefined && existing.source !== "ai_inference" && !isCorrectionLanguage(userMessage)) {
@@ -426,6 +435,12 @@ function buildGroundedAcknowledgement(
     }
   }
 
+  const parentNeeds = facts.find((fact) => fact.key === "parentExperienceNeeds")
+  if (parentNeeds !== undefined && hasParentExperienceNeeds(parentNeeds.value)) {
+    const text = parentExperienceNeedsAcknowledgement(parentNeeds.value)
+    if (text !== null) return { text, evidence: [toAcknowledgementEvidence(parentNeeds)] }
+  }
+
   const english = englishAcknowledgement(facts)
   if (english !== null) return english
 
@@ -462,6 +477,12 @@ function englishAcknowledgement(
   if (listening !== undefined && speaking !== undefined && isPositiveListening(listening) && isValue(speaking, "difficulty_initiating")) {
     return compact(
       "영어 설명은 대체로 이해하지만 먼저 영어로 말하는 건 조금 어려워하는 편이군요.",
+      [listening, speaking],
+    )
+  }
+  if (listening !== undefined && speaking !== undefined && isPositiveListening(listening) && isValue(speaking, "answers_simple_questions")) {
+    return compact(
+      "영어로 진행되는 수업을 이해하고 질문에도 답할 수 있는 편이군요.",
       [listening, speaking],
     )
   }
@@ -625,7 +646,7 @@ function isEnglishModelFactSupportedByUserText(
     if (fact.value === "initiates_speech") return /(?:먼저\s*말|자발적으로\s*(?:영어로\s*)?말|스스로\s*(?:영어로\s*)?말)/iu.test(text) && !/(?:어려|힘들|못|않)/iu.test(text)
     if (fact.value === "can_converse") return /(?:영어로\s*(?:곧잘|편하게|유창하게)?\s*(?:말|대화)|영어로\s*(?:대화|소통)이?\s*(?:잘\s*)?가능|(?:외국인|원어민).{0,24}대화.{0,32}(?:문제(?:는)?\s*없|무리\s*없|가능))/iu.test(text) && !/(?:어려|힘들|잘\s*못|못)/iu.test(text)
     if (fact.value === "can_present_in_english") return /영어로\s*(?:수업|발표).{0,24}(?:문제(?:는)?\s*없|무리\s*없|가능)/iu.test(text)
-    if (fact.value === "answers_simple_questions") return /(?:간단한\s*(?:질문|대화)|질문에\s*(?:답|대답)|간단히\s*대답)/iu.test(text) && !/(?:어려|힘들|잘\s*못|못)/iu.test(text)
+    if (fact.value === "answers_simple_questions") return /(?:간단한\s*(?:질문|대화)|질문에\s*(?:답|대답)|간단히\s*대답|대답(?:은|을)?\s*(?:할\s*수|가능|할\s*수\s*있))/iu.test(text) && !/(?:어려|힘들|잘\s*못|못)/iu.test(text)
     return false
   }
   if (fact.key === "childEnglishReading") return /읽|책|파닉스|독해/iu.test(text)

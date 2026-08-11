@@ -19,6 +19,9 @@ export type EnglishReadinessAssessment = {
   readonly confidence: number
   readonly evidenceKeys: readonly string[]
   readonly missingEvidence: readonly string[]
+  /** Whether the current facts are enough to explain program-level English fit. */
+  readonly recommendationSufficiency: boolean
+  /** Compatibility alias for persisted callers. */
   readonly sufficientForRecommendation: boolean
   readonly reason: string
 }
@@ -66,6 +69,7 @@ export function assessEnglishReadiness(state: CampfitV3ConversationState): Engli
         confidence: 0.96,
         evidenceKeys,
         missingEvidence: missingEvidenceFor(legacy, listening, speaking, reading, writing, usage),
+        recommendationSufficiency: true,
         sufficientForRecommendation: true,
         reason: "기존 영어 수준 선택값을 호환용으로 사용했습니다.",
       }
@@ -75,6 +79,7 @@ export function assessEnglishReadiness(state: CampfitV3ConversationState): Engli
       confidence: 0.2,
       evidenceKeys,
       missingEvidence: ["듣기", "말하기", "읽기 또는 쓰기"],
+      recommendationSufficiency: false,
       sufficientForRecommendation: false,
       reason: "영어 노출·환경·평가 정보만으로는 실제 프로그램 참여 준비도를 판단하지 않습니다.",
     }
@@ -89,7 +94,7 @@ export function assessEnglishReadiness(state: CampfitV3ConversationState): Engli
   const expressiveEvidence = speaking !== null && speaking !== "unknown"
     || writing !== null && writing !== "unknown"
     || usage.length > 0
-  const sufficientForRecommendation = receptiveEvidence && expressiveEvidence
+  const recommendationSufficiency = receptiveEvidence && expressiveEvidence
 
   const lowEnglish = !hasAbilityEvidence && legacyLevel === "beginner"
     || (speaking === "rarely_speaks" && listeningScore <= 1 && readingScore <= 1)
@@ -103,11 +108,12 @@ export function assessEnglishReadiness(state: CampfitV3ConversationState): Engli
 
   return {
     readiness,
-    confidence: sufficientForRecommendation ? 0.92 : 0.62,
+    confidence: recommendationSufficiency ? 0.92 : 0.62,
     evidenceKeys,
     missingEvidence: missingEvidenceFor(readiness, listening, speaking, reading, writing, usage),
-    sufficientForRecommendation,
-    reason: readinessReason(readiness, sufficientForRecommendation, evidenceKeys),
+    recommendationSufficiency,
+    sufficientForRecommendation: recommendationSufficiency,
+    reason: readinessReason(readiness, recommendationSufficiency, evidenceKeys),
   }
 }
 

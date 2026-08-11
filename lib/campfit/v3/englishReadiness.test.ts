@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
+import { assessEnglishReadiness, englishEvidenceGap } from "@/lib/campfit/v3/englishReadiness"
 import { createInitialConversationState, extractDeterministicFacts, mergeFacts, syncEnglishReadiness } from "@/lib/campfit/v3/stateEngine"
 
 describe("CampFit v3 English readiness", () => {
@@ -96,6 +96,68 @@ describe("CampFit v3 English readiness", () => {
     for (const { text, expected } of cases) {
       const facts = extractDeterministicFacts(text, undefined, "child_english_level")
       expect(facts.filter((fact) => fact.key.startsWith("childEnglish")).map((fact) => [fact.key, fact.value])).toEqual(expected)
+    }
+  })
+
+  it("uses recommendation sufficiency instead of requiring a complete English profile", () => {
+    const cases = [
+      {
+        text: "선생님 설명을 이해하고 대답할 수 있어요.",
+        expected: {
+          listening: "understands_class_explanation",
+          speaking: "answers_simple_questions",
+          sufficiency: true,
+          gap: null,
+        },
+      },
+      {
+        text: "선생님 말은 알아듣는데 대답은 잘 못해요.",
+        expected: {
+          listening: "understands_class_explanation",
+          speaking: "difficulty_initiating",
+          sufficiency: true,
+          gap: null,
+        },
+      },
+      {
+        text: "영어책은 잘 읽는데 수업 설명은 잘 못 알아들어요.",
+        expected: {
+          reading: "reads_english_books",
+          listening: "struggles_with_class_explanation",
+          sufficiency: false,
+          gap: "speaking",
+        },
+      },
+      {
+        text: "영어유치원은 오래 다녔는데 실제 영어 수업을 따라가는지는 잘 모르겠어요.",
+        expected: {
+          experience: true,
+          sufficiency: false,
+          gap: null,
+        },
+      },
+    ] as const
+
+    for (const testCase of cases) {
+      const facts = extractDeterministicFacts(testCase.text, undefined, "child_english_level")
+      const state = syncEnglishReadiness(mergeFacts(createInitialConversationState(), facts))
+      const assessment = assessEnglishReadiness(state)
+
+      if ("listening" in testCase.expected) {
+        expect(state.facts.childEnglishListening?.value).toBe(testCase.expected.listening)
+      }
+      if ("speaking" in testCase.expected) {
+        expect(state.facts.childEnglishSpeaking?.value).toBe(testCase.expected.speaking)
+      }
+      if ("reading" in testCase.expected) {
+        expect(state.facts.childEnglishReading?.value).toBe(testCase.expected.reading)
+      }
+      if ("experience" in testCase.expected) {
+        expect(state.facts.childEnglishExperience?.value).toEqual(expect.any(Array))
+      }
+      expect(assessment.recommendationSufficiency).toBe(testCase.expected.sufficiency)
+      expect(assessment.sufficientForRecommendation).toBe(testCase.expected.sufficiency)
+      expect(englishEvidenceGap(state)).toBe(testCase.expected.gap)
     }
   })
 })
