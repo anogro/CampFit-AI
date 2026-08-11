@@ -237,7 +237,24 @@ describe("CampFit v3 state and question engine", () => {
     const provider: CampfitV3LLMProvider = {
       analyzeConversation: async () => ({
         assistantMessage: "아이와 부모님의 영어 수준을 분리해 확인했어요.",
-        facts: [],
+        facts: [
+          {
+            key: "childEnglishLevel",
+            subject: "child",
+            value: "beginner",
+            source: "explicit_user_statement",
+            confidence: 1,
+            evidence: "아이의 영어가 초급",
+          },
+          {
+            key: "parentEnglishCommunication",
+            subject: "parent",
+            value: "possible",
+            source: "explicit_user_statement",
+            confidence: 1,
+            evidence: "부모가 영어로 소통 가능",
+          },
+        ],
         unresolved: [],
         conflicts: [],
         suggestedNextQuestionKey: "special_care_follow_up",

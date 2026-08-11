@@ -19,6 +19,7 @@ import {
   programStrengths,
   rankLabel,
 } from "@/components/campfit/v3/resultCopy"
+import { assessEnglishReadiness, englishReadinessLabels } from "@/lib/campfit/v3/englishReadiness"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationState,
@@ -40,6 +41,8 @@ type CampFitV3ResultProps = {
 function getAxisDetail(axisKey: string, state: CampfitV3ConversationState): string {
   switch (axisKey) {
     case "english": {
+      const readinessAssessment = assessEnglishReadiness(state)
+      if (readinessAssessment.evidenceKeys.length > 0 && readinessAssessment.readiness !== "unknown") return englishReadinessLabels[readinessAssessment.readiness]
       const level = state.facts.childEnglishLevel?.value
       if (level === "beginner") return "영어 초급자 수준"
       if (level === "basic") return "단어·짧은 표현 수준"
@@ -90,6 +93,8 @@ function getAxisDetail(axisKey: string, state: CampfitV3ConversationState): stri
 }
 
 function englishLevelLabel(state: CampfitV3ConversationState): string {
+  const readinessAssessment = assessEnglishReadiness(state)
+  if (readinessAssessment.evidenceKeys.length > 0 && readinessAssessment.readiness !== "unknown") return englishReadinessLabels[readinessAssessment.readiness]
   const level = state.facts.childEnglishLevel?.value
   if (level === "beginner") return "영어 초급자 수준"
   if (level === "basic") return "단어·짧은 표현 수준"

@@ -4,6 +4,7 @@ import {
   rangesOverlap,
 } from "@/lib/campfit/v3/catalogPolicy"
 import type { ExperienceSignalStatus, V3ParentStayPreferences } from "@/lib/campfit/v3/catalogPolicy"
+import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
 import type {
   V3Catalog,
   V3CatalogCity,
@@ -198,6 +199,9 @@ function evaluateProgram(input: {
   const care = String(input.state.facts.specialCareFollowUp?.value ?? "unknown")
   const communication = String(input.state.facts.parentCommunicationNeed?.value ?? "unknown")
   const childLevel = String(input.state.facts.childEnglishLevel?.value ?? "unknown")
+  const readinessAssessment = assessEnglishReadiness(input.state)
+  const readiness = readinessAssessment.readiness
+  const hasDetailedEnglishEvidence = readinessAssessment.evidenceKeys.length > 0
 
   if (input.program.status !== "active") excluded.push("active 프로그램이 아님")
   const parentCheck = evaluateParentCompatibility(input.program.parentScope, input.parentPreferences)
@@ -235,7 +239,7 @@ function evaluateProgram(input: {
     verify.push("필요할 때 한국어로 도움받을 수 있는 범위")
   }
 
-  if (childLevel === "beginner") {
+  if (childLevel === "beginner" || hasDetailedEnglishEvidence && (readiness === "support_required" || readiness === "beginner_friendly")) {
     if (input.program.beginnerClass === false) softMismatch.push("초급자 전용 반 미확인")
     if (input.program.beginnerClass !== true) verify.push("영어 초급자 반·초기 적응 지원")
   }
@@ -279,7 +283,9 @@ function evaluateProgram(input: {
     (input.directionScore.get(direction) ?? 50) * 0.55
       + directionSignalForScoring(programExperienceScore(input.program, direction), programExperienceStatus(input.program, direction)) * 0.45,
   )
-  const beginnerFit = childLevel === "beginner" ? input.program.beginnerClass === true ? 100 : input.program.beginnerClass === false ? 30 : 55 : 75
+  const beginnerFit = childLevel === "beginner" || hasDetailedEnglishEvidence && (readiness === "support_required" || readiness === "beginner_friendly")
+    ? input.program.beginnerClass === true ? 100 : input.program.beginnerClass === false ? 30 : 55
+    : 75
   const supportFit = supportScore(koreanNeed, input.program)
   const budgetFit = referenceMinimumKrw === null ? 58 : referenceMinimumKrw <= input.basicInfo.budgetMaxKrw ? 90 : 25
   const score = clamp(goalFit * 0.46 + beginnerFit * 0.14 + supportFit * 0.14 + budgetFit * 0.14 + 60 * 0.07 + metadataScore(input.program) * 0.05)
@@ -770,7 +776,11 @@ function supportConditions(state: CampfitV3ConversationState): readonly string[]
   const communication = String(state.facts.parentCommunicationNeed?.value ?? "unknown")
   if (communication === "daily") items.push("부모에게 매일 간단한 활동 공유")
   if (communication === "issue_only") items.push("문제 발생 시 부모에게 즉시 연락")
-  if (String(state.facts.childEnglishLevel?.value ?? "") === "beginner") items.push("영어 초급자 적응 지원")
+  const readinessAssessment = assessEnglishReadiness(state)
+  const readiness = readinessAssessment.readiness
+  if (readinessAssessment.evidenceKeys.length > 0 && readiness === "support_required") items.push("영어 지원 담당자와 초급자 반·초기 적응 지원")
+  else if (readinessAssessment.evidenceKeys.length > 0 && readiness === "beginner_friendly") items.push("쉬운 영어 안내와 초반 적응 지원")
+  else if (String(state.facts.childEnglishLevel?.value ?? "") === "beginner") items.push("영어 초급자 적응 지원")
   const care = String(state.facts.specialCareFollowUp?.value ?? "unknown")
   if (care !== "none") items.push("특별 식사 대응 확인", "복약 지원 확인", "건강·생활 지원 조건 확인")
   return items.length ? items : ["프로그램별 응급 연락 절차 확인"]
@@ -778,11 +788,13 @@ function supportConditions(state: CampfitV3ConversationState): readonly string[]
 
 function requiredFactLabels(state: CampfitV3ConversationState): readonly string[] {
   const pairs = [
-    ["childEnglishLevel", "아이 영어 수준 확인"], ["experienceGoals", "주요 경험 목표 확인"], ["preferredRegions", "희망 지역 확인"],
+    ["experienceGoals", "주요 경험 목표 확인"], ["preferredRegions", "희망 지역 확인"],
     ["regionImportance", "지역 중요도 확인"], ["koreanSupportNeed", "한국어 지원 수준 확인"],
     ["parentStayGoals", "부모 체류 목적 확인"],
   ] as const
-  return pairs.filter(([key]) => state.facts[key] === undefined).map(([, label]) => label)
+  const labels = pairs.filter(([key]) => state.facts[key] === undefined).map(([, label]) => label)
+  if (!assessEnglishReadiness(state).sufficientForRecommendation) return ["아이 영어 준비도 확인", ...labels]
+  return labels
 }
 
 function readGoalStrengths(state: CampfitV3ConversationState): Readonly<Record<ExperienceDirectionKey, ExperienceGoalStrength>> {
@@ -811,8 +823,8 @@ function programExperienceStatus(program: V3CatalogProgram, direction: Experienc
 }
 
 function englishReadiness(state: CampfitV3ConversationState): number {
-  const value = String(state.facts.childEnglishLevel?.value ?? "unknown")
-  return value === "advanced" ? 90 : value === "intermediate" ? 72 : value === "basic" ? 48 : value === "beginner" ? 32 : 50
+  const value = assessEnglishReadiness(state).readiness
+  return value === "academic_ready" ? 90 : value === "general_program_ready" ? 72 : value === "beginner_friendly" ? 48 : value === "support_required" ? 32 : 50
 }
 
 function strengthScore(value: ExperienceGoalStrength): number {

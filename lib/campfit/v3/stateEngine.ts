@@ -1,4 +1,5 @@
 import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/types/campfitV3"
+import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationState,
@@ -8,6 +9,9 @@ import type {
   CampfitV3FactStatus,
   CampfitV3FactSubject,
   CampfitV3QuickReply,
+  CampfitV3EnglishAssessmentType,
+  CampfitV3EnglishEnvironmentType,
+  CampfitV3EnglishExperienceType,
   ExperienceDirectionKey,
   ExperienceGoalStrength,
 } from "@/types/campfitV3"
@@ -75,7 +79,7 @@ export function mergeFacts(
     if (incoming.source === "ai_inference" && incoming.evidence.trim().length === 0) continue
     const value = existing !== undefined && incoming.source !== "user_correction"
       && Array.isArray(existing.value) && Array.isArray(incoming.value) && incoming.value.length > 0
-      ? Array.from(new Set([...existing.value, ...incoming.value]))
+      ? mergeArrayValues(existing.value, incoming.value)
       : incoming.value
     facts[incoming.key] = value === incoming.value ? incoming : { ...incoming, value }
     if (incoming.status !== "tentative" && incoming.status !== "unknown" && incoming.source !== "ai_inference") resolved.add(incoming.key)
@@ -96,6 +100,47 @@ export function mergeFacts(
     unresolved: state.unresolved.filter((key) => !resolved.has(key)),
     conflicts: state.conflicts.filter((conflict) => !resolved.has(conflict.key)),
   }
+}
+
+export function syncEnglishReadiness(state: CampfitV3ConversationState): CampfitV3ConversationState {
+  const assessment = assessEnglishReadiness(state)
+  const hasEnglishInput = assessment.evidenceKeys.length > 0
+    || state.facts.childEnglishLevel !== undefined
+    || state.facts.englishReadiness !== undefined
+  if (!hasEnglishInput) return state
+
+  const readinessFact = createFact({
+    key: "englishReadiness",
+    subject: "child",
+    value: assessment.readiness,
+    source: "ai_inference",
+    confidence: assessment.confidence,
+    status: assessment.sufficientForRecommendation ? "known" : "tentative",
+    evidence: assessment.reason,
+  })
+  const merged = mergeFacts(state, [readinessFact])
+  const englishKeys: readonly CampfitV3FactKey[] = [
+    "childEnglishLevel",
+    "englishReadiness",
+    "childEnglishExperience",
+    "childEnglishEnvironment",
+    "childEnglishAssessment",
+    "childEnglishListening",
+    "childEnglishSpeaking",
+    "childEnglishReading",
+    "childEnglishWriting",
+    "childEnglishUsage",
+  ]
+  const unresolved = assessment.sufficientForRecommendation
+    ? merged.unresolved.filter((key) => !englishKeys.includes(key))
+    : Array.from(new Set([
+      ...merged.unresolved,
+      ...(assessment.readiness === "unknown" ? ["englishReadiness" as const] : []),
+    ]))
+  const completedQuestionKeys = assessment.sufficientForRecommendation
+    ? merged.completedQuestionKeys
+    : merged.completedQuestionKeys.filter((key) => key !== "child_english_level")
+  return { ...merged, unresolved, completedQuestionKeys }
 }
 
 export function markChangedExplicitFactsAsCorrections(
@@ -124,6 +169,15 @@ export function isSemanticallyValidModelFact(input: {
 }): boolean {
   const subjects: Readonly<Record<CampfitV3FactKey, readonly CampfitV3FactSubject[]>> = {
     childEnglishLevel: ["child"],
+    childEnglishExperience: ["child"],
+    childEnglishEnvironment: ["child"],
+    childEnglishAssessment: ["child"],
+    childEnglishListening: ["child"],
+    childEnglishSpeaking: ["child"],
+    childEnglishReading: ["child"],
+    childEnglishWriting: ["child"],
+    childEnglishUsage: ["child"],
+    englishReadiness: ["child"],
     parentEnglishCommunication: ["parent"],
     isFirstOverseasEducationExperience: ["child"],
     dayProgramSeparationReadiness: ["child"],
@@ -155,6 +209,24 @@ export function isSemanticallyValidModelFact(input: {
   switch (input.key) {
     case "childEnglishLevel":
       return isOneOf(input.value, ["beginner", "basic", "intermediate", "advanced"])
+    case "childEnglishExperience":
+      return isEnglishExperienceArray(input.value)
+    case "childEnglishEnvironment":
+      return isStringArray(input.value, 8, ["international_school", "overseas_school", "overseas_camp", "overseas_residence"])
+    case "childEnglishAssessment":
+      return isEnglishAssessmentArray(input.value)
+    case "childEnglishListening":
+      return isOneOf(input.value, ["understands_simple_instructions", "understands_class_explanation", "unknown"])
+    case "childEnglishSpeaking":
+      return isOneOf(input.value, ["answers_simple_questions", "can_converse", "initiates_speech", "difficulty_initiating", "rarely_speaks", "unknown"])
+    case "childEnglishReading":
+      return isOneOf(input.value, ["phonics_only", "reads_simple_text", "reads_english_books", "understands_english_books", "unknown"])
+    case "childEnglishWriting":
+      return isOneOf(input.value, ["simple_words", "simple_sentences", "can_explain_in_english", "unknown"])
+    case "childEnglishUsage":
+      return isStringArray(input.value, 8, ["speaks_with_foreigners", "answers_in_english", "initiates_in_english", "difficulty_initiating", "rarely_uses_english"])
+    case "englishReadiness":
+      return isOneOf(input.value, ["support_required", "beginner_friendly", "general_program_ready", "academic_ready", "unknown"])
     case "parentEnglishCommunication":
       return isOneOf(input.value, ["possible", "limited", "not_possible"])
     case "isFirstOverseasEducationExperience":
@@ -265,11 +337,54 @@ export function extractDeterministicFacts(
     facts.push(createFact({ key, subject, value, source: "explicit_user_statement", evidence: evidence.slice(0, 240) }))
   }
 
-  const childEnglishText = /(아이|애|첫째|둘째|첫째 아이|둘째 아이).{0,40}(영어|수업|대화)|(?:영어 수업|영어로 대화|단어나 짧은 표현)/iu.test(text)
+  const childEnglishText = /(아이|애|첫째|둘째|첫째 아이|둘째 아이).{0,40}(영어|수업|대화)/iu.test(text)
+    || currentQuestionKey === "child_english_level" && /(?:영어 수업|영어로 대화|단어나 짧은 표현|간단한 대화|일상 대화|초급|중급|고급|beginner|basic|intermediate|advanced)/iu.test(text)
   if (childEnglishText && /(초급|처음|거의 못|낯설|첨|단어나 짧은 표현|beginner)/iu.test(text)) push("childEnglishLevel", "child", "beginner")
   else if (childEnglishText && /(간단한 문장|짧은 문장|듣고\s*말|이야기하고\s*듣|basic)/iu.test(text)) push("childEnglishLevel", "child", "basic")
   else if (childEnglishText && /(중급|간단한 대화|일상 대화|수업\s*(?:에|을)?\s*참여|영어\s*수업.{0,10}참여|참여할\s*정도|대화.*가능|intermediate)/iu.test(text)) push("childEnglishLevel", "child", "intermediate")
   else if (childEnglishText && /(고급|수업.*무리|편하게|advanced)/iu.test(text)) push("childEnglishLevel", "child", "advanced")
+
+  const childEnglishEvidenceContext = currentQuestionKey === "child_english_level"
+    || childEnglishText
+    || /(아이|애|자녀|첫째|둘째).{0,48}(영어|수업|대화|읽|말|쓰기)/iu.test(text)
+    || /(영어\s*유치원|영어\s*학원|AR\s*\d|Lexile|국제학교|해외\s*(?:학교|캠프|거주)|영어책|파닉스)/iu.test(text)
+  const englishExperience: Array<{ type: CampfitV3EnglishExperienceType; durationYears: number | null; ongoing: boolean | null }> = []
+  const deniedEnglishKindergarten = /(?:영어\s*유치원|영유).{0,10}(?:안\s*다녔|다니지\s*않|경험\s*없)|(?:안\s*다녔|다니지\s*않).{0,10}(?:영어\s*유치원|영유)/iu.test(text)
+  if (childEnglishEvidenceContext && !deniedEnglishKindergarten && /(영어\s*유치원|영유)/iu.test(text)) englishExperience.push({ type: "english_kindergarten", durationYears: durationYearsFor(text, /(영어\s*유치원|영유)/iu), ongoing: ongoingFor(text) })
+  if (childEnglishEvidenceContext && /(영어\s*학원|영어\s*어학원)/iu.test(text)) englishExperience.push({ type: "english_academy", durationYears: durationYearsFor(text, /(영어\s*학원|영어\s*어학원)/iu), ongoing: ongoingFor(text) })
+  if (childEnglishEvidenceContext && /(영어\s*수업|영어로\s*(?:하는\s*)?(?:수업|교육)|영어\s*과외)/iu.test(text)) englishExperience.push({ type: "english_class", durationYears: durationYearsFor(text, /(영어\s*수업|영어로\s*(?:하는\s*)?(?:수업|교육)|영어\s*과외)/iu), ongoing: ongoingFor(text) })
+  if (childEnglishEvidenceContext && /(영어\s*몰입|몰입\s*교육|영어로만|영어\s*환경)/iu.test(text)) englishExperience.push({ type: "english_immersion", durationYears: durationYearsFor(text, /(영어\s*몰입|몰입\s*교육|영어로만|영어\s*환경)/iu), ongoing: ongoingFor(text) })
+  if (englishExperience.length) push("childEnglishExperience", "child", dedupeStructuredValues(englishExperience))
+
+  const englishEnvironment: CampfitV3EnglishEnvironmentType[] = []
+  if (childEnglishEvidenceContext && /(국제학교|international\s*school)/iu.test(text)) englishEnvironment.push("international_school")
+  if (childEnglishEvidenceContext && /(해외\s*(?:학교|유학)|외국\s*학교|overseas\s*school)/iu.test(text)) englishEnvironment.push("overseas_school")
+  if (childEnglishEvidenceContext && /(해외\s*캠프|해외캠프|overseas\s*camp)/iu.test(text)) englishEnvironment.push("overseas_camp")
+  if (childEnglishEvidenceContext && /(해외\s*(?:거주|생활)|외국에서\s*살|overseas\s*residen)/iu.test(text)) englishEnvironment.push("overseas_residence")
+  if (englishEnvironment.length) push("childEnglishEnvironment", "child", Array.from(new Set(englishEnvironment)))
+
+  const englishAssessments: Array<{ type: CampfitV3EnglishAssessmentType; value: number | string }> = []
+  const ar = childEnglishEvidenceContext ? text.match(/\bAR\s*(\d+(?:\.\d+)?)/iu) : null
+  if (ar?.[1] !== undefined) englishAssessments.push({ type: "ar", value: Number(ar[1]) })
+  const lexile = childEnglishEvidenceContext ? text.match(/\bLexile\s*(\d+)/iu) : null
+  if (lexile?.[1] !== undefined) englishAssessments.push({ type: "lexile", value: Number(lexile[1]) })
+  const exam = childEnglishEvidenceContext ? text.match(/\b(TOEFL|TOEIC|IELTS|Cambridge)\s*([A-Za-z0-9+.-]*)/iu) : null
+  if (exam?.[0] !== undefined) englishAssessments.push({ type: "english_exam", value: exam[0].trim() })
+  if (childEnglishEvidenceContext && /(영어\s*(?:시험|레벨|학년)|학교\s*영어\s*수준)/iu.test(text) && !englishAssessments.some((item) => item.type === "english_exam")) {
+    englishAssessments.push({ type: "school_level", value: text.slice(0, 80) })
+  }
+  if (englishAssessments.length) push("childEnglishAssessment", "child", dedupeStructuredValues(englishAssessments))
+
+  const listening = childEnglishEvidenceContext ? listeningEvidence(text) : null
+  if (listening !== null) push("childEnglishListening", "child", listening)
+  const speaking = childEnglishEvidenceContext ? speakingEvidence(text) : null
+  if (speaking !== null) push("childEnglishSpeaking", "child", speaking)
+  const reading = childEnglishEvidenceContext ? readingEvidence(text) : null
+  if (reading !== null) push("childEnglishReading", "child", reading)
+  const writing = childEnglishEvidenceContext ? writingEvidence(text) : null
+  if (writing !== null) push("childEnglishWriting", "child", writing)
+  const usage = childEnglishEvidenceContext ? usageEvidence(text) : []
+  if (usage.length) push("childEnglishUsage", "child", usage)
 
   if (/(저는|제가|부모|엄마|아빠|보호자).{0,24}(영어|basic\s*communication|소통).{0,20}(가능|할 수|괜찮|소통|돼|되)/iu.test(text)) push("parentEnglishCommunication", "parent", "possible")
   if (/(첫|처음).{0,8}(해외|캠프|교육)/.test(text)) push("isFirstOverseasEducationExperience", "child", true)
@@ -485,6 +600,105 @@ function isBudgetRange(value: unknown): boolean {
     && Number.isInteger(record["max"])
     && record["max"] > 0
     && record["min"] <= record["max"]
+}
+
+function mergeArrayValues(existing: readonly unknown[], incoming: readonly unknown[]): readonly unknown[] {
+  const values = [...existing, ...incoming]
+  const seen = new Set<string>()
+  return values.filter((value) => {
+    const key = typeof value === "object" && value !== null ? JSON.stringify(value) : `${typeof value}:${String(value)}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function dedupeStructuredValues<T>(values: readonly T[]): readonly T[] {
+  const seen = new Set<string>()
+  return values.filter((value) => {
+    const key = JSON.stringify(value)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function durationYearsFor(text: string, _context: RegExp): number | null {
+  const match = text.match(/(\d+(?:\.\d+)?)\s*년/iu)
+  if (!match?.[1]) return null
+  const value = Number(match[1])
+  return Number.isFinite(value) && value >= 0 && value <= 20 ? value : null
+}
+
+function ongoingFor(text: string): boolean | null {
+  if (/(계속|현재|지금도|다니고\s*있|재학)/iu.test(text)) return true
+  if (/(그만|중단|예전|다녔지만|다녔고\s*지금은)/iu.test(text)) return false
+  return null
+}
+
+function listeningEvidence(text: string): "understands_simple_instructions" | "understands_class_explanation" | null {
+  if (/외국인\s*선생님.{0,20}(대충|조금|간단히).{0,12}(알아듣|이해)/iu.test(text)) return "understands_simple_instructions"
+  if (/(원어민|외국인).{0,20}(말|설명).{0,12}(대충|조금|잘)?\s*(알아듣|이해)/iu.test(text)) return "understands_simple_instructions"
+  if (/(선생님|교사|수업).{0,20}(설명|말).{0,20}(잘\s*)?(알아듣|이해|따라)/iu.test(text)
+    || /(영어로\s*(수업|설명)).{0,20}(이해|따라|들을)/iu.test(text)) return "understands_class_explanation"
+  if (/(간단한\s*(지시|안내|설명)|외국인\s*선생님.{0,20}(알아듣|이해)|듣고\s*말|말을\s*듣)/iu.test(text)) return "understands_simple_instructions"
+  return null
+}
+
+function speakingEvidence(text: string): "answers_simple_questions" | "can_converse" | "initiates_speech" | "difficulty_initiating" | "rarely_speaks" | null {
+  if (/(먼저\s*말|말을?\s*먼저|자발적으로\s*말)/iu.test(text) && /(잘\s*못|어려|힘들|않)/iu.test(text)) return "difficulty_initiating"
+  if (/(말하기|영어로\s*말).{0,16}(어려|힘들|잘\s*못)|먼저\s*말하.{0,8}(못|어려)/iu.test(text)) return "difficulty_initiating"
+  if (/(대답|질문에\s*답).{0,12}(잘\s*못|어려|힘들)/iu.test(text)) return "difficulty_initiating"
+  if (/(먼저\s*말|자발적으로\s*영어로\s*말|스스로\s*말)/iu.test(text)) return "initiates_speech"
+  if (/(영어로\s*곧잘\s*말|영어로\s*편하게\s*(?:말|대화)|유창하게\s*말|영어로\s*대화가?\s*(?:잘\s*)?가능)/iu.test(text)) return "can_converse"
+  if (/(간단한\s*(?:질문|대화)|질문에\s*(?:답|대답)|짧은\s*대화|대화가?\s*가능|간단히\s*대답)/iu.test(text)) return "answers_simple_questions"
+  if (/(영어는\s*거의\s*(?:처음|못)|영어로\s*말을?\s*거의\s*안)/iu.test(text)) return "rarely_speaks"
+  return null
+}
+
+function readingEvidence(text: string): "phonics_only" | "reads_simple_text" | "reads_english_books" | "understands_english_books" | null {
+  if (/(영어책|영어\s*책|영어로\s*된\s*책).{0,16}(읽고|읽으면서|이해)/iu.test(text) || /(읽고\s*이해|독해가?\s*가능)/iu.test(text)) return "understands_english_books"
+  if (/(영어책|영어\s*책|영어\s*동화책).{0,12}(읽|보)/iu.test(text)) return "reads_english_books"
+  if (/(간단한\s*(글|문장)|짧은\s*글).{0,12}(읽|읽을)/iu.test(text)) return "reads_simple_text"
+  if (/(파닉스|phonics)/iu.test(text)) return "phonics_only"
+  return null
+}
+
+function writingEvidence(text: string): "simple_words" | "simple_sentences" | "can_explain_in_english" | null {
+  if (/(영어로\s*(설명|글을\s*(쓰|써)|작문)|영어\s*작문|영어로\s*자기\s*생각을\s*(쓰|써))/iu.test(text)) return "can_explain_in_english"
+  if (/(영어로\s*(간단한\s*)?(문장|글).{0,8}(쓰|써|작성)|문장\s*쓰기)/iu.test(text)) return "simple_sentences"
+  if (/(영어\s*단어.{0,8}(쓰|써|적)|단어\s*쓰기)/iu.test(text)) return "simple_words"
+  return null
+}
+
+function usageEvidence(text: string): readonly string[] {
+  const values: string[] = []
+  if (/(외국인|원어민).{0,20}(?:대화|이야기|소통)|(?:외국인|원어민).{0,20}(?:과|와|랑|하고).{0,12}(?:말|대화|소통)/iu.test(text)) values.push("speaks_with_foreigners")
+  if (/외국\s*친구.{0,20}(?:영어|영어로).{0,12}(?:쓰|사용)/iu.test(text)) values.push("speaks_with_foreigners")
+  if (/(영어로\s*(질문에\s*)?(답|대답)|영어\s*질문에\s*대답)/iu.test(text)) values.push("answers_in_english")
+  if (/(먼저\s*영어로\s*말|자발적으로\s*영어|스스로\s*영어로\s*말)/iu.test(text)) values.push("initiates_in_english")
+  if (/(영어를?\s*(거의|잘)\s*(사용|안\s*쓰)|영어\s*사용\s*기회가?\s*(적|없))/iu.test(text)) values.push("rarely_uses_english")
+  if (/(영어로\s*먼저\s*말하.{0,8}(못|어려)|영어\s*사용.{0,8}(소극|어려))/iu.test(text)) values.push("difficulty_initiating")
+  return Array.from(new Set(values))
+}
+
+function isEnglishExperienceArray(value: unknown): value is readonly { readonly type: CampfitV3EnglishExperienceType; readonly durationYears: number | null; readonly ongoing: boolean | null }[] {
+  return Array.isArray(value) && value.length <= 8 && value.every((item) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return false
+    const record = item as Record<string, unknown>
+    return isOneOf(record["type"], ["english_kindergarten", "english_academy", "english_class", "english_immersion"])
+      && (record["durationYears"] === null || (typeof record["durationYears"] === "number" && Number.isFinite(record["durationYears"]) && record["durationYears"] >= 0 && record["durationYears"] <= 20))
+      && (record["ongoing"] === null || typeof record["ongoing"] === "boolean")
+  })
+}
+
+function isEnglishAssessmentArray(value: unknown): value is readonly { readonly type: CampfitV3EnglishAssessmentType; readonly value: number | string }[] {
+  return Array.isArray(value) && value.length <= 8 && value.every((item) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return false
+    const record = item as Record<string, unknown>
+    return isOneOf(record["type"], ["ar", "lexile", "english_exam", "school_level"])
+      && ((typeof record["value"] === "number" && Number.isFinite(record["value"])) || (typeof record["value"] === "string" && record["value"].trim().length > 0 && record["value"].length <= 80))
+  })
 }
 
 function parseBudgetRange(text: string, basicInfo?: CampfitV3BasicInfo): { readonly min: number; readonly max: number } | null {

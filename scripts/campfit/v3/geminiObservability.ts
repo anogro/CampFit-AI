@@ -18,6 +18,7 @@ const expectedFactKeys = new Set<CampfitV3FactKey>([
   "durationWeeks",
   "budgetIncludesFlight",
   "childEnglishLevel",
+  "englishReadiness",
   "parentEnglishCommunication",
 ])
 

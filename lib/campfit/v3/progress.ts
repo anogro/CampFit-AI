@@ -1,4 +1,5 @@
 import type { CampfitV3BasicInfo, CampfitV3ConversationState, CampfitV3FactKey } from "@/types/campfitV3"
+import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
 
 const weightedSlots: readonly { readonly key: CampfitV3FactKey; readonly weight: number }[] = [
   { key: "childEnglishLevel", weight: 7 },
@@ -17,7 +18,10 @@ export function calculateProgress(basicInfo: CampfitV3BasicInfo, state: CampfitV
   const factCredit = weightedSlots.reduce((sum, slot) => {
     const fact = state.facts[slot.key]
     if (slot.key === "dayProgramSeparationReadiness" && state.facts.isFirstOverseasEducationExperience?.value === false) return sum + slot.weight
-    if (!fact || fact.status === "unknown" || fact.status === "tentative" || state.conflicts.some((conflict) => conflict.key === slot.key)) return sum
+    if (slot.key === "childEnglishLevel" && !isEnglishReadinessSufficient(state)) return sum
+    if (state.conflicts.some((conflict) => conflict.key === slot.key)) return sum
+    if (!fact) return slot.key === "childEnglishLevel" ? sum + slot.weight : sum
+    if (fact.status === "unknown" || fact.status === "tentative") return sum
     if (fact.source === "ai_inference") return sum + (fact.confidence >= 0.85 ? slot.weight * 0.5 : 0)
     return sum + slot.weight
   }, 0)
@@ -26,18 +30,22 @@ export function calculateProgress(basicInfo: CampfitV3BasicInfo, state: CampfitV
 
 export function isReadyForRecommendation(state: CampfitV3ConversationState): boolean {
   const core: readonly CampfitV3FactKey[] = [
-    "childEnglishLevel",
     "experienceGoals",
     "preferredRegions",
     "parentStayGoals",
   ]
-  return core.every((key) => {
+  const coreReady = core.every((key) => {
     const fact = state.facts[key]
     return fact !== undefined
       && fact.status !== "unknown"
       && fact.status !== "tentative"
       && !state.conflicts.some((conflict) => conflict.key === key)
   })
+  return coreReady && isEnglishReadinessSufficient(state)
+}
+
+export function isEnglishReadinessSufficient(state: CampfitV3ConversationState): boolean {
+  return assessEnglishReadiness(state).sufficientForRecommendation
 }
 
 export function progressMessage(progress: number): string {

@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS, campfitV3FactKeys, campfitV3FactSources, campfitV3FactStatuses, campfitV3FactSubjects } from "@/types/campfitV3"
+import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS, campfitV3EnglishAssessmentTypes, campfitV3EnglishEnvironmentTypes, campfitV3EnglishExperienceTypes, campfitV3EnglishReadinessValues, campfitV3FactKeys, campfitV3FactSources, campfitV3FactStatuses, campfitV3FactSubjects } from "@/types/campfitV3"
 
 export const CampfitV3BasicInfoSchema = z
   .object({
@@ -222,6 +222,15 @@ export const CampfitV3RecommendRequestSchema = z.object({
 
 const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], readonly string[]>> = {
   childEnglishLevel: ["child"],
+  childEnglishExperience: ["child"],
+  childEnglishEnvironment: ["child"],
+  childEnglishAssessment: ["child"],
+  childEnglishListening: ["child"],
+  childEnglishSpeaking: ["child"],
+  childEnglishReading: ["child"],
+  childEnglishWriting: ["child"],
+  childEnglishUsage: ["child"],
+  englishReadiness: ["child"],
   parentEnglishCommunication: ["parent"],
   isFirstOverseasEducationExperience: ["child"],
   dayProgramSeparationReadiness: ["child"],
@@ -250,8 +259,26 @@ const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], read
 }
 
 const goalStrengthSchema = z.enum(["primary", "secondary", "mentioned", "none"])
+const englishExperienceSchema = z.array(z.object({
+  type: z.enum(campfitV3EnglishExperienceTypes),
+  durationYears: z.number().min(0).max(20).nullable(),
+  ongoing: z.boolean().nullable(),
+})).max(8)
+const englishAssessmentSchema = z.array(z.object({
+  type: z.enum(campfitV3EnglishAssessmentTypes),
+  value: z.union([z.number().finite(), z.string().trim().min(1).max(80)]),
+})).max(8)
 const valueSchemas: Readonly<Record<(typeof campfitV3FactKeys)[number], z.ZodTypeAny>> = {
   childEnglishLevel: z.enum(["beginner", "basic", "intermediate", "advanced"]),
+  childEnglishExperience: englishExperienceSchema,
+  childEnglishEnvironment: z.array(z.enum(campfitV3EnglishEnvironmentTypes)).max(8),
+  childEnglishAssessment: englishAssessmentSchema,
+  childEnglishListening: z.enum(["understands_simple_instructions", "understands_class_explanation", "unknown"]),
+  childEnglishSpeaking: z.enum(["answers_simple_questions", "can_converse", "initiates_speech", "difficulty_initiating", "rarely_speaks", "unknown"]),
+  childEnglishReading: z.enum(["phonics_only", "reads_simple_text", "reads_english_books", "understands_english_books", "unknown"]),
+  childEnglishWriting: z.enum(["simple_words", "simple_sentences", "can_explain_in_english", "unknown"]),
+  childEnglishUsage: z.array(z.enum(["speaks_with_foreigners", "answers_in_english", "initiates_in_english", "difficulty_initiating", "rarely_uses_english"])).max(8),
+  englishReadiness: z.enum(campfitV3EnglishReadinessValues),
   parentEnglishCommunication: z.enum(["possible", "limited", "not_possible"]),
   isFirstOverseasEducationExperience: z.boolean(),
   dayProgramSeparationReadiness: z.enum(["needs_close_support", "with_initial_support", "ready"]),

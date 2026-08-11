@@ -11,7 +11,7 @@ import type {
   CampfitV3ProviderDiagnosticCode,
   CampfitV3ProviderErrorMetadata,
 } from "@/lib/campfit/v3/provider"
-import { campfitV3FactKeys, campfitV3FactSubjects } from "@/types/campfitV3"
+import { campfitV3EnglishAssessmentTypes, campfitV3EnglishExperienceTypes, campfitV3FactKeys, campfitV3FactSubjects } from "@/types/campfitV3"
 
 const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses"
 
@@ -39,6 +39,33 @@ export const campfitModelResponseJsonSchema = {
               { type: "boolean" },
               { type: "number" },
               { type: "array", items: { type: "string" } },
+              {
+                type: "array",
+                maxItems: 8,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    type: { type: "string", enum: [...campfitV3EnglishExperienceTypes] },
+                    durationYears: { type: ["number", "null"], minimum: 0, maximum: 20 },
+                    ongoing: { type: ["boolean", "null"] },
+                  },
+                  required: ["type", "durationYears", "ongoing"],
+                },
+              },
+              {
+                type: "array",
+                maxItems: 8,
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    type: { type: "string", enum: [...campfitV3EnglishAssessmentTypes] },
+                    value: { anyOf: [{ type: "number" }, { type: "string", minLength: 1, maxLength: 80 }] },
+                  },
+                  required: ["type", "value"],
+                },
+              },
               {
                 type: "object",
                 additionalProperties: false,

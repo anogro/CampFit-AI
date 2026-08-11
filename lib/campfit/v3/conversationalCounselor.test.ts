@@ -173,6 +173,80 @@ describe("CampFit v3 conversational counselor flow", () => {
     expect(response.progress).toBe(calculateProgress(response.updatedBasicInfo, response.updatedState))
   })
 
+  it("does not accept an LLM listening fact unsupported by the user's English statement", async () => {
+    const start = startConversation(basicInfo)
+    const provider: CampfitV3LLMProvider = {
+      ...fallbackProvider,
+      analyzeConversation: async () => ({
+        assistantMessage: "아이의 영어 말하기 상황을 확인했어요.",
+        facts: [
+          {
+            key: "childEnglishListening",
+            subject: "child",
+            value: "understands_simple_instructions",
+            source: "explicit_user_statement",
+            confidence: 1,
+            evidence: "영어로 곧잘 말해요.",
+          },
+          {
+            key: "childEnglishSpeaking",
+            subject: "child",
+            value: "can_converse",
+            source: "explicit_user_statement",
+            confidence: 1,
+            evidence: "영어로 곧잘 말해요.",
+          },
+        ],
+        unresolved: [],
+        conflicts: [],
+        suggestedNextQuestionKey: "child_english_level",
+        nextAction: "ask",
+        readyForRecommendation: false,
+      }),
+    }
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "영어로 곧잘 말해요.",
+      quickReplyKey: null,
+      provider,
+    })
+
+    expect(response.aiUsed).toBe(true)
+    expect(response.updatedState.facts.childEnglishListening).toBeUndefined()
+    expect(response.updatedState.facts.childEnglishSpeaking?.value).toBe("can_converse")
+    expect(response.updatedState.facts.englishReadiness?.value).toBe("beginner_friendly")
+  })
+
+  it("does not apply deterministic English extraction after a valid provider response", async () => {
+    const start = startConversation(basicInfo)
+    const provider: CampfitV3LLMProvider = {
+      ...fallbackProvider,
+      analyzeConversation: async () => ({
+        assistantMessage: "영어 상황을 확인했어요.",
+        facts: [],
+        unresolved: ["childEnglishSpeaking"],
+        conflicts: [],
+        suggestedNextQuestionKey: "child_english_level",
+        nextAction: "ask",
+        readyForRecommendation: false,
+      }),
+    }
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "영어로 곧잘 말해요.",
+      quickReplyKey: null,
+      provider,
+    })
+
+    expect(response.aiUsed).toBe(true)
+    expect(response.updatedState.facts.childEnglishSpeaking).toBeUndefined()
+    expect(response.updatedState.unresolved).toContain("childEnglishSpeaking")
+  })
+
   it("does not infer current English level from English-kindergarten experience alone", async () => {
     const start = startConversation(basicInfo)
     const response = await processConversationMessage({

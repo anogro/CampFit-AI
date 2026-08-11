@@ -15,6 +15,15 @@ export type CampfitV3FactSubject = (typeof campfitV3FactSubjects)[number]
 
 export const campfitV3FactKeys = [
   "childEnglishLevel",
+  "childEnglishExperience",
+  "childEnglishEnvironment",
+  "childEnglishAssessment",
+  "childEnglishListening",
+  "childEnglishSpeaking",
+  "childEnglishReading",
+  "childEnglishWriting",
+  "childEnglishUsage",
+  "englishReadiness",
   "parentEnglishCommunication",
   "isFirstOverseasEducationExperience",
   "dayProgramSeparationReadiness",
@@ -42,6 +51,45 @@ export const campfitV3FactKeys = [
   "durationWeeks",
 ] as const
 export type CampfitV3FactKey = (typeof campfitV3FactKeys)[number]
+
+export const campfitV3EnglishReadinessValues = [
+  "support_required",
+  "beginner_friendly",
+  "general_program_ready",
+  "academic_ready",
+  "unknown",
+] as const
+export type CampfitV3EnglishReadiness = (typeof campfitV3EnglishReadinessValues)[number]
+
+export const campfitV3EnglishExperienceTypes = [
+  "english_kindergarten",
+  "english_academy",
+  "english_class",
+  "english_immersion",
+] as const
+export type CampfitV3EnglishExperienceType = (typeof campfitV3EnglishExperienceTypes)[number]
+
+export const campfitV3EnglishEnvironmentTypes = [
+  "international_school",
+  "overseas_school",
+  "overseas_camp",
+  "overseas_residence",
+] as const
+export type CampfitV3EnglishEnvironmentType = (typeof campfitV3EnglishEnvironmentTypes)[number]
+
+export const campfitV3EnglishAssessmentTypes = ["ar", "lexile", "english_exam", "school_level"] as const
+export type CampfitV3EnglishAssessmentType = (typeof campfitV3EnglishAssessmentTypes)[number]
+
+export type CampfitV3EnglishExperience = {
+  readonly type: CampfitV3EnglishExperienceType
+  readonly durationYears: number | null
+  readonly ongoing: boolean | null
+}
+
+export type CampfitV3EnglishAssessment = {
+  readonly type: CampfitV3EnglishAssessmentType
+  readonly value: number | string
+}
 
 export const campfitV3FactStatuses = ["known", "unknown", "tentative", "confirmed"] as const
 export type CampfitV3FactStatus = (typeof campfitV3FactStatuses)[number]

@@ -11,6 +11,7 @@ import {
   isSemanticallyValidModelFact,
   markChangedExplicitFactsAsCorrections,
   mergeFacts,
+  syncEnglishReadiness,
 } from "@/lib/campfit/v3/stateEngine"
 import type {
   CampfitV3LLMProvider,
@@ -97,13 +98,6 @@ export async function processConversationMessage(input: {
         evidence: "특별관리 후속 확인이 필요하다고 답함",
       })]
       : extractedFacts
-    deterministicFacts = privacySafeFacts
-    const deterministic = markChangedExplicitFactsAsCorrections(
-      state,
-      deterministicFacts,
-      isCorrectionLanguage(input.userMessage),
-    )
-    state = mergeFacts(state, deterministic)
     model = await input.provider.analyzeConversation({
       transcript: safeTranscript,
       currentState: state,
@@ -112,8 +106,20 @@ export async function processConversationMessage(input: {
       allowedQuestionKeys: allowedQuestionKeys(state),
     })
     providerDiagnostic = input.provider.getLastDiagnostic?.() ?? null
-    if (model !== null) state = mergeModelResponse(state, model, safeUserMessage)
+    if (model !== null) {
+      state = mergeModelResponse(state, model, safeUserMessage)
+    } else {
+      deterministicFacts = privacySafeFacts
+      const deterministic = markChangedExplicitFactsAsCorrections(
+        state,
+        deterministicFacts,
+        isCorrectionLanguage(input.userMessage),
+      )
+      state = mergeFacts(state, deterministic)
+    }
   }
+
+  state = syncEnglishReadiness(state)
 
   const partialUnderstanding = deterministicFacts.length > 0 || (model?.facts.length ?? 0) > 0
   if (currentQuestion !== null) {
@@ -183,6 +189,9 @@ function mergeModelResponse(
   userMessage: string,
 ): CampfitV3ConversationState {
   const facts = model.facts.flatMap((fact): readonly CampfitV3Fact[] => {
+    if (fact.key === "englishReadiness") return []
+    if (fact.key === "parentEnglishCommunication" && !mentionsParentEnglishCommunication(userMessage)) return []
+    if (isEnglishEvidenceKey(fact.key) && !isEnglishModelFactSupportedByUserText(fact, userMessage)) return []
     if (!isSemanticallyValidModelFact(fact)) return []
     const existing = state.facts[fact.key]
     if (existing !== undefined && existing.source !== "ai_inference" && !isCorrectionLanguage(userMessage)) {
@@ -404,6 +413,48 @@ function acknowledgement(
     return fallbackAcknowledgement(deterministicFacts, userMessage)
   }
   return dedupeMessage(candidate)
+}
+
+function mentionsParentEnglishCommunication(message: string): boolean {
+  return /(?:저는|제가|본인|부모|부모님|엄마|아빠|보호자).{0,32}(?:영어|basic\s*communication|소통|대화)/iu.test(message)
+}
+
+function isEnglishEvidenceKey(key: CampfitV3FactKey): boolean {
+  return key === "childEnglishExperience"
+    || key === "childEnglishEnvironment"
+    || key === "childEnglishAssessment"
+    || key === "childEnglishListening"
+    || key === "childEnglishSpeaking"
+    || key === "childEnglishReading"
+    || key === "childEnglishWriting"
+    || key === "childEnglishUsage"
+}
+
+function isEnglishModelFactSupportedByUserText(
+  fact: CampfitV3ModelResponse["facts"][number],
+  userMessage: string,
+): boolean {
+  const text = userMessage
+  if (fact.key === "childEnglishListening") return /듣|알아듣|이해|따라|선생님|수업/iu.test(text)
+  if (fact.key === "childEnglishSpeaking") return /말|대화|소통|답|회화|선생님|수업/iu.test(text)
+  if (fact.key === "childEnglishReading") return /읽|책|파닉스|독해/iu.test(text)
+  if (fact.key === "childEnglishWriting") return /쓰|작문|문장/iu.test(text)
+  if (fact.key === "childEnglishUsage") return /쓰|사용|외국|원어민|친구|대화/iu.test(text)
+  if (fact.key === "childEnglishEnvironment") return /국제학교|해외\s*(?:학교|캠프|거주)|외국\s*학교/iu.test(text)
+  if (fact.key === "childEnglishAssessment") return /AR|Lexile|시험|학교\s*영어|레벨|수준/iu.test(text)
+  if (fact.key === "childEnglishExperience") {
+    const values = Array.isArray(fact.value) ? fact.value : [fact.value]
+    return values.every((value) => {
+      if (typeof value !== "object" || value === null || Array.isArray(value)) return false
+      const type = (value as Record<string, unknown>)["type"]
+      if (type === "english_kindergarten") return /영어\s*유치원|영유/iu.test(text)
+      if (type === "english_academy") return /영어\s*(?:학원|어학원)/iu.test(text)
+      if (type === "english_class") return /영어\s*(?:수업|과외)|영어로\s*(?:하는\s*)?수업/iu.test(text)
+      if (type === "english_immersion") return /영어\s*(?:몰입|환경)|몰입\s*교육|영어로만/iu.test(text)
+      return false
+    })
+  }
+  return true
 }
 
 function fallbackAcknowledgement(facts: readonly CampfitV3Fact[], userMessage: string): string {
