@@ -23,6 +23,8 @@ export type EnglishReadinessAssessment = {
   readonly reason: string
 }
 
+export type EnglishEvidenceGap = "classroom_comprehension" | "speaking" | null
+
 const readinessValues: ReadonlySet<string> = new Set(campfitV3EnglishReadinessValues)
 
 export function assessEnglishReadiness(state: CampfitV3ConversationState): EnglishReadinessAssessment {
@@ -160,9 +162,33 @@ function scoreListening(value: string | null): number {
 
 function scoreSpeaking(value: string | null): number {
   if (value === "initiates_speech") return 3
+  if (value === "can_present_in_english") return 3
   if (value === "can_converse") return 2
   if (value === "answers_simple_questions") return 1
   return 0
+}
+
+/**
+ * Selects the smallest missing English evidence to ask about next. This is
+ * intentionally narrower than missingEvidence: an AR score is not reading
+ * evidence, and a reading fact must never trigger another reading question.
+ */
+export function englishEvidenceGap(state: CampfitV3ConversationState): EnglishEvidenceGap {
+  const facts = state.facts
+  const listening = stringValue(facts.childEnglishListening?.value)
+  const speaking = stringValue(facts.childEnglishSpeaking?.value)
+  const reading = stringValue(facts.childEnglishReading?.value)
+  const assessments = objectArrayValue(facts.childEnglishAssessment?.value)
+  const hasListening = listening !== null && listening !== "unknown"
+  const hasSpeaking = speaking !== null && speaking !== "unknown"
+    || stringArrayValue(facts.childEnglishUsage?.value).length > 0
+
+  if (hasListening && hasSpeaking) return null
+  if (!hasListening && (assessments.length > 0 || reading !== null && reading !== "unknown" || hasSpeaking)) {
+    return "classroom_comprehension"
+  }
+  if (hasListening && !hasSpeaking) return "speaking"
+  return null
 }
 
 function scoreReading(value: string | null): number {

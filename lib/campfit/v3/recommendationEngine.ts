@@ -5,6 +5,7 @@ import {
 } from "@/lib/campfit/v3/catalogPolicy"
 import type { ExperienceSignalStatus, V3ParentStayPreferences } from "@/lib/campfit/v3/catalogPolicy"
 import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
+import { assessEnglishRequirementMatch, type EnglishRequirementMatch } from "@/lib/campfit/v3/englishRequirement"
 import type {
   V3Catalog,
   V3CatalogCity,
@@ -62,6 +63,7 @@ type ScoredProgram = {
   readonly exactPrice: V3PriceOption | null
   readonly sessionAssessment: SessionVariantAssessment | null
   readonly priceAssessment: PriceAssessment
+  readonly englishMatch: EnglishRequirementMatch
 }
 
 export type V3RecommendationParentPreferences = V3ParentStayPreferences
@@ -202,6 +204,8 @@ function evaluateProgram(input: {
   const readinessAssessment = assessEnglishReadiness(input.state)
   const readiness = readinessAssessment.readiness
   const hasDetailedEnglishEvidence = readinessAssessment.evidenceKeys.length > 0
+  const englishMatch = assessEnglishRequirementMatch(readiness, input.program.englishRequirement)
+  if (englishMatch.status === "official_requirement_mismatch") excluded.push("공식 영어 자격조건 미충족 가능성")
 
   if (input.program.status !== "active") excluded.push("active 프로그램이 아님")
   const parentCheck = evaluateParentCompatibility(input.program.parentScope, input.parentPreferences)
@@ -243,6 +247,7 @@ function evaluateProgram(input: {
     if (input.program.beginnerClass === false) softMismatch.push("초급자 전용 반 미확인")
     if (input.program.beginnerClass !== true) verify.push("영어 초급자 반·초기 적응 지원")
   }
+  verify.push(...englishMatch.verification)
   if (input.state.facts.isFirstOverseasEducationExperience?.value === true && input.program.earlyAdaptationSupport !== true) {
     verify.push("첫 해외 교육 경험을 위한 초기 적응 지원")
   }
@@ -288,7 +293,7 @@ function evaluateProgram(input: {
     : 75
   const supportFit = supportScore(koreanNeed, input.program)
   const budgetFit = referenceMinimumKrw === null ? 58 : referenceMinimumKrw <= input.basicInfo.budgetMaxKrw ? 90 : 25
-  const score = clamp(goalFit * 0.46 + beginnerFit * 0.14 + supportFit * 0.14 + budgetFit * 0.14 + 60 * 0.07 + metadataScore(input.program) * 0.05)
+  const score = clamp(goalFit * 0.46 + beginnerFit * 0.14 + supportFit * 0.14 + budgetFit * 0.14 + 60 * 0.07 + metadataScore(input.program) * 0.05 + englishMatch.scoreAdjustment)
   const classification: ProgramClassification = excluded.length
     ? "excluded"
     : softMismatch.length > 0 || score < 62
@@ -308,6 +313,7 @@ function evaluateProgram(input: {
     exactPrice,
     sessionAssessment: timing.assessment ?? null,
     priceAssessment,
+    englishMatch,
   }
 }
 
@@ -693,7 +699,12 @@ function toProgramCandidate(item: ScoredProgram, basicInfo: CampfitV3BasicInfo):
     durationLabel: item.program.durationWeeks.length ? `${item.program.durationWeeks.join("·")}주 옵션` : "기간 확인 필요",
     priceLabel,
     primaryDirection: directionLabels[item.direction],
-    reason,
+    reason: `${reason} ${item.englishMatch.explanation}`,
+    englishRequirementLevel: item.program.englishRequirement?.level ?? "unknown",
+    englishRequirementSource: item.program.englishRequirement?.source ?? "unknown",
+    englishMatchStatus: item.englishMatch.status,
+    englishMatchLabel: item.englishMatch.label,
+    englishMatchExplanation: item.englishMatch.explanation,
     verify: item.verify.length ? item.verify : ["최신 일정과 실제 수업 구성"],
     detailUrl: item.program.slug ? `${baseUrl}/program/${encodeURIComponent(item.program.slug)}` : null,
     group,

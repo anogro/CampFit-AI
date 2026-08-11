@@ -29,7 +29,81 @@ describe("CampFit v3 Demo Catalog recommendation coverage", () => {
     expect(result.programCandidates.every((program, index, programs) => programs.findIndex((candidate) => candidate.programId === program.programId) === index)).toBe(true)
     expect(result.programCandidates[1]?.reason).not.toContain("점수")
   })
+
+  it.each([
+    ["A beginner + immersion", personaState("support_required", { englishIntensive: "primary", cultureActivity: "secondary" }), ["english_burden_possible", "manageable_with_support"]],
+    ["B beginner + activity", personaState("support_required", { cultureActivity: "primary", englishIntensive: "secondary" }), ["comfortable", "manageable_with_support", "unknown"]],
+    ["C general + STEM", personaState("general_program_ready", { subjectProject: "primary", englishIntensive: "secondary" }), ["comfortable", "manageable_with_support"]],
+    ["D academic + schooling", personaState("academic_ready", { schoolSchooling: "primary", subjectProject: "secondary" }), ["comfortable", "manageable_with_support"]],
+    ["E English unknown", personaState("unknown", { cultureActivity: "primary" }), ["unknown", "comfortable", "manageable_with_support"]],
+  ] as const)("keeps persona %s non-empty and exposes English matching", (_label, state, acceptedStatuses) => {
+    const result = buildRecommendation({
+      basicInfo: demoBasicInfo,
+      state,
+      catalog: loadDemoCatalog(2026),
+      now: new Date("2026-07-19T00:00:00.000Z"),
+    })
+    expect(result.programCandidates.length).toBeGreaterThan(0)
+    expect(result.programCandidates.some((candidate) => (acceptedStatuses as readonly string[]).includes(candidate.englishMatchStatus ?? "unknown"))).toBe(true)
+    expect(result.programCandidates.some((candidate) => candidate.englishMatchLabel)).toBe(true)
+  })
 })
+
+const demoBasicInfo: CampfitV3BasicInfo = {
+  childAges: [8],
+  departureWindow: "2026-08",
+  durationWeeks: 4,
+  budgetMinKrw: 8_000_000,
+  budgetMaxKrw: 12_000_000,
+  adultCount: 1,
+  childCount: 1,
+  guardianStaysNearby: true,
+}
+
+function personaState(readiness: "support_required" | "beginner_friendly" | "general_program_ready" | "academic_ready" | "unknown", goals: Record<string, string>): CampfitV3ConversationState {
+  const facts: CampfitV3ConversationState["facts"] = {
+    experienceGoals: fact("experienceGoals", goals, "preference"),
+    preferredRegions: fact("preferredRegions", [], "preference"),
+    regionImportance: fact("regionImportance", "no_preference", "preference"),
+    parentStayGoals: fact("parentStayGoals", ["restWellness"], "parent"),
+    koreanSupportNeed: fact("koreanSupportNeed", "emergency_only", "constraint"),
+    parentCommunicationNeed: fact("parentCommunicationNeed", "issue_only", "constraint"),
+    specialCareFollowUp: fact("specialCareFollowUp", "none", "constraint"),
+  }
+  if (readiness === "unknown") return baseState(facts)
+  if (readiness === "support_required") return baseState({ ...facts, childEnglishLevel: fact("childEnglishLevel", "beginner", "child") })
+  const detailed = readiness === "academic_ready"
+    ? {
+        childEnglishListening: "understands_class_explanation",
+        childEnglishSpeaking: "initiates_speech",
+        childEnglishReading: "understands_english_books",
+        childEnglishWriting: "can_explain_in_english",
+      }
+    : {
+        childEnglishListening: "understands_class_explanation",
+        childEnglishSpeaking: "can_converse",
+        childEnglishReading: "reads_simple_text",
+        childEnglishWriting: "simple_words",
+      }
+  return baseState({
+    ...facts,
+    ...Object.fromEntries(Object.entries(detailed).map(([key, value]) => [key, fact(key as keyof CampfitV3ConversationState["facts"], value, "child")])),
+  })
+}
+
+function baseState(facts: CampfitV3ConversationState["facts"]): CampfitV3ConversationState {
+  return {
+    facts,
+    askedQuestionKeys: [],
+    completedQuestionKeys: [],
+    failedQuestionKeys: [],
+    currentQuestionKey: null,
+    questionCount: 10,
+    progress: 100,
+    unresolved: [],
+    conflicts: [],
+  }
+}
 
 const demoState: CampfitV3ConversationState = {
   facts: {

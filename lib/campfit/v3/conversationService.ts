@@ -1,5 +1,6 @@
 import { allowedQuestionKeys, getQuestion, isQuestionCompleted, selectNextQuestion } from "@/lib/campfit/v3/questionBank"
 import { calculateProgress, isReadyForRecommendation, progressMessage } from "@/lib/campfit/v3/progress"
+import { englishEvidenceGap } from "@/lib/campfit/v3/englishReadiness"
 import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/types/campfitV3"
 import {
   applyQuickReply,
@@ -20,6 +21,7 @@ import type {
 } from "@/lib/campfit/v3/provider"
 import type {
   CampfitV3AiDiagnostics,
+  CampfitV3AcknowledgementEvidence,
   CampfitV3BasicInfo,
   CampfitV3ConversationResponse,
   CampfitV3ConversationState,
@@ -64,6 +66,7 @@ export async function processConversationMessage(input: {
   let model: CampfitV3ModelResponse | null = null
   let providerDiagnostic: CampfitV3ProviderDiagnostic | null = null
   let deterministicFacts: readonly CampfitV3Fact[] = []
+  let acceptedModelFacts: readonly CampfitV3Fact[] = []
   const warnings: string[] = []
   const sensitiveHealthDetail = containsSensitiveHealthDetail(input.userMessage)
   const specialCareAnswer = currentQuestion?.key === "special_care_follow_up"
@@ -107,7 +110,8 @@ export async function processConversationMessage(input: {
     })
     providerDiagnostic = input.provider.getLastDiagnostic?.() ?? null
     if (model !== null) {
-      state = mergeModelResponse(state, model, safeUserMessage)
+      acceptedModelFacts = acceptedFactsFromModel(state, model, safeUserMessage)
+      state = mergeModelResponse(state, model, acceptedModelFacts)
     } else {
       deterministicFacts = privacySafeFacts
       const deterministic = markChangedExplicitFactsAsCorrections(
@@ -158,17 +162,22 @@ export async function processConversationMessage(input: {
 
   const nextQuestionText = currentQuestion === null || targetUpdated
     ? nextQuestion?.title ?? "확인이 필요한 조건을 다시 살펴보고 있어요."
-    : followUpQuestionText(currentQuestion, input.transcript)
+    : followUpQuestionText(currentQuestion, input.transcript, state)
+  const groundedAcknowledgement = buildGroundedAcknowledgement(
+    [...deterministicFacts, ...acceptedModelFacts],
+    input.userMessage,
+  )
   const assistantMessage = ready
     ? "필요한 내용을 모두 확인했어요. 지금 조건에 맞는 경험 방향과 도시, 프로그램 후보를 정리해볼게요."
       : currentQuestion !== null && !targetUpdated
       ? partialUnderstanding
-        ? `${acknowledgement(model, deterministicFacts, input.userMessage, input.transcript)}\n\n${nextQuestionText}`
+        ? `${groundedAcknowledgement.text}\n\n${nextQuestionText}`
         : `아직 답변을 충분히 파악하지 못했어요.\n\n${nextQuestionText}`
-      : `${acknowledgement(model, deterministicFacts, input.userMessage, input.transcript)}\n\n${nextQuestionText}`
+      : `${groundedAcknowledgement.text}\n\n${nextQuestionText}`
 
   return {
     assistantMessage,
+    acknowledgementEvidence: groundedAcknowledgement.evidence,
     updatedState: state,
     updatedBasicInfo,
     quickReplies: nextQuestion?.quickReplies ?? [],
@@ -183,12 +192,12 @@ export async function processConversationMessage(input: {
   }
 }
 
-function mergeModelResponse(
+function acceptedFactsFromModel(
   state: CampfitV3ConversationState,
   model: CampfitV3ModelResponse,
   userMessage: string,
-): CampfitV3ConversationState {
-  const facts = model.facts.flatMap((fact): readonly CampfitV3Fact[] => {
+): readonly CampfitV3Fact[] {
+  return model.facts.flatMap((fact): readonly CampfitV3Fact[] => {
     if (fact.key === "englishReadiness") return []
     if (fact.key === "parentEnglishCommunication" && !mentionsParentEnglishCommunication(userMessage)) return []
     if (isEnglishEvidenceKey(fact.key) && !isEnglishModelFactSupportedByUserText(fact, userMessage)) return []
@@ -207,6 +216,13 @@ function mergeModelResponse(
       evidence,
     })]
   })
+}
+
+function mergeModelResponse(
+  state: CampfitV3ConversationState,
+  model: CampfitV3ModelResponse,
+  facts: readonly CampfitV3Fact[],
+): CampfitV3ConversationState {
   const merged = mergeFacts(state, facts)
   const conflictMap = new Map(merged.conflicts.map((conflict) => [conflict.key, conflict]))
   for (const conflict of model.conflicts) {
@@ -398,21 +414,183 @@ export function cleanAcknowledgement(text: string): string {
   return sliced.join(" ");
 }
 
-function acknowledgement(
-  model: CampfitV3ModelResponse | null,
-  deterministicFacts: readonly CampfitV3Fact[],
+function buildGroundedAcknowledgement(
+  facts: readonly CampfitV3Fact[],
   userMessage: string,
-  transcript: readonly CampfitV3TranscriptMessage[],
-): string {
-  const candidate = model === null
-    ? fallbackAcknowledgement(deterministicFacts, userMessage)
-    : model.facts.some((fact) => fact.key === "specialCareFollowUp")
-      ? "별도로 확인할 사항의 존재 여부만 반영했어요. 상세 내용은 프로그램 상담 단계에서 확인해 주세요."
-      : cleanAcknowledgement(model.assistantMessage)
-  if (model !== null && transcript.some((item) => item.role === "assistant" && isNearDuplicate(candidate, item.content))) {
-    return fallbackAcknowledgement(deterministicFacts, userMessage)
+): { readonly text: string; readonly evidence: readonly CampfitV3AcknowledgementEvidence[] } {
+  const specialCare = facts.find((fact) => fact.key === "specialCareFollowUp")
+  if (specialCare !== undefined) {
+    return {
+      text: "별도로 확인할 사항의 존재 여부만 반영했어요. 상세 내용은 프로그램 상담 단계에서 확인해 주세요.",
+      evidence: [toAcknowledgementEvidence(specialCare)],
+    }
   }
-  return dedupeMessage(candidate)
+
+  const english = englishAcknowledgement(facts)
+  if (english !== null) return english
+
+  return {
+    text: dedupeMessage(fallbackAcknowledgement(facts, userMessage)),
+    evidence: acknowledgementEvidenceForFallback(facts),
+  }
+}
+
+function englishAcknowledgement(
+  facts: readonly CampfitV3Fact[],
+): { readonly text: string; readonly evidence: readonly CampfitV3AcknowledgementEvidence[] } | null {
+  const level = facts.find((fact) => fact.key === "childEnglishLevel")
+  const experience = facts.find((fact) => fact.key === "childEnglishExperience")
+  const listening = facts.find((fact) => fact.key === "childEnglishListening")
+  const speaking = facts.find((fact) => fact.key === "childEnglishSpeaking")
+  const reading = facts.find((fact) => fact.key === "childEnglishReading")
+  const usage = facts.find((fact) => fact.key === "childEnglishUsage")
+
+  const compact = (
+    text: string,
+    usedFacts: readonly CampfitV3Fact[],
+  ): { readonly text: string; readonly evidence: readonly CampfitV3AcknowledgementEvidence[] } => ({
+    text,
+    evidence: usedFacts.map(toAcknowledgementEvidence),
+  })
+
+  if (listening !== undefined && reading !== undefined && isValue(listening, "struggles_with_class_explanation") && isReadingFact(reading)) {
+    return compact(
+      "영어책 읽기는 가능하지만 영어로 설명을 들으면 이해하기 어려워하는 편이군요.",
+      [reading, listening],
+    )
+  }
+  if (listening !== undefined && speaking !== undefined && isPositiveListening(listening) && isValue(speaking, "difficulty_initiating")) {
+    return compact(
+      "영어 설명은 대체로 이해하지만 먼저 영어로 말하는 건 조금 어려워하는 편이군요.",
+      [listening, speaking],
+    )
+  }
+  if (speaking !== undefined && isValue(speaking, "can_present_in_english")) {
+    return compact("영어로 수업을 듣고 발표하는 환경에도 무리 없이 참여하는 편이군요.", [speaking, ...(listening !== undefined && isPositiveListening(listening) ? [listening] : [])])
+  }
+  if (listening !== undefined && speaking !== undefined && isPositiveListening(listening) && isPositiveSpeaking(speaking)) {
+    return compact(
+      "영어 설명을 이해하고 영어로 표현하는 활동에도 무리 없이 참여하는 편이군요.",
+      [listening, speaking],
+    )
+  }
+  if (speaking !== undefined && isValue(speaking, "difficulty_initiating")) {
+    return compact("영어로 먼저 말하는 데는 조금 자신 없어하는 편이군요.", [speaking])
+  }
+  if (level?.value === "beginner") return compact("아직 영어가 익숙하지 않은 단계군요.", [level])
+  if (listening !== undefined && isPositiveListening(listening)) return compact(renderEnglishListening(listening.value) ?? "영어 설명은 이해하는 편이군요.", [listening])
+  if (reading !== undefined && listening !== undefined && isReadingFact(reading) && isValue(listening, "struggles_with_class_explanation")) {
+    return compact("영어 읽기와 듣기에서 편안함의 차이가 있는 편이군요.", [reading, listening])
+  }
+  const usageClause = renderEnglishUsage(usage?.value)
+  if (usageClause !== null && usage !== undefined) return compact(`${usageClause}.`, [usage])
+  if (renderEnglishExperience(experience?.value) !== null && experience !== undefined) {
+    return compact("영어 학습 경험은 확인했어요. 실제로 영어를 듣고 말할 때의 편안함도 함께 살펴볼게요.", [experience])
+  }
+  if (Array.isArray(facts.find((fact) => fact.key === "childEnglishAssessment")?.value)) {
+    const assessment = facts.find((fact) => fact.key === "childEnglishAssessment")
+    if (assessment !== undefined) return compact("영어 평가 정보는 확인했어요. 실제로 영어를 듣고 말할 때의 편안함도 함께 살펴볼게요.", [assessment])
+  }
+  return null
+}
+
+function isValue(fact: CampfitV3Fact | undefined, value: string): boolean {
+  return fact?.value === value
+}
+
+function isPositiveListening(fact: CampfitV3Fact | undefined): boolean {
+  return fact?.value === "understands_simple_instructions" || fact?.value === "understands_class_explanation"
+}
+
+function isPositiveSpeaking(fact: CampfitV3Fact | undefined): boolean {
+  return fact?.value === "answers_simple_questions"
+    || fact?.value === "can_converse"
+    || fact?.value === "initiates_speech"
+    || fact?.value === "can_present_in_english"
+}
+
+function isReadingFact(fact: CampfitV3Fact | undefined): boolean {
+  return fact?.key === "childEnglishReading"
+    && typeof fact.value === "string"
+    && ["reads_simple_text", "reads_english_books", "understands_english_books"].includes(fact.value)
+}
+
+function renderEnglishExperience(value: unknown): string | null {
+  if (!Array.isArray(value)) return null
+  const entries = value.filter(isEnglishExperienceValue)
+  if (entries.length === 0) return null
+  const labels = entries.map((entry) => {
+    const label = entry.type === "english_kindergarten"
+      ? "영어유치원"
+      : entry.type === "english_academy"
+        ? "영어학원"
+        : entry.type === "english_class"
+          ? "영어 수업"
+          : "영어 몰입 환경"
+    return entry.durationYears === null ? label : `${label} ${entry.durationYears}년`
+  })
+  const ongoing = entries
+    .filter((entry) => entry.ongoing === true)
+    .map((entry) => entry.type === "english_academy" ? "영어학원" : entry.type === "english_class" ? "영어 수업" : null)
+    .filter((label) => label !== null)
+  const uniqueLabels = Array.from(new Set(labels))
+  const base = uniqueLabels.length <= 1 ? uniqueLabels[0] : `${uniqueLabels.slice(0, -1).join(", ")}과 ${uniqueLabels.at(-1)}`
+  return ongoing.length > 0 ? `${base} 경험이 있고 지금도 ${Array.from(new Set(ongoing)).join("과 ")}에 다니거나 참여하고 있어요` : `${base} 경험이 있어요`
+}
+
+function renderEnglishListening(value: unknown): string | null {
+  if (value === "understands_simple_instructions") return "외국인 선생님의 말이나 간단한 안내는 대체로 알아듣는 편이에요"
+  if (value === "understands_class_explanation") return "영어 수업의 설명은 이해하고 따라가는 편이에요"
+  if (value === "struggles_with_class_explanation") return "영어로 설명을 들으면 이해하기 어려워하는 편이에요"
+  return null
+}
+
+function renderEnglishSpeaking(value: unknown): string | null {
+  if (value === "difficulty_initiating") return "먼저 영어로 말하는 것은 조금 어려워하는 편이에요"
+  if (value === "rarely_speaks") return "영어로 먼저 말하는 기회는 많지 않은 편이에요"
+  if (value === "initiates_speech") return "먼저 영어로 말하는 것도 가능한 편이에요"
+  if (value === "can_present_in_english") return "영어로 수업을 듣고 발표하는 것도 가능한 편이에요"
+  if (value === "can_converse") return "영어로 대화할 수 있는 편이에요"
+  if (value === "answers_simple_questions") return "간단한 질문에는 영어로 답할 수 있는 편이에요"
+  return null
+}
+
+function renderEnglishUsage(value: unknown): string | null {
+  if (!Array.isArray(value)) return null
+  if (value.includes("initiates_in_english")) return "영어로 먼저 말하는 경험도 있어요"
+  if (value.includes("speaks_with_foreigners")) return "외국인과 영어로 대화하거나 어울리는 경험이 있어요"
+  if (value.includes("answers_in_english")) return "영어 질문에 답하는 경험이 있어요"
+  if (value.includes("difficulty_initiating")) return "영어로 먼저 말하는 것은 조금 어려워하는 편이에요"
+  if (value.includes("rarely_uses_english")) return "실제로 영어를 사용하는 기회는 많지 않은 편이에요"
+  return null
+}
+
+function isEnglishExperienceValue(value: unknown): value is {
+  readonly type: "english_kindergarten" | "english_academy" | "english_class" | "english_immersion"
+  readonly durationYears: number | null
+  readonly ongoing: boolean | null
+} {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false
+  const record = value as Record<string, unknown>
+  return typeof record["type"] === "string"
+    && ["english_kindergarten", "english_academy", "english_class", "english_immersion"].includes(record["type"] as string)
+    && (record["durationYears"] === null || typeof record["durationYears"] === "number")
+    && (record["ongoing"] === null || typeof record["ongoing"] === "boolean")
+}
+
+function toAcknowledgementEvidence(fact: CampfitV3Fact): CampfitV3AcknowledgementEvidence {
+  return { factKey: fact.key, source: fact.source, evidence: fact.evidence }
+}
+
+function acknowledgementEvidenceForFallback(facts: readonly CampfitV3Fact[]): readonly CampfitV3AcknowledgementEvidence[] {
+  const renderedKeys = new Set<CampfitV3FactKey>([
+    "desiredOutcomes",
+    "parentStayGoals",
+    "worries",
+    "programCommuteNeed",
+    "programMealNeed",
+  ])
+  return facts.filter((fact) => renderedKeys.has(fact.key)).map(toAcknowledgementEvidence)
 }
 
 function mentionsParentEnglishCommunication(message: string): boolean {
@@ -435,8 +613,21 @@ function isEnglishModelFactSupportedByUserText(
   userMessage: string,
 ): boolean {
   const text = userMessage
-  if (fact.key === "childEnglishListening") return /듣|알아듣|이해|따라|선생님|수업/iu.test(text)
-  if (fact.key === "childEnglishSpeaking") return /말|대화|소통|답|회화|선생님|수업/iu.test(text)
+  if (fact.key === "childEnglishListening") {
+    if (fact.value === "struggles_with_class_explanation") return /(?:선생님|교사|수업).{0,24}(?:설명|말).{0,10}(?:잘\s*)?(?:못\s*알아(?:듣|들)|이해\s*못)|(?:선생님|교사).{0,24}설명(?:은|이|을)?\s*(?:어려|힘들)/iu.test(text)
+    if (fact.value === "understands_class_explanation") return /(?:선생님|교사|수업).{0,24}(?:설명|말).{0,20}(?:잘\s*)?(?:알아듣|이해|따라)/iu.test(text)
+    if (fact.value === "understands_simple_instructions") return /(?:알아듣|이해|따라|듣고\s*말|간단한\s*(?:지시|안내|설명))/iu.test(text)
+    return false
+  }
+  if (fact.key === "childEnglishSpeaking") {
+    if (fact.value === "difficulty_initiating") return /(?:먼저\s*말|말하기|영어로\s*말|대답).{0,20}(?:어려|힘들|잘\s*못|못|자신\s*없)/iu.test(text)
+    if (fact.value === "rarely_speaks") return /(?:영어로\s*)?(?:말을?|말하기).{0,20}(?:거의\s*(?:안|못)|드물|기회가?\s*적)/iu.test(text)
+    if (fact.value === "initiates_speech") return /(?:먼저\s*말|자발적으로\s*(?:영어로\s*)?말|스스로\s*(?:영어로\s*)?말)/iu.test(text) && !/(?:어려|힘들|못|않)/iu.test(text)
+    if (fact.value === "can_converse") return /(?:영어로\s*(?:곧잘|편하게|유창하게)?\s*(?:말|대화)|영어로\s*(?:대화|소통)이?\s*(?:잘\s*)?가능|(?:외국인|원어민).{0,24}대화.{0,32}(?:문제(?:는)?\s*없|무리\s*없|가능))/iu.test(text) && !/(?:어려|힘들|잘\s*못|못)/iu.test(text)
+    if (fact.value === "can_present_in_english") return /영어로\s*(?:수업|발표).{0,24}(?:문제(?:는)?\s*없|무리\s*없|가능)/iu.test(text)
+    if (fact.value === "answers_simple_questions") return /(?:간단한\s*(?:질문|대화)|질문에\s*(?:답|대답)|간단히\s*대답)/iu.test(text) && !/(?:어려|힘들|잘\s*못|못)/iu.test(text)
+    return false
+  }
   if (fact.key === "childEnglishReading") return /읽|책|파닉스|독해/iu.test(text)
   if (fact.key === "childEnglishWriting") return /쓰|작문|문장/iu.test(text)
   if (fact.key === "childEnglishUsage") return /쓰|사용|외국|원어민|친구|대화/iu.test(text)
@@ -447,11 +638,24 @@ function isEnglishModelFactSupportedByUserText(
     return values.every((value) => {
       if (typeof value !== "object" || value === null || Array.isArray(value)) return false
       const type = (value as Record<string, unknown>)["type"]
-      if (type === "english_kindergarten") return /영어\s*유치원|영유/iu.test(text)
-      if (type === "english_academy") return /영어\s*(?:학원|어학원)/iu.test(text)
-      if (type === "english_class") return /영어\s*(?:수업|과외)|영어로\s*(?:하는\s*)?수업/iu.test(text)
-      if (type === "english_immersion") return /영어\s*(?:몰입|환경)|몰입\s*교육|영어로만/iu.test(text)
-      return false
+      const durationYears = (value as Record<string, unknown>)["durationYears"]
+      const ongoing = (value as Record<string, unknown>)["ongoing"]
+      const context = type === "english_academy"
+        ? /(영어\s*(?:학원|어학원))/iu
+        : type === "english_class"
+          ? /(영어\s*(?:수업|과외)|영어로\s*(?:하는\s*)?수업)/iu
+          : type === "english_immersion"
+            ? /(영어\s*(?:몰입|환경)|몰입\s*교육|영어로만)/iu
+            : /(영어\s*유치원|영유)/iu
+      const match = text.match(context)
+      const durationText = match?.index === undefined ? "" : text.slice(match.index, match.index + 48)
+      const ongoingBeforeText = match?.index === undefined ? "" : text.slice(Math.max(0, match.index - 20), match.index)
+      const typeSupported = match !== null
+      if (!typeSupported) return false
+      if (typeof durationYears === "number" && !new RegExp(`${durationYears}\\s*년`, "iu").test(durationText)) return false
+      if (ongoing === true && !/(?:계속|현재|지금도|다니고\s*있|재학)/iu.test(durationText + ongoingBeforeText)) return false
+      if (ongoing === false && !/(?:그만|중단|예전|다녔지만|다녔고\s*(?:지금은|현재는)?)/iu.test(durationText + ongoingBeforeText)) return false
+      return true
     })
   }
   return true
@@ -475,8 +679,28 @@ function fallbackAcknowledgement(facts: readonly CampfitV3Fact[], userMessage: s
   return `${joinKorean(parts)}을 확인했어요.`
 }
 
-function followUpQuestionText(question: ReturnType<typeof getQuestion>, transcript: readonly CampfitV3TranscriptMessage[]): string {
+function followUpQuestionText(
+  question: ReturnType<typeof getQuestion>,
+  transcript: readonly CampfitV3TranscriptMessage[],
+  state: CampfitV3ConversationState,
+): string {
   if (question === null) return "확인이 필요한 조건을 다시 살펴보고 있어요."
+  if (question.key === "child_english_level") {
+    const gap = englishEvidenceGap(state)
+    if (gap === "classroom_comprehension") {
+      const hasAssessment = Array.isArray(state.facts.childEnglishAssessment?.value)
+        && state.facts.childEnglishAssessment.value.length > 0
+      const hasSpeaking = state.facts.childEnglishSpeaking?.value !== undefined
+        && state.facts.childEnglishSpeaking.value !== "unknown"
+      if (hasAssessment && hasSpeaking) return "영어 평가 정보와 먼저 영어로 말하는 데 어려움은 이해했어요. 영어로 진행되는 수업에서 선생님의 설명은 대체로 이해하고 따라갈 수 있나요?"
+      if (state.facts.childEnglishReading !== undefined) return "영어책 읽기와 듣기는 다를 수 있어요. 선생님이 영어로 설명할 때는 대체로 이해하고 따라갈 수 있나요?"
+      return "영어로 진행되는 수업에서 선생님의 설명은 대체로 이해하고 따라갈 수 있나요?"
+    }
+    if (gap === "speaking") {
+      if (state.facts.childEnglishListening?.value === "struggles_with_class_explanation") return "영어 설명을 듣는 부분은 확인했어요. 간단한 질문에 답하거나 먼저 영어로 말하는 건 어떤가요?"
+      return "영어 설명은 이해하는 편이군요. 간단한 질문에 답하거나 먼저 영어로 말하는 건 어떤가요?"
+    }
+  }
   const previousAssistant = [...transcript].reverse().find((item) => item.role === "assistant")?.content
   if (previousAssistant !== undefined && normalizeMessage(previousAssistant) === normalizeMessage(question.title)) {
     return question.followUpTitle ?? "이 조건을 조금 더 구체적으로 알려주실 수 있을까요?"

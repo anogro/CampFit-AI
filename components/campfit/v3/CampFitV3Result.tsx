@@ -393,6 +393,12 @@ function ProgramInlineCard({ program, index }: { readonly program: CampfitV3Prog
       <div className="mt-3">
         <p className="text-xs font-black text-[var(--text-primary)]">추천 이유</p>
         <p className="mt-1 text-sm leading-6 [word-break:keep-all]">{strengths[0]}</p>
+        {program.englishMatchLabel ? (
+          <div data-campfit-english-match={program.englishMatchStatus ?? "unknown"} className="mt-3 rounded-2xl border border-[var(--border-default)] bg-[var(--accent-soft)]/40 p-3">
+            <p className="text-xs font-black text-[var(--accent-primary)]">영어 부담도 · {program.englishRequirementSource === "official" ? "공식 확인" : program.englishRequirementSource === "inferred" ? "설명 기반 추론" : program.englishRequirementSource === "demo_fixture" ? "데모 테스트 데이터" : "확인되지 않음"}</p>
+            <p className="mt-1 text-sm font-bold leading-6 [word-break:keep-all]">{program.englishMatchLabel}</p>
+          </div>
+        ) : null}
         {(() => {
           const tripCost = program.tripCost
           let estimatedTotalText = program.priceLabel

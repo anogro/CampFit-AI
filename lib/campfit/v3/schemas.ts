@@ -85,6 +85,11 @@ export const CampfitV3ConversationMessageRequestSchema = z.object({
 
 export const CampfitV3ConversationResponseSchema = z.object({
   assistantMessage: z.string().min(1).max(1000),
+  acknowledgementEvidence: z.array(z.object({
+    factKey: z.enum(campfitV3FactKeys),
+    source: z.enum(["ai_inference", "explicit_user_statement", "quick_reply", "structured_input", "user_correction"]),
+    evidence: z.string().min(1).max(240),
+  })).max(20).optional(),
   updatedState: CampfitV3ConversationStateSchema,
   updatedBasicInfo: CampfitV3BasicInfoSchema,
   quickReplies: z.array(z.object({ key: z.string().min(1).max(80), label: z.string().min(1).max(200) })).max(12),
@@ -204,7 +209,12 @@ export const CampfitV3RecommendationResultSchema = z.object({
   programCandidates: z.array(z.object({
     programId: z.string().min(1), name: z.string().min(1), cityName: z.string().min(1), countryName: z.string().min(1),
     imageUrl: z.string().nullable(), ageLabel: z.string(), durationLabel: z.string(), priceLabel: z.string(), primaryDirection: z.string(),
-    reason: z.string(), verify: z.array(z.string()), detailUrl: z.string().nullable(),
+    reason: z.string(), verify: z.array(z.string()),
+    englishRequirementLevel: z.enum(["no_requirement", "beginner_friendly", "general_english", "academic_english", "unknown"]).optional(),
+    englishRequirementSource: z.enum(["official", "inferred", "demo_fixture", "unknown"]).optional(),
+    englishMatchStatus: z.enum(["comfortable", "manageable_with_support", "english_burden_possible", "official_requirement_mismatch", "unknown"]).optional(),
+    englishMatchLabel: z.string().optional(), englishMatchExplanation: z.string().optional(),
+    detailUrl: z.string().nullable(),
     group: z.enum(["우선 살펴볼 프로그램", "조건 확인 후 살펴볼 프로그램", "함께 비교할 대안"]), score: z.number().min(0).max(100), tripCost: CampfitV3TripCostSchema.optional(),
   })).max(9),
   verificationChecklist: z.array(z.string()).max(50),
@@ -273,8 +283,8 @@ const valueSchemas: Readonly<Record<(typeof campfitV3FactKeys)[number], z.ZodTyp
   childEnglishExperience: englishExperienceSchema,
   childEnglishEnvironment: z.array(z.enum(campfitV3EnglishEnvironmentTypes)).max(8),
   childEnglishAssessment: englishAssessmentSchema,
-  childEnglishListening: z.enum(["understands_simple_instructions", "understands_class_explanation", "unknown"]),
-  childEnglishSpeaking: z.enum(["answers_simple_questions", "can_converse", "initiates_speech", "difficulty_initiating", "rarely_speaks", "unknown"]),
+  childEnglishListening: z.enum(["understands_simple_instructions", "understands_class_explanation", "struggles_with_class_explanation", "unknown"]),
+  childEnglishSpeaking: z.enum(["answers_simple_questions", "can_converse", "initiates_speech", "can_present_in_english", "difficulty_initiating", "rarely_speaks", "unknown"]),
   childEnglishReading: z.enum(["phonics_only", "reads_simple_text", "reads_english_books", "understands_english_books", "unknown"]),
   childEnglishWriting: z.enum(["simple_words", "simple_sentences", "can_explain_in_english", "unknown"]),
   childEnglishUsage: z.array(z.enum(["speaks_with_foreigners", "answers_in_english", "initiates_in_english", "difficulty_initiating", "rarely_uses_english"])).max(8),

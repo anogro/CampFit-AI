@@ -184,8 +184,15 @@ export type CampfitV3AiDiagnostics = {
   readonly causeMessage?: string | null | undefined
 }
 
+export type CampfitV3AcknowledgementEvidence = {
+  readonly factKey: CampfitV3FactKey
+  readonly source: CampfitV3FactSource
+  readonly evidence: string
+}
+
 export type CampfitV3ConversationResponse = {
   readonly assistantMessage: string
+  readonly acknowledgementEvidence?: readonly CampfitV3AcknowledgementEvidence[] | undefined
   readonly updatedState: CampfitV3ConversationState
   readonly updatedBasicInfo: CampfitV3BasicInfo
   readonly quickReplies: readonly CampfitV3QuickReply[]
@@ -250,6 +257,11 @@ export type CampfitV3ProgramCandidate = {
   readonly primaryDirection: string
   readonly reason: string
   readonly verify: readonly string[]
+  readonly englishRequirementLevel?: "no_requirement" | "beginner_friendly" | "general_english" | "academic_english" | "unknown" | undefined
+  readonly englishRequirementSource?: "official" | "inferred" | "demo_fixture" | "unknown" | undefined
+  readonly englishMatchStatus?: "comfortable" | "manageable_with_support" | "english_burden_possible" | "official_requirement_mismatch" | "unknown" | undefined
+  readonly englishMatchLabel?: string | undefined
+  readonly englishMatchExplanation?: string | undefined
   readonly detailUrl: string | null
   readonly group: "우선 살펴볼 프로그램" | "조건 확인 후 살펴볼 프로그램" | "함께 비교할 대안"
   readonly score: number

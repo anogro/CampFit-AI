@@ -216,9 +216,9 @@ export function isSemanticallyValidModelFact(input: {
     case "childEnglishAssessment":
       return isEnglishAssessmentArray(input.value)
     case "childEnglishListening":
-      return isOneOf(input.value, ["understands_simple_instructions", "understands_class_explanation", "unknown"])
+      return isOneOf(input.value, ["understands_simple_instructions", "understands_class_explanation", "struggles_with_class_explanation", "unknown"])
     case "childEnglishSpeaking":
-      return isOneOf(input.value, ["answers_simple_questions", "can_converse", "initiates_speech", "difficulty_initiating", "rarely_speaks", "unknown"])
+      return isOneOf(input.value, ["answers_simple_questions", "can_converse", "initiates_speech", "can_present_in_english", "difficulty_initiating", "rarely_speaks", "unknown"])
     case "childEnglishReading":
       return isOneOf(input.value, ["phonics_only", "reads_simple_text", "reads_english_books", "understands_english_books", "unknown"])
     case "childEnglishWriting":
@@ -338,7 +338,7 @@ export function extractDeterministicFacts(
   }
 
   const childEnglishText = /(아이|애|첫째|둘째|첫째 아이|둘째 아이).{0,40}(영어|수업|대화)/iu.test(text)
-    || currentQuestionKey === "child_english_level" && /(?:영어 수업|영어로 대화|단어나 짧은 표현|간단한 대화|일상 대화|초급|중급|고급|beginner|basic|intermediate|advanced)/iu.test(text)
+    || currentQuestionKey === "child_english_level" && /(?:영어 수업|영어로 대화|단어나 짧은 표현|간단한 대화|일상 대화|초급|영어(?:는|가|를|에|로)\s*(?:거의\s*)?(?:처음|못|낯설)|중급|고급|beginner|basic|intermediate|advanced)/iu.test(text)
   if (childEnglishText && /(초급|처음|거의 못|낯설|첨|단어나 짧은 표현|beginner)/iu.test(text)) push("childEnglishLevel", "child", "beginner")
   else if (childEnglishText && /(간단한 문장|짧은 문장|듣고\s*말|이야기하고\s*듣|basic)/iu.test(text)) push("childEnglishLevel", "child", "basic")
   else if (childEnglishText && /(중급|간단한 대화|일상 대화|수업\s*(?:에|을)?\s*참여|영어\s*수업.{0,10}참여|참여할\s*정도|대화.*가능|intermediate)/iu.test(text)) push("childEnglishLevel", "child", "intermediate")
@@ -350,10 +350,10 @@ export function extractDeterministicFacts(
     || /(영어\s*유치원|영어\s*학원|AR\s*\d|Lexile|국제학교|해외\s*(?:학교|캠프|거주)|영어책|파닉스)/iu.test(text)
   const englishExperience: Array<{ type: CampfitV3EnglishExperienceType; durationYears: number | null; ongoing: boolean | null }> = []
   const deniedEnglishKindergarten = /(?:영어\s*유치원|영유).{0,10}(?:안\s*다녔|다니지\s*않|경험\s*없)|(?:안\s*다녔|다니지\s*않).{0,10}(?:영어\s*유치원|영유)/iu.test(text)
-  if (childEnglishEvidenceContext && !deniedEnglishKindergarten && /(영어\s*유치원|영유)/iu.test(text)) englishExperience.push({ type: "english_kindergarten", durationYears: durationYearsFor(text, /(영어\s*유치원|영유)/iu), ongoing: ongoingFor(text) })
-  if (childEnglishEvidenceContext && /(영어\s*학원|영어\s*어학원)/iu.test(text)) englishExperience.push({ type: "english_academy", durationYears: durationYearsFor(text, /(영어\s*학원|영어\s*어학원)/iu), ongoing: ongoingFor(text) })
-  if (childEnglishEvidenceContext && /(영어\s*수업|영어로\s*(?:하는\s*)?(?:수업|교육)|영어\s*과외)/iu.test(text)) englishExperience.push({ type: "english_class", durationYears: durationYearsFor(text, /(영어\s*수업|영어로\s*(?:하는\s*)?(?:수업|교육)|영어\s*과외)/iu), ongoing: ongoingFor(text) })
-  if (childEnglishEvidenceContext && /(영어\s*몰입|몰입\s*교육|영어로만|영어\s*환경)/iu.test(text)) englishExperience.push({ type: "english_immersion", durationYears: durationYearsFor(text, /(영어\s*몰입|몰입\s*교육|영어로만|영어\s*환경)/iu), ongoing: ongoingFor(text) })
+  if (childEnglishEvidenceContext && !deniedEnglishKindergarten && /(영어\s*유치원|영유)/iu.test(text)) englishExperience.push({ type: "english_kindergarten", durationYears: durationYearsFor(text, /(영어\s*유치원|영유)/iu), ongoing: ongoingFor(text, /(영어\s*유치원|영유)/iu) })
+  if (childEnglishEvidenceContext && /(영어\s*학원|영어\s*어학원)/iu.test(text)) englishExperience.push({ type: "english_academy", durationYears: durationYearsFor(text, /(영어\s*학원|영어\s*어학원)/iu), ongoing: ongoingFor(text, /(영어\s*학원|영어\s*어학원)/iu) })
+  if (childEnglishEvidenceContext && /(영어\s*수업|영어로\s*(?:하는\s*)?(?:수업|교육)|영어\s*과외)/iu.test(text)) englishExperience.push({ type: "english_class", durationYears: durationYearsFor(text, /(영어\s*수업|영어로\s*(?:하는\s*)?(?:수업|교육)|영어\s*과외)/iu), ongoing: ongoingFor(text, /(영어\s*수업|영어로\s*(?:하는\s*)?(?:수업|교육)|영어\s*과외)/iu) })
+  if (childEnglishEvidenceContext && /(영어\s*몰입|몰입\s*교육|영어로만|영어\s*환경)/iu.test(text)) englishExperience.push({ type: "english_immersion", durationYears: durationYearsFor(text, /(영어\s*몰입|몰입\s*교육|영어로만|영어\s*환경)/iu), ongoing: ongoingFor(text, /(영어\s*몰입|몰입\s*교육|영어로만|영어\s*환경)/iu) })
   if (englishExperience.length) push("childEnglishExperience", "child", dedupeStructuredValues(englishExperience))
 
   const englishEnvironment: CampfitV3EnglishEnvironmentType[] = []
@@ -364,9 +364,9 @@ export function extractDeterministicFacts(
   if (englishEnvironment.length) push("childEnglishEnvironment", "child", Array.from(new Set(englishEnvironment)))
 
   const englishAssessments: Array<{ type: CampfitV3EnglishAssessmentType; value: number | string }> = []
-  const ar = childEnglishEvidenceContext ? text.match(/\bAR\s*(\d+(?:\.\d+)?)/iu) : null
+  const ar = childEnglishEvidenceContext ? text.match(/\bAR\s*(?:은|는)?\s*(\d+(?:\.\d+)?)/iu) : null
   if (ar?.[1] !== undefined) englishAssessments.push({ type: "ar", value: Number(ar[1]) })
-  const lexile = childEnglishEvidenceContext ? text.match(/\bLexile\s*(\d+)/iu) : null
+  const lexile = childEnglishEvidenceContext ? text.match(/\bLexile\s*(?:은|는)?\s*(\d+)/iu) : null
   if (lexile?.[1] !== undefined) englishAssessments.push({ type: "lexile", value: Number(lexile[1]) })
   const exam = childEnglishEvidenceContext ? text.match(/\b(TOEFL|TOEIC|IELTS|Cambridge)\s*([A-Za-z0-9+.-]*)/iu) : null
   if (exam?.[0] !== undefined) englishAssessments.push({ type: "english_exam", value: exam[0].trim() })
@@ -475,6 +475,7 @@ export function extractDeterministicFacts(
   else if (/한국어.{0,12}(필요 없|중요하지 않|없어도|없으면).{0,8}(괜찮|돼|좋)/.test(text)) push("koreanSupportNeed", "constraint", "none")
   else if (/한국어.{0,40}꼭\s*있어야\s*하는\s*건?\s*아니/.test(text)
     || /한국어.{0,30}(있으면|가능).{0,24}(안심|좋|선호).{0,20}(꼭|필수).{0,12}(아니|없)/.test(text)) push("koreanSupportNeed", "constraint", "preferred")
+  else if (/한국어\s*지원/.test(text)) push("koreanSupportNeed", "constraint", "unknown")
 
   const stayGoals: string[] = []
   const parentStayContext = /(저는|부모|엄마|아빠|보호자|아이.{0,12}(캠프|프로그램).{0,12}시간)/.test(text)
@@ -623,35 +624,59 @@ function dedupeStructuredValues<T>(values: readonly T[]): readonly T[] {
   })
 }
 
-function durationYearsFor(text: string, _context: RegExp): number | null {
-  const match = text.match(/(\d+(?:\.\d+)?)\s*년/iu)
+function durationYearsFor(text: string, context: RegExp): number | null {
+  const match = experienceDurationContext(text, context).match(/(\d+(?:\.\d+)?)\s*년/iu)
   if (!match?.[1]) return null
   const value = Number(match[1])
   return Number.isFinite(value) && value >= 0 && value <= 20 ? value : null
 }
 
-function ongoingFor(text: string): boolean | null {
-  if (/(계속|현재|지금도|다니고\s*있|재학)/iu.test(text)) return true
-  if (/(그만|중단|예전|다녔지만|다녔고\s*지금은)/iu.test(text)) return false
+function ongoingFor(text: string, context: RegExp): boolean | null {
+  const match = text.match(context)
+  if (match?.index === undefined) return null
+  const afterText = text.slice(match.index, match.index + 48)
+  const beforeText = text.slice(Math.max(0, match.index - 20), match.index)
+  if (/(그만|중단|예전|다녔지만)/iu.test(beforeText) || /(그만|중단|예전|다녔지만|다녔고\s*(?:지금은|현재는)?)/iu.test(afterText)) return false
+  if (/(계속|현재|지금도|다니고\s*있|재학)/iu.test(afterText + beforeText)) return true
   return null
 }
 
-function listeningEvidence(text: string): "understands_simple_instructions" | "understands_class_explanation" | null {
+function experienceContext(text: string, context: RegExp): string {
+  const match = text.match(context)
+  if (match?.index === undefined) return ""
+  return text.slice(Math.max(0, match.index - 12), match.index + 48)
+}
+
+function experienceDurationContext(text: string, context: RegExp): string {
+  const match = text.match(context)
+  if (match?.index === undefined) return ""
+  return text.slice(match.index, match.index + 48)
+}
+
+function listeningEvidence(text: string): "understands_simple_instructions" | "understands_class_explanation" | "struggles_with_class_explanation" | null {
+  if (/(?:선생님|교사|수업).{0,24}(?:설명|말).{0,10}(?:잘\s*)?(?:못\s*알아(?:듣|들)|이해\s*못)/iu.test(text)
+    || /(?:선생님|교사).{0,24}설명(?:은|이|을)?\s*(?:어려|힘들)/iu.test(text)) return "struggles_with_class_explanation"
+  if (/(영어로\s*(?:하는\s*)?(?:수업|설명)).{0,10}(?:잘\s*)?(?:못\s*알아(?:듣|들)|이해\s*못)/iu.test(text)
+    || /영어로\s*(?:하는\s*)?설명(?:은|이|을)?\s*(?:어려|힘들)/iu.test(text)) return "struggles_with_class_explanation"
+  if (/외국인\s*선생님.{0,20}(?:설명|수업).{0,16}(?:잘\s*)?(?:알아듣|이해|따라)/iu.test(text)) return "understands_class_explanation"
   if (/외국인\s*선생님.{0,20}(대충|조금|간단히).{0,12}(알아듣|이해)/iu.test(text)) return "understands_simple_instructions"
   if (/(원어민|외국인).{0,20}(말|설명).{0,12}(대충|조금|잘)?\s*(알아듣|이해)/iu.test(text)) return "understands_simple_instructions"
   if (/(선생님|교사|수업).{0,20}(설명|말).{0,20}(잘\s*)?(알아듣|이해|따라)/iu.test(text)
-    || /(영어로\s*(수업|설명)).{0,20}(이해|따라|들을)/iu.test(text)) return "understands_class_explanation"
+    || /(영어로\s*(?:하는\s*)?(수업|설명)).{0,20}(이해|따라|들을|듣|참여)/iu.test(text)) return "understands_class_explanation"
   if (/(간단한\s*(지시|안내|설명)|외국인\s*선생님.{0,20}(알아듣|이해)|듣고\s*말|말을\s*듣)/iu.test(text)) return "understands_simple_instructions"
   return null
 }
 
-function speakingEvidence(text: string): "answers_simple_questions" | "can_converse" | "initiates_speech" | "difficulty_initiating" | "rarely_speaks" | null {
+function speakingEvidence(text: string): "answers_simple_questions" | "can_converse" | "initiates_speech" | "can_present_in_english" | "difficulty_initiating" | "rarely_speaks" | null {
   if (/(먼저\s*말|말을?\s*먼저|자발적으로\s*말)/iu.test(text) && /(잘\s*못|어려|힘들|않)/iu.test(text)) return "difficulty_initiating"
-  if (/(말하기|영어로\s*말).{0,16}(어려|힘들|잘\s*못)|먼저\s*말하.{0,8}(못|어려)/iu.test(text)) return "difficulty_initiating"
+  if (/(말하기|영어로\s*말|회화).{0,20}(어려|힘들|잘\s*못|자신\s*없)|먼저\s*말하.{0,8}(못|어려|자신\s*없)/iu.test(text)) return "difficulty_initiating"
   if (/(대답|질문에\s*답).{0,12}(잘\s*못|어려|힘들)/iu.test(text)) return "difficulty_initiating"
+  if (/영어로\s*(?:수업|발표).{0,24}(?:문제(?:는)?\s*없|무리\s*없|가능)/iu.test(text)) return "can_present_in_english"
+  if (/(?:외국인|원어민).{0,24}대화.{0,32}(?:문제(?:는)?\s*없|무리\s*없|가능)/iu.test(text)) return "can_converse"
   if (/(먼저\s*말|자발적으로\s*영어로\s*말|스스로\s*말)/iu.test(text)) return "initiates_speech"
   if (/(영어로\s*곧잘\s*말|영어로\s*편하게\s*(?:말|대화)|유창하게\s*말|영어로\s*대화가?\s*(?:잘\s*)?가능)/iu.test(text)) return "can_converse"
   if (/(간단한\s*(?:질문|대화)|질문에\s*(?:답|대답)|짧은\s*대화|대화가?\s*가능|간단히\s*대답)/iu.test(text)) return "answers_simple_questions"
+  if (/실제로\s*말.{0,16}(?:안\s*(?:나오|나와)|잘\s*안\s*(?:나오|나와))/iu.test(text)) return "rarely_speaks"
   if (/(영어는\s*거의\s*(?:처음|못)|영어로\s*말을?\s*거의\s*안)/iu.test(text)) return "rarely_speaks"
   return null
 }
@@ -665,7 +690,7 @@ function readingEvidence(text: string): "phonics_only" | "reads_simple_text" | "
 }
 
 function writingEvidence(text: string): "simple_words" | "simple_sentences" | "can_explain_in_english" | null {
-  if (/(영어로\s*(설명|글을\s*(쓰|써)|작문)|영어\s*작문|영어로\s*자기\s*생각을\s*(쓰|써))/iu.test(text)) return "can_explain_in_english"
+  if (/(영어로\s*(?:글을\s*(쓰|써)|작문)|영어\s*작문|영어로\s*자기\s*생각을\s*(쓰|써)|(?:아이|자녀|스스로|직접).{0,20}영어로\s*설명|영어로\s*설명.{0,8}(?:할\s*수|가능|잘\s*해))/iu.test(text)) return "can_explain_in_english"
   if (/(영어로\s*(간단한\s*)?(문장|글).{0,8}(쓰|써|작성)|문장\s*쓰기)/iu.test(text)) return "simple_sentences"
   if (/(영어\s*단어.{0,8}(쓰|써|적)|단어\s*쓰기)/iu.test(text)) return "simple_words"
   return null

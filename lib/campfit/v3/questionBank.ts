@@ -1,6 +1,7 @@
 import type { CampfitV3ConversationState, CampfitV3QuickReply } from "@/types/campfitV3"
 import { questionReplies } from "@/lib/campfit/v3/stateEngine"
 import { isEnglishReadinessSufficient } from "@/lib/campfit/v3/progress"
+import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
 
 export type CampfitV3Question = {
   readonly key: string
@@ -45,6 +46,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
     quickReplies: questionReplies([["must_daily", "매일 한국어 지원이 꼭 필요해요"], ["emergency_only", "비상 상황에서만 필요해요"], ["preferred", "있으면 더 안심돼요"], ["none", "중요하지 않아요"]]),
     completedBy: ["koreanSupportNeed"],
     priority: 90,
+    shouldAsk: shouldAskKoreanSupport,
   },
   {
     key: "parent_communication_need",
@@ -159,4 +161,24 @@ function shouldAsk(question: CampfitV3Question, state: CampfitV3ConversationStat
 
 function canPlan(question: CampfitV3Question, state: CampfitV3ConversationState): boolean {
   return question.askInPlanner !== false && shouldAsk(question, state)
+}
+
+function shouldAskKoreanSupport(state: CampfitV3ConversationState): boolean {
+  if (state.facts.koreanSupportNeed !== undefined) return true
+
+  const assessment = assessEnglishReadiness(state)
+  if (assessment.readiness === "support_required") return true
+
+  const speaking = state.facts.childEnglishSpeaking?.value
+  const usage = state.facts.childEnglishUsage?.value
+  const hasIndependentParticipationDifficulty = speaking === "difficulty_initiating"
+    || speaking === "rarely_speaks"
+    || Array.isArray(usage) && usage.some((value) => value === "difficulty_initiating" || value === "rarely_uses_english")
+  if (!hasIndependentParticipationDifficulty) return false
+
+  const hasSupportOrAdaptationEvidence = state.facts.beginnerSupportNeed?.value === true
+    || state.facts.initialAdaptationSupportNeed?.value === true
+    || state.facts.dayProgramSeparationReadiness?.value === "needs_close_support"
+    || state.facts.dayProgramSeparationReadiness?.value === "with_initial_support"
+  return hasSupportOrAdaptationEvidence
 }

@@ -66,8 +66,8 @@ describe("CampFit v3 English readiness", () => {
   it("keeps the deterministic fallback narrow across natural Korean variants", () => {
     const cases = [
       { text: "영어로 곧잘 말해요.", expected: [["childEnglishSpeaking", "can_converse"]] },
-      { text: "외국인 선생님이랑 수업은 잘 따라가요.", expected: [] },
-      { text: "영어는 오래 배웠는데 실제로 말은 별로 안 나와요.", expected: [] },
+      { text: "외국인 선생님이랑 수업은 잘 따라가요.", expected: [["childEnglishListening", "understands_class_explanation"]] },
+      { text: "영어는 오래 배웠는데 실제로 말은 별로 안 나와요.", expected: [["childEnglishSpeaking", "rarely_speaks"]] },
       {
         text: "원어민이 하는 말은 대충 알아듣는데 대답은 잘 못해요.",
         expected: [
@@ -76,12 +76,21 @@ describe("CampFit v3 English readiness", () => {
         ],
       },
       { text: "외국 친구랑 놀 때는 영어를 쓰긴 해요.", expected: [["childEnglishUsage", ["speaks_with_foreigners"]]] },
-      { text: "학교 영어는 잘하는데 회화는 자신 없어해요.", expected: [] },
+      { text: "학교 영어는 잘하는데 회화는 자신 없어해요.", expected: [["childEnglishSpeaking", "difficulty_initiating"]] },
       {
         text: "영어유치원은 안 다녔지만 영어로 하는 수업은 잘 따라가요.",
-        expected: [["childEnglishExperience", [{ type: "english_class", durationYears: null, ongoing: false }]]],
+        expected: [
+          ["childEnglishExperience", [{ type: "english_class", durationYears: null, ongoing: false }]],
+          ["childEnglishListening", "understands_class_explanation"],
+        ],
       },
-      { text: "영어캠프는 처음이지만 외국인 선생님과 대화하는 데 큰 문제는 없어요.", expected: [["childEnglishUsage", ["speaks_with_foreigners"]]] },
+      {
+        text: "영어캠프는 처음이지만 외국인 선생님과 대화하는 데 큰 문제는 없어요.",
+        expected: [
+          ["childEnglishSpeaking", "can_converse"],
+          ["childEnglishUsage", ["speaks_with_foreigners"]],
+        ],
+      },
     ] as const
 
     for (const { text, expected } of cases) {

@@ -36,4 +36,17 @@ describe("CampFit v3 Demo Catalog", () => {
     const familyPriceVariants = catalog.programs[0]?.priceOptions.filter((option) => option.adultCount === 1 && option.childCount === 1 && option.durationWeeks === 4 && option.priceValue !== null)
     expect(new Set(familyPriceVariants?.map((option) => option.priceValue)).size).toBeGreaterThan(1)
   })
+
+  it("includes an explicit, non-official English requirement fixture distribution", () => {
+    expect(new Set(demoProgramDefinitions.map((program) => program.englishRequirementLevel))).toEqual(new Set([
+      "no_requirement",
+      "beginner_friendly",
+      "general_english",
+      "academic_english",
+      "unknown",
+    ]))
+    expect(demoProgramDefinitions.some((program) => program.englishRequirementLevel === "beginner_friendly" && program.englishExposure >= 0.8)).toBe(true)
+    expect(demoProgramDefinitions.some((program) => program.englishRequirementLevel === "academic_english" && program.englishExposure <= 0.6)).toBe(true)
+    expect(demoProgramDefinitions.every((program) => program.englishRequirementSource === "demo_fixture")).toBe(true)
+  })
 })

@@ -103,8 +103,8 @@ function normalizeModelFactShape(value: unknown): Record<string, unknown> | null
     fact["value"] = fact["value"][0]
   }
   if (key === "childEnglishLevel" && fact["value"] === "unknown") return null
-  if (key === "childEnglishListening" && !["understands_simple_instructions", "understands_class_explanation", "unknown"].includes(fact["value"] as string)) return null
-  if (key === "childEnglishSpeaking" && !["answers_simple_questions", "can_converse", "initiates_speech", "difficulty_initiating", "rarely_speaks", "unknown"].includes(fact["value"] as string)) return null
+  if (key === "childEnglishListening" && !["understands_simple_instructions", "understands_class_explanation", "struggles_with_class_explanation", "unknown"].includes(fact["value"] as string)) return null
+  if (key === "childEnglishSpeaking" && !["answers_simple_questions", "can_converse", "initiates_speech", "can_present_in_english", "difficulty_initiating", "rarely_speaks", "unknown"].includes(fact["value"] as string)) return null
   if (key === "childEnglishReading" && !["phonics_only", "reads_simple_text", "reads_english_books", "understands_english_books", "unknown"].includes(fact["value"] as string)) return null
   if (key === "childEnglishWriting" && !["simple_words", "simple_sentences", "can_explain_in_english", "unknown"].includes(fact["value"] as string)) return null
   return fact

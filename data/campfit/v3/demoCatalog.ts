@@ -1,5 +1,6 @@
 import type { ExperienceDirectionKey } from "@/types/campfitV3"
 import type { Camp } from "@/types/campfit"
+import type { EnglishRequirementLevel } from "@/lib/campfit/v3/englishRequirement"
 
 export const CAMPFIT_V3_DEMO_CATALOG_VERSION = "campfit-v3-demo-3"
 
@@ -69,6 +70,11 @@ export type DemoProgramDefinition = {
   readonly traits: readonly string[]
   readonly strengths: readonly string[]
   readonly tradeoffs: readonly string[]
+  /** Synthetic-only English requirement projection. Never treated as provider evidence. */
+  readonly englishRequirementLevel: EnglishRequirementLevel
+  readonly englishExposure: number
+  readonly englishRequirementSource: "demo_fixture"
+  readonly englishRequirementText?: string | undefined
 }
 
 const coreDemoCityDefinitions: readonly DemoCityDefinition[] = [
@@ -297,8 +303,38 @@ export const demoCityDefinitions: readonly DemoCityDefinition[] = [...coreDemoCi
 
 const cityCountry: Readonly<Record<string, string>> = Object.fromEntries(demoCityDefinitions.map((city) => [city.name, city.country]))
 
-function demoProgram(input: Omit<DemoProgramDefinition, "country">): DemoProgramDefinition {
-  return { ...input, country: cityCountry[input.city] ?? "" }
+const demoEnglishRequirementOverrides: Readonly<Record<string, {
+  readonly level: EnglishRequirementLevel
+  readonly exposure: number
+  readonly text: string
+}>> = {
+  "demo-cm-family-english": { level: "beginner_friendly", exposure: 0.9, text: "데모: 영어 노출은 높지만 초급자 지원이 있는 가족형 활동" },
+  "demo-cebu-sports-english": { level: "no_requirement", exposure: 0.35, text: "데모: 영어 수준 자체가 참가 조건이 아닌 활동형 구성" },
+  "demo-singapore-stem-maker": { level: "general_english", exposure: 0.75, text: "데모: 일반적인 영어 설명을 이해하며 프로젝트에 참여" },
+  "demo-auckland-school-bridge": { level: "academic_english", exposure: 0.55, text: "데모: 영어 수업·학교 활동 수행이 필요한 구성" },
+  "demo-dubai-stem-future-lab": { level: "academic_english", exposure: 0.45, text: "데모: 영어 노출은 보통이지만 발표·프로젝트 수행 조건을 가정" },
+}
+
+function demoProgram(input: Omit<DemoProgramDefinition, "country" | "englishRequirementLevel" | "englishExposure" | "englishRequirementSource" | "englishRequirementText"> & Partial<Pick<DemoProgramDefinition, "englishRequirementLevel" | "englishExposure" | "englishRequirementSource" | "englishRequirementText">>): DemoProgramDefinition {
+  const override = demoEnglishRequirementOverride(input.id)
+  return {
+    ...input,
+    country: cityCountry[input.city] ?? "",
+    englishRequirementLevel: input.englishRequirementLevel ?? override?.level ?? "unknown",
+    englishExposure: input.englishExposure ?? override?.exposure ?? 0.5,
+    englishRequirementSource: "demo_fixture",
+    englishRequirementText: input.englishRequirementText ?? override?.text,
+  }
+}
+
+function demoEnglishRequirementOverride(id: string): typeof demoEnglishRequirementOverrides[string] | undefined {
+  const exact = demoEnglishRequirementOverrides[id]
+  if (exact) return exact
+  if (id.endsWith("-family-english")) return { level: "beginner_friendly", exposure: 0.9, text: "데모: 영어 노출은 높지만 초급자 지원이 있는 가족형 활동" }
+  if (id.endsWith("-stem-lab")) return { level: "general_english", exposure: 0.75, text: "데모: 일반적인 영어 설명을 이해하며 프로젝트에 참여" }
+  if (id.endsWith("-school-experience")) return { level: "academic_english", exposure: 0.55, text: "데모: 영어 수업·학교 활동 수행이 필요한 구성" }
+  if (id.endsWith("-outdoor-discovery")) return { level: "no_requirement", exposure: 0.35, text: "데모: 영어 수준 자체가 참가 조건이 아닌 활동형 구성" }
+  return undefined
 }
 
 const familyDefaults = {
