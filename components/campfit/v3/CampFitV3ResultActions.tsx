@@ -10,6 +10,7 @@ import {
   sendCampFitResultEmail,
   type CampFitResultExportFormat,
 } from "@/components/campfit/v3/resultExport"
+import { trackCampfitV3AnalyticsEvent } from "@/components/campfit/v3/analyticsClient"
 
 export type CampFitV3EmailRequest = {
   readonly email: string
@@ -20,6 +21,7 @@ export type CampFitV3EmailRequest = {
 type CampFitV3ResultActionsProps = {
   readonly reportRef: RefObject<HTMLElement | null>
   readonly onRequestEmail?: (request: CampFitV3EmailRequest) => void | Promise<void>
+  readonly resultId: string | null
   readonly onBack: () => void
   readonly onRestart: () => void
 }
@@ -27,6 +29,7 @@ type CampFitV3ResultActionsProps = {
 export function CampFitV3ResultActions({
   reportRef,
   onRequestEmail,
+  resultId,
   onBack,
   onRestart,
 }: CampFitV3ResultActionsProps) {
@@ -41,10 +44,12 @@ export function CampFitV3ResultActions({
   async function saveReport(format: CampFitResultExportFormat): Promise<void> {
     const report = reportRef.current
     if (!report || !exportLock.current.acquire()) return
+    trackCampfitV3AnalyticsEvent({ eventName: "campfit_report_action", stage: "result", resultId, action: "email_requested" })
     setExportBusy(format)
     setNotice("")
     try {
       await downloadCampFitResult(report, getCampFitReportFilename(format), format)
+      trackCampfitV3AnalyticsEvent({ eventName: "campfit_report_action", stage: "result", resultId, action: format === "pdf" ? "pdf_saved" : "png_saved" })
       setNotice(format === "pdf" ? "결과 PDF를 저장했어요." : "결과 PNG 이미지를 저장했어요.")
     } catch {
       setNotice("리포트를 저장하지 못했어요. 잠시 후 다시 시도해주세요.")
@@ -71,6 +76,7 @@ export function CampFitV3ResultActions({
       const pdf = await createCampFitResultPdfBlob(report)
       if (onRequestEmail) await onRequestEmail({ email: normalizedEmail, pdf, filename })
       else await sendCampFitResultEmail({ email: normalizedEmail, pdf, filename })
+      trackCampfitV3AnalyticsEvent({ eventName: "campfit_report_action", stage: "result", resultId, action: "email_sent" })
       setEmail("")
       setEmailOpen(false)
       setNotice("추천 리포트를 이메일로 보내드렸어요.")
