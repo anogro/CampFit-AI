@@ -28,6 +28,7 @@ export const campfitV3FactKeys = [
   "isFirstOverseasEducationExperience",
   "dayProgramSeparationReadiness",
   "preferredActivities",
+  "activityPreferences",
   "destinationPreference",
   "socialPreference",
   "desiredOutcomes",
@@ -117,6 +118,38 @@ export type CampfitV3ParentExperienceNeed = {
 }
 
 export type CampfitV3ParentExperienceNeeds = Readonly<Record<CampfitV3ParentExperienceNeedAxis, CampfitV3ParentExperienceNeed>>
+
+export const campfitV3ActivityPreferenceCategories = [
+  "stem_maker",
+  "sports_physical",
+  "nature_outdoor",
+  "animals_ecology",
+  "art_creative",
+  "performance_music",
+  "culture_lifestyle",
+] as const
+export type CampfitV3ActivityPreferenceCategory = (typeof campfitV3ActivityPreferenceCategories)[number]
+
+export const campfitV3ActivityPreferenceStrengths = ["strong", "positive", "neutral", "dislike"] as const
+export type CampfitV3ActivityPreferenceStrength = (typeof campfitV3ActivityPreferenceStrengths)[number]
+
+export const campfitV3VarietyPreferenceValues = ["strong", "positive", "unspecified"] as const
+export type CampfitV3VarietyPreference = (typeof campfitV3VarietyPreferenceValues)[number]
+
+export type CampfitV3ActivityPreference = {
+  readonly category: CampfitV3ActivityPreferenceCategory
+  readonly strength: CampfitV3ActivityPreferenceStrength
+  readonly rank: number | null
+  readonly mentionedActivities: readonly string[]
+  readonly evidence: readonly string[]
+}
+
+export type CampfitV3ActivityPreferenceProfile = {
+  readonly preferences: readonly CampfitV3ActivityPreference[]
+  /** Variety/breadth is a child preference, not the program's multi_activity label. */
+  readonly varietyPreference: CampfitV3VarietyPreference
+  readonly evidence: readonly string[]
+}
 
 export const campfitV3FactStatuses = ["known", "unknown", "tentative", "confirmed"] as const
 export type CampfitV3FactStatus = (typeof campfitV3FactStatuses)[number]

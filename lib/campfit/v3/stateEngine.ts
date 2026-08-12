@@ -1,6 +1,7 @@
 import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/types/campfitV3"
 import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
 import { extractParentExperienceNeedsValue, isParentExperienceNeedsValue } from "@/lib/campfit/v3/parentExperienceNeeds"
+import { activityPreferenceProfileFromCategory, extractActivityPreferenceProfile, isActivityPreferenceProfileValue } from "@/lib/campfit/v3/activityPreferences"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationState,
@@ -183,6 +184,7 @@ export function isSemanticallyValidModelFact(input: {
     isFirstOverseasEducationExperience: ["child"],
     dayProgramSeparationReadiness: ["child"],
     preferredActivities: ["preference"],
+    activityPreferences: ["preference"],
     destinationPreference: ["preference"],
     socialPreference: ["child", "preference"],
     desiredOutcomes: ["preference"],
@@ -241,6 +243,8 @@ export function isSemanticallyValidModelFact(input: {
       return isOneOf(input.value, ["needs_close_support", "with_initial_support", "ready"])
     case "preferredActivities":
       return isStringArray(input.value, 12)
+    case "activityPreferences":
+      return isActivityPreferenceProfileValue(input.value)
     case "destinationPreference":
       return isStringArray(input.value, 8)
     case "socialPreference":
@@ -299,6 +303,9 @@ export function factsFromQuickReply(questionKey: string, replyKey: string, label
       return [fact("childEnglishLevel", "child", replyKey)]
     case "primary_experience_goal":
       return [fact("experienceGoals", "preference", goalStrengths(replyKey))]
+    case "child_activity_preferences":
+      if (!["stem_maker", "sports_physical", "nature_outdoor", "variety"].includes(replyKey)) return []
+      return [fact("activityPreferences", "preference", activityPreferenceProfileFromCategory(replyKey as "stem_maker" | "sports_physical" | "nature_outdoor" | "variety", label))]
     case "preferred_region":
       return replyKey === "no_preference"
         ? [fact("preferredRegions", "preference", []), fact("regionImportance", "preference", "no_preference")]
@@ -429,6 +436,9 @@ export function extractDeterministicFacts(
   if (/(과학|science|STEM)/i.test(text)) preferredActivities.push("science")
   if (/(코딩|coding)/i.test(text)) preferredActivities.push("coding")
   if (preferredActivities.length) push("preferredActivities", "preference", Array.from(new Set(preferredActivities)))
+
+  const activityPreferences = extractActivityPreferenceProfile(text)
+  if (activityPreferences !== null) push("activityPreferences", "preference", activityPreferences)
 
   // City selection priorities are separate from the child's program direction.
   // Keep them in the existing structured facts so extra consultation answers

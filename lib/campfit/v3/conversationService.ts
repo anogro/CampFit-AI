@@ -2,6 +2,7 @@ import { allowedQuestionKeys, getQuestion, isQuestionCompleted, selectNextQuesti
 import { calculateProgress, isReadyForRecommendation, progressMessage } from "@/lib/campfit/v3/progress"
 import { englishEvidenceGap } from "@/lib/campfit/v3/englishReadiness"
 import { parentExperienceNeedsAcknowledgement, parentNeedEvidenceIsGrounded, hasParentExperienceNeeds } from "@/lib/campfit/v3/parentExperienceNeeds"
+import { activityPreferenceAcknowledgement, activityPreferenceValueIsGrounded, hasMeaningfulActivityEvidence } from "@/lib/campfit/v3/activityPreferences"
 import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/types/campfitV3"
 import {
   applyQuickReply,
@@ -118,7 +119,7 @@ export async function processConversationMessage(input: {
       // partial provider response must not reopen an English question when the
       // user's wording already contains enough recommendation evidence.
       const acceptedKeys = new Set(acceptedModelFacts.map((fact) => fact.key))
-      deterministicFacts = privacySafeFacts.filter((fact) => isEnglishEvidenceKey(fact.key) && !acceptedKeys.has(fact.key))
+      deterministicFacts = privacySafeFacts.filter((fact) => isGroundedSupplementFactKey(fact.key) && !acceptedKeys.has(fact.key))
       state = mergeFacts(state, deterministicFacts)
     } else {
       deterministicFacts = privacySafeFacts
@@ -133,7 +134,18 @@ export async function processConversationMessage(input: {
 
   state = syncEnglishReadiness(state)
 
-  const partialUnderstanding = deterministicFacts.length > 0 || (model?.facts.length ?? 0) > 0
+  const relevantDeterministicFacts = currentQuestion?.key === "child_english_level"
+    ? deterministicFacts.some((fact) => isEnglishEvidenceKey(fact.key)
+      || fact.key === "childEnglishLevel"
+      || fact.key === "activityPreferences" && hasMeaningfulActivityEvidence(fact.value)
+      || fact.key === "parentExperienceNeeds" && hasParentExperienceNeeds(fact.value))
+    : deterministicFacts.length > 0
+  const relevantModelFacts = currentQuestion?.key === "child_english_level"
+    ? acceptedModelFacts.some((fact) => isEnglishEvidenceKey(fact.key)
+      || fact.key === "childEnglishLevel"
+      || fact.key === "parentExperienceNeeds" && hasParentExperienceNeeds(fact.value))
+    : acceptedModelFacts.length > 0
+  const partialUnderstanding = relevantDeterministicFacts || relevantModelFacts
   if (currentQuestion !== null) {
     state = isQuestionCompleted(currentQuestion, state)
       ? markQuestionCompleted(state, currentQuestion.key)
@@ -210,6 +222,7 @@ function acceptedFactsFromModel(
     if (fact.key === "parentEnglishCommunication" && !mentionsParentEnglishCommunication(userMessage)) return []
     if (isEnglishEvidenceKey(fact.key) && !isEnglishModelFactSupportedByUserText(fact, userMessage)) return []
     if (fact.key === "parentExperienceNeeds" && !parentNeedEvidenceIsGrounded(fact.value, fact.evidence, userMessage)) return []
+    if (fact.key === "activityPreferences" && !activityPreferenceValueIsGrounded(fact.value, fact.evidence, userMessage)) return []
     if (!isSemanticallyValidModelFact(fact)) return []
     const existing = state.facts[fact.key]
     if (existing !== undefined && existing.source !== "ai_inference" && !isCorrectionLanguage(userMessage)) {
@@ -441,6 +454,12 @@ function buildGroundedAcknowledgement(
     if (text !== null) return { text, evidence: [toAcknowledgementEvidence(parentNeeds)] }
   }
 
+  const activities = facts.find((fact) => fact.key === "activityPreferences")
+  if (activities !== undefined) {
+    const text = activityPreferenceAcknowledgement(activities.value)
+    if (text !== null) return { text, evidence: [toAcknowledgementEvidence(activities)] }
+  }
+
   const english = englishAcknowledgement(facts)
   if (english !== null) return english
 
@@ -627,6 +646,10 @@ function isEnglishEvidenceKey(key: CampfitV3FactKey): boolean {
     || key === "childEnglishReading"
     || key === "childEnglishWriting"
     || key === "childEnglishUsage"
+}
+
+function isGroundedSupplementFactKey(key: CampfitV3FactKey): boolean {
+  return isEnglishEvidenceKey(key) || key === "activityPreferences"
 }
 
 function isEnglishModelFactSupportedByUserText(

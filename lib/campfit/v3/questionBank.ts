@@ -3,6 +3,7 @@ import { questionReplies } from "@/lib/campfit/v3/stateEngine"
 import { isEnglishReadinessSufficient } from "@/lib/campfit/v3/progress"
 import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
 import { hasParentExperienceNeeds } from "@/lib/campfit/v3/parentExperienceNeeds"
+import { activityRecommendationSufficiency } from "@/lib/campfit/v3/activityPreferences"
 
 export type CampfitV3Question = {
   readonly key: string
@@ -66,6 +67,21 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
     completedBy: ["experienceGoals"],
     priority: 80,
     shouldAsk: (state) => !hasParentExperienceNeeds(state.facts.parentExperienceNeeds?.value),
+  },
+  {
+    key: "child_activity_preferences",
+    title: "아이가 평소 특히 좋아하거나 오래 집중하는 활동이 있나요? 운동·만들기·실험·자연·동물처럼 편한 예로 말씀해주셔도 좋아요.",
+    followUpTitle: "아이에게 잘 맞는 활동을 한두 가지만 알려주셔도 충분해요. 잘 모르겠다면 여러 활동을 다양하게 경험하는 편인지도 말씀해 주세요.",
+    helper: "모든 활동을 확인할 필요는 없어요. 좋아하는 활동과 선호하지 않는 활동이 있으면 함께 알려주세요.",
+    quickReplies: questionReplies([
+      ["stem_maker", "만들기·실험"],
+      ["sports_physical", "운동·몸을 움직이는 활동"],
+      ["nature_outdoor", "자연·야외 활동"],
+      ["variety", "여러 활동을 다양하게 경험"],
+    ]),
+    completedBy: ["activityPreferences"],
+    priority: 72,
+    shouldAsk: (state) => state.currentQuestionKey !== null && state.askedQuestionKeys.length > 0 && state.facts.activityPreferences === undefined,
   },
   {
     key: "preferred_region",
@@ -144,6 +160,11 @@ export function allowedQuestionKeys(state: CampfitV3ConversationState): readonly
 export function isQuestionCompleted(question: CampfitV3Question, state: CampfitV3ConversationState): boolean {
   if (state.completedQuestionKeys.includes(question.key)) return true
   if (question.key === "child_english_level") return isEnglishReadinessSufficient(state)
+  if (question.key === "child_activity_preferences") {
+    const activityFact = state.facts.activityPreferences
+    if (activityFact !== undefined) return activityFact.status === "confirmed" || activityRecommendationSufficiency(activityFact.value)
+    return false
+  }
   if (question.key === "primary_experience_goal" && hasParentExperienceNeeds(state.facts.parentExperienceNeeds?.value)) return true
   return question.completedBy.every((key) => {
     const fact = state.facts[key as keyof typeof state.facts]

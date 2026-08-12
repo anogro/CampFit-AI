@@ -1,5 +1,6 @@
 import type { CampfitV3BasicInfo, CampfitV3ConversationState, CampfitV3FactKey } from "@/types/campfitV3"
 import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
+import { activityRecommendationSufficiency } from "@/lib/campfit/v3/activityPreferences"
 import { hasParentExperienceNeeds } from "@/lib/campfit/v3/parentExperienceNeeds"
 
 const weightedSlots: readonly { readonly key: CampfitV3FactKey; readonly weight: number }[] = [
@@ -46,7 +47,11 @@ export function isReadyForRecommendation(state: CampfitV3ConversationState): boo
       && fact.status !== "tentative"
       && !state.conflicts.some((conflict) => conflict.key === key)
   })
-  return coreReady && isEnglishReadinessSufficient(state)
+  const activityFact = state.facts.activityPreferences
+  const activityReadyForLiveFlow = state.currentQuestionKey === null
+    || state.askedQuestionKeys.length === 0
+    || activityFact !== undefined && (activityFact.status === "confirmed" || activityRecommendationSufficiency(activityFact.value))
+  return coreReady && isEnglishReadinessSufficient(state) && activityReadyForLiveFlow
 }
 
 export function isEnglishReadinessSufficient(state: CampfitV3ConversationState): boolean {

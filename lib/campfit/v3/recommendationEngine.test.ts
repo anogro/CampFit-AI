@@ -31,7 +31,7 @@ describe("CampFit v3 recommendation engine", () => {
     expect(result.programCandidates).toEqual([])
   })
 
-  it("removes cities whose one-month family living baseline exceeds the budget", () => {
+  it("keeps a modestly over-budget city as an alternative with an explicit burden", () => {
     const catalog = productionCatalog([
       program({ id: "london-program", city: "London", country: "United Kingdom", direction: "cultureActivity" }),
       program({ id: "cebu-program", city: "Cebu", country: "Philippines", direction: "cultureActivity" }),
@@ -44,7 +44,24 @@ describe("CampFit v3 recommendation engine", () => {
         : item)
     const result = buildRecommendation({ basicInfo, state: stateFor("cultureActivity"), catalog: { ...catalog, cities }, now })
 
-    expect(result.destinationRecommendations.map((item) => item.cityName)).not.toContain("London")
+    const london = result.destinationRecommendations.find((item) => item.cityName === "London")
+    expect(london).toBeDefined()
+    expect(london?.verify).toContain("예산 상한 대비 체류 비용 부담 가능성")
+  })
+
+  it("hard-excludes a city when its minimum reference total is more than 50% over budget", () => {
+    const catalog = productionCatalog([
+      program({ id: "tokyo-program", city: "Tokyo", country: "Japan", direction: "cultureActivity" }),
+      program({ id: "cebu-program", city: "Cebu", country: "Philippines", direction: "cultureActivity" }),
+      program({ id: "osaka-program", city: "Osaka", country: "Japan", direction: "cultureActivity" }),
+      program({ id: "auckland-program", city: "Auckland", country: "New Zealand", direction: "cultureActivity" }),
+    ])
+    const cities = catalog.cities.map((item) => item.name === "Tokyo"
+      ? { ...item, flightCostKrw: 2_500_000, livingCostMonthlyKrw: 5_000_000, housingCostMonthlyKrw: 5_000_000 }
+      : item)
+    const result = buildRecommendation({ basicInfo, state: stateFor("cultureActivity"), catalog: { ...catalog, cities }, now })
+
+    expect(result.destinationRecommendations.map((item) => item.cityName)).not.toContain("Tokyo")
   })
 
   it("scenario A selects a production-shaped Cebu culture program with DB provenance", () => {

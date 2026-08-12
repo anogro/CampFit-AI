@@ -64,4 +64,40 @@ describe("CampFit v3 provider normalization", () => {
     ])
     expect(result.model?.unresolved).toHaveLength(2)
   })
+
+  it("accepts a grounded semantic activity profile while preserving evidence", () => {
+    const payload = {
+      assistantMessage: "직접 만들고 실험하는 활동을 특히 좋아하는 편이군요.",
+      facts: [{
+        key: "activityPreferences",
+        subject: "preference",
+        value: {
+          preferences: [{
+            category: "stem_maker",
+            strength: "strong",
+            rank: 1,
+            mentionedActivities: ["레고 조립"],
+            evidence: ["레고 조립을 제일 좋아해요"],
+          }],
+          varietyPreference: "unspecified",
+          evidence: ["레고 조립을 제일 좋아해요"],
+        },
+        source: "explicit_user_statement",
+        confidence: 1,
+        evidence: "레고 조립을 제일 좋아해요",
+      }],
+      unresolved: [],
+      conflicts: [],
+      suggestedNextQuestionKey: null,
+      nextAction: "recommend",
+      readyForRecommendation: false,
+    }
+
+    const result = parseStructuredProviderText(JSON.stringify(payload), ["child_activity_preferences"])
+
+    expect(result.model?.facts[0]?.key).toBe("activityPreferences")
+    expect(result.model?.facts[0]?.value).toMatchObject({
+      preferences: [{ category: "stem_maker", strength: "strong", rank: 1 }],
+    })
+  })
 })

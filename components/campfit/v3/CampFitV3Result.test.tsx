@@ -107,7 +107,7 @@ describe("CampFitV3Result UI component", () => {
     expect(markup.indexOf("결과를 저장해두세요")).toBeGreaterThan(markup.indexOf("확인사항"))
     expect(markup).toContain("도시 평균 생활비")
     expect(markup).toContain("월 약 200만 원")
-    expect(markup).toContain("프로그램 가격")
+    expect(markup).toContain("총 예상 금액")
     expect(markup).toContain("lg:grid-cols-2")
     expect(markup).not.toContain("비교용")
     expect(markup).toContain("영어 경험")
@@ -147,7 +147,7 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).not.toContain("기본 회화 가능")
   })
 
-  it("shows city living cost and program price without a family total trip cost", () => {
+  it("shows city living cost and family total estimate when trip cost components are available", () => {
     const markup = renderToStaticMarkup(
       createElement(CampFitV3Result, {
         result,
@@ -159,8 +159,8 @@ describe("CampFitV3Result UI component", () => {
     )
 
     expect(markup).toContain("도시 평균 생활비")
-    expect(markup).toContain("프로그램 가격")
-    expect(markup).toContain("300만원")
+    expect(markup).toContain("총 예상 금액")
+    expect(markup).toContain("약 600만~750만 원")
     expect(markup).not.toContain("우리 가족 예상 총여행비")
     expect(markup).not.toContain("총여행비 구성")
   })

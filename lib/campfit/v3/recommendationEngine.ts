@@ -4,6 +4,8 @@ import {
   rangesOverlap,
 } from "@/lib/campfit/v3/catalogPolicy"
 import type { ExperienceSignalStatus, V3ParentStayPreferences } from "@/lib/campfit/v3/catalogPolicy"
+import { isActivityPreferenceProfileValue } from "@/lib/campfit/v3/activityPreferences"
+import type { ExperienceTag } from "@/lib/campfit/v3/catalogPolicy"
 import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
 import { assessEnglishRequirementMatch, type EnglishRequirementMatch } from "@/lib/campfit/v3/englishRequirement"
 import { hasParentExperienceNeeds } from "@/lib/campfit/v3/parentExperienceNeeds"
@@ -100,7 +102,10 @@ export function buildRecommendation(input: {
   const scoredPrograms = scorePrograms(input.basicInfo, input.state, input.catalog, directions, parentPreferences, now)
   const eligiblePrograms = scoredPrograms.filter((item) => item.classification !== "excluded")
 
-  const destinations = scoreDestinations(input.basicInfo, input.state, input.catalog.cities, scoredPrograms, directions)
+  // Keep hard-excluded programs out of both candidate selection and fallback.
+  // City cost evidence should use the same eligible pool so an excluded row
+  // cannot leak back into the result or influence a city's estimate.
+  const destinations = scoreDestinations(input.basicInfo, input.state, input.catalog.cities, eligiblePrograms, directions)
   const sortedEligiblePrograms = eligiblePrograms.sort(comparePrograms)
   // City and program recommendations are independent lists. A strong program
   // in a city outside the city Top3 must still be eligible for the program Top3.
@@ -111,7 +116,7 @@ export function buildRecommendation(input: {
     const firstCityName = destinations[0].cityName.trim().toLowerCase()
     const hasFirstCityProgram = programCandidates.some((c) => c.cityName.trim().toLowerCase() === firstCityName)
     if (!hasFirstCityProgram) {
-      const fallbackProgram = scoredPrograms.find((item) => item.program.city.trim().toLowerCase() === firstCityName)
+      const fallbackProgram = eligiblePrograms.find((item) => item.program.city.trim().toLowerCase() === firstCityName)
       if (fallbackProgram) {
         const fallbackCandidate = toProgramCandidate(fallbackProgram, input.basicInfo)
         programCandidates = [
@@ -201,11 +206,16 @@ function evaluateProgram(input: {
   const koreanNeed = String(input.state.facts.koreanSupportNeed?.value ?? "unknown")
   const care = String(input.state.facts.specialCareFollowUp?.value ?? "unknown")
   const communication = String(input.state.facts.parentCommunicationNeed?.value ?? "unknown")
+  const commuteNeed = String(input.state.facts.programCommuteNeed?.value ?? "any")
   const childLevel = String(input.state.facts.childEnglishLevel?.value ?? "unknown")
   const readinessAssessment = assessEnglishReadiness(input.state)
   const readiness = readinessAssessment.readiness
   const hasDetailedEnglishEvidence = readinessAssessment.evidenceKeys.length > 0
   const englishMatch = assessEnglishRequirementMatch(readiness, input.program.englishRequirement)
+  const activityFitAdjustment = activityPreferenceFitAdjustment(input.program, input.state)
+  const commuteFitAdjustment = commuteNeed === "shuttle_preferred"
+    ? input.program.shuttleAvailable === true ? 8 : input.program.shuttleAvailable === false ? -8 : 0
+    : 0
   if (englishMatch.status === "official_requirement_mismatch") excluded.push("공식 영어 자격조건 미충족 가능성")
 
   if (input.program.status !== "active") excluded.push("active 프로그램이 아님")
@@ -253,6 +263,7 @@ function evaluateProgram(input: {
     verify.push("첫 해외 교육 경험을 위한 초기 적응 지원")
   }
   if (communication === "daily" && input.program.dailyParentReport !== true) verify.push("부모에게 전달되는 활동 소식의 빈도")
+  if (commuteNeed === "shuttle_preferred" && input.program.shuttleAvailable !== true) verify.push("셔틀·차량 이동 제공 여부")
 
   if (care === "required" || care === "unknown") {
     if (input.program.specialCareSupport === "unsupported") excluded.push("특별관리 대응 불가가 명시됨")
@@ -294,7 +305,7 @@ function evaluateProgram(input: {
     : 75
   const supportFit = supportScore(koreanNeed, input.program)
   const budgetFit = referenceMinimumKrw === null ? 58 : referenceMinimumKrw <= input.basicInfo.budgetMaxKrw ? 90 : 25
-  const score = clamp(goalFit * 0.46 + beginnerFit * 0.14 + supportFit * 0.14 + budgetFit * 0.14 + 60 * 0.07 + metadataScore(input.program) * 0.05 + englishMatch.scoreAdjustment)
+  const score = clamp(goalFit * 0.46 + beginnerFit * 0.14 + supportFit * 0.14 + budgetFit * 0.14 + 60 * 0.07 + metadataScore(input.program) * 0.05 + englishMatch.scoreAdjustment + activityFitAdjustment + commuteFitAdjustment)
   const classification: ProgramClassification = excluded.length
     ? "excluded"
     : softMismatch.length > 0 || score < 62
@@ -602,6 +613,7 @@ function scoreDestinations(
     if (importance === "must" && preferred.length && !preferred.includes(city.regionGroup)) return []
     const regionFit = !preferred.length ? 70 : preferred.includes(city.regionGroup) ? 100 : importance === "strong" ? 35 : 60
     const cityCostProgram = programs.find((item) => cityKey(item.program.city, item.program.country) === cityKey(city.name, city.country))?.program ?? null
+    if (cityBudgetAssessment(city, cityCostProgram, basicInfo).status === "hard_over") return []
     const costFit = cityBudgetFit(city, cityCostProgram, basicInfo)
     const parentFit = parentStayFit(city, stayGoals)
     const profileFit = cityProfileFit(city, priorities)
@@ -618,7 +630,7 @@ function scoreDestinations(
       role,
       imageUrl: item.city.imageUrl,
       reason: cityReason(item.city, preferred.includes(item.city.regionGroup), priorities),
-      verify: cityVerify(item.city, stayGoals),
+      verify: cityVerify(item.city, stayGoals, programs.find((program) => cityKey(program.program.city, program.program.country) === cityKey(item.city.name, item.city.country))?.program ?? null, basicInfo),
       costEstimate: estimateCityCost(item.city, programs.find((program) => cityKey(program.program.city, program.program.country) === cityKey(item.city.name, item.city.country))?.program ?? null, basicInfo),
       cityStayFlightCostKrw: cityStayFlightCost(item.city, basicInfo),
       cityStayMonthlyCostKrw: cityStayMonthlyCost(item.city, basicInfo),
@@ -800,7 +812,7 @@ function supportConditions(state: CampfitV3ConversationState): readonly string[]
 
 function requiredFactLabels(state: CampfitV3ConversationState): readonly string[] {
   const pairs = [
-    ["experienceGoals", "주요 경험 목표 확인"], ["preferredRegions", "희망 지역 확인"],
+    ["experienceGoals", "주요 경험 목표 확인"], ["activityPreferences", "아이 활동 선호 확인"], ["preferredRegions", "희망 지역 확인"],
     ["regionImportance", "지역 중요도 확인"], ["koreanSupportNeed", "한국어 지원 수준 확인"],
     ["parentStayGoals", "부모 체류 목적 확인"],
   ] as const
@@ -809,6 +821,36 @@ function requiredFactLabels(state: CampfitV3ConversationState): readonly string[
     .map(([, label]) => label)
   if (!assessEnglishReadiness(state).recommendationSufficiency) return ["아이 영어 준비도 확인", ...labels]
   return labels
+}
+
+function activityPreferenceFitAdjustment(program: V3CatalogProgram, state: CampfitV3ConversationState): number {
+  const value = state.facts.activityPreferences?.value
+  if (!isActivityPreferenceProfileValue(value) || value.preferences.length === 0) return 0
+  const signals = new Map(program.experienceAssessment?.tags.map((item) => [item.tag, item.score]) ?? [])
+  let adjustment = 0
+  for (const preference of value.preferences) {
+    const categoryTags = activityCategoryTags[preference.category] ?? []
+    if (categoryTags.length === 0) continue
+    const evidenceScore = Math.max(...categoryTags.map((tag) => signals.get(tag) ?? 50))
+    if (evidenceScore === 50) continue
+    if (preference.strength === "dislike") {
+      adjustment -= Math.min(5, Math.max(0, evidenceScore - 60) * 0.08)
+    } else {
+      const weight = preference.strength === "strong" ? 0.1 : 0.06
+      adjustment += Math.min(5, (evidenceScore - 50) * weight)
+    }
+  }
+  return adjustment
+}
+
+const activityCategoryTags: Readonly<Record<string, readonly ExperienceTag[]>> = {
+  stem_maker: ["stem", "science", "technology", "coding", "robotics", "maker", "design", "creative_project", "problem_solving"],
+  sports_physical: ["sports"],
+  nature_outdoor: ["nature", "environment", "outdoor"],
+  animals_ecology: ["nature", "environment"],
+  art_creative: ["arts", "design", "creative_project"],
+  performance_music: ["arts", "performance"],
+  culture_lifestyle: ["culture", "local_experience"],
 }
 
 function readGoalStrengths(state: CampfitV3ConversationState): Readonly<Record<ExperienceDirectionKey, ExperienceGoalStrength>> {
@@ -925,12 +967,13 @@ function legacyCityReason(city: V3CatalogCity, programCount: number, preferred: 
   return parts.join(" ")
 }
 
-function cityVerify(city: V3CatalogCity, stayGoals: readonly string[]): readonly string[] {
+function cityVerify(city: V3CatalogCity, stayGoals: readonly string[], program: V3CatalogProgram | null, basicInfo: CampfitV3BasicInfo): readonly string[] {
   const items = ["프로그램과 숙소 사이 실제 이동시간"]
   if (city.flightCostKrw === null) items.push("항공료")
   else items.push("항공료의 왕복·출발지·시즌 기준")
   if (city.housingCostMonthlyKrw === null) items.push("단기 가족 숙소 가격")
   else items.push("도심 1BR 월 비용과 실제 단기 가족 숙소의 차이")
+  if (cityBudgetAssessment(city, program, basicInfo).status === "soft_over") items.push("예산 상한 대비 체류 비용 부담 가능성")
   if (stayGoals.includes("remoteWork") && !hasParentStayEvidence(city, "remoteWork")) items.push("인터넷·업무공간 등 원격근무 환경")
   return items
 }
@@ -952,10 +995,27 @@ function hasParentStayEvidence(city: V3CatalogCity, goal: string): boolean {
 }
 
 function cityBudgetFit(city: V3CatalogCity, program: V3CatalogProgram | null, basicInfo: CampfitV3BasicInfo): number {
-  const estimate = estimateCityCost(city, program, basicInfo)
-  if (estimate.estimatedTotalMinKrw === null || basicInfo.budgetMaxKrw <= 0) return 60
-  const ratio = estimate.estimatedTotalMinKrw / basicInfo.budgetMaxKrw
+  const ratio = cityBudgetAssessment(city, program, basicInfo).ratio
+  if (ratio === null || basicInfo.budgetMaxKrw <= 0) return 60
   return ratio <= 0.85 ? 92 : ratio <= 1.1 ? 72 : ratio <= 1.35 ? 52 : 35
+}
+
+type CityBudgetAssessment = {
+  readonly status: "unknown" | "within_budget" | "soft_over" | "hard_over"
+  readonly ratio: number | null
+}
+
+function cityBudgetAssessment(city: V3CatalogCity, program: V3CatalogProgram | null, basicInfo: CampfitV3BasicInfo): CityBudgetAssessment {
+  const estimate = estimateCityCost(city, program, basicInfo)
+  if (estimate.estimatedTotalMinKrw === null || basicInfo.budgetMaxKrw <= 0) return { status: "unknown", ratio: null }
+  const ratio = estimate.estimatedTotalMinKrw / basicInfo.budgetMaxKrw
+  // Keep modest overages as ranked alternatives with an explicit warning.
+  // Exclude only when the minimum reference total is more than 50% over the
+  // budget ceiling; this is a practical guard, not an exact-budget filter.
+  return {
+    status: ratio > 1.5 ? "hard_over" : ratio > 1 ? "soft_over" : "within_budget",
+    ratio,
+  }
 }
 
 function supportScore(need: string, program: V3CatalogProgram): number {

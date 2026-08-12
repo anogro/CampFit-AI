@@ -11,7 +11,7 @@ import type {
   CampfitV3ProviderDiagnosticCode,
   CampfitV3ProviderErrorMetadata,
 } from "@/lib/campfit/v3/provider"
-import { campfitV3EnglishAssessmentTypes, campfitV3EnglishExperienceTypes, campfitV3FactKeys, campfitV3FactSubjects } from "@/types/campfitV3"
+import { campfitV3ActivityPreferenceCategories, campfitV3ActivityPreferenceStrengths, campfitV3EnglishAssessmentTypes, campfitV3EnglishExperienceTypes, campfitV3FactKeys, campfitV3FactSubjects } from "@/types/campfitV3"
 
 const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses"
 
@@ -88,6 +88,31 @@ export const campfitModelResponseJsonSchema = {
                   cultureActivity: { type: "string", enum: ["primary", "secondary", "mentioned", "none"] },
                 },
                 required: ["schoolSchooling", "englishIntensive", "subjectProject", "cultureActivity"],
+              },
+              {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  preferences: {
+                    type: "array",
+                    maxItems: 7,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        category: { type: "string", enum: [...campfitV3ActivityPreferenceCategories] },
+                        strength: { type: "string", enum: [...campfitV3ActivityPreferenceStrengths] },
+                        rank: { type: ["integer", "null"], minimum: 1 },
+                        mentionedActivities: { type: "array", maxItems: 8, items: { type: "string", minLength: 1, maxLength: 80 } },
+                        evidence: { type: "array", maxItems: 3, items: { type: "string", minLength: 1, maxLength: 240 } },
+                      },
+                      required: ["category", "strength", "rank", "mentionedActivities", "evidence"],
+                    },
+                  },
+                  varietyPreference: { type: "string", enum: ["strong", "positive", "unspecified"] },
+                  evidence: { type: "array", maxItems: 6, items: { type: "string", minLength: 1, maxLength: 240 } },
+                },
+                required: ["preferences", "varietyPreference", "evidence"],
               },
               {
                 type: "object",

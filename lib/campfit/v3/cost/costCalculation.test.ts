@@ -138,7 +138,8 @@ describe("CampFit v3 family trip cost calculation", () => {
     const { packageInclusions: _packageInclusions, demoProfile: _demoProfile, ...program } = source
     const city = findCity(program.city)
     const cost = calculateTotalTripCost({ basicInfo: info({ adultCount: 1, childCount: 1, durationWeeks: 4 }), program, city, estimateProfile: null, calculatedAt })
-    expect(cost.breakdown.accommodation.status).toBe("inquiry")
+    expect(cost.breakdown.accommodation.status).toBe("partial")
+    expect(cost.breakdown.accommodation.notes.join(" ")).toContain("Cities의 1BR 월 주거비")
     expect(cost.breakdown.living.status).toBe("partial")
     expect(cost.breakdown.localTransport.status).toBe("inquiry")
   })

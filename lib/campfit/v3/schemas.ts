@@ -245,6 +245,7 @@ const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], read
   isFirstOverseasEducationExperience: ["child"],
   dayProgramSeparationReadiness: ["child"],
   preferredActivities: ["preference"],
+  activityPreferences: ["preference"],
   destinationPreference: ["preference"],
   socialPreference: ["child", "preference"],
   desiredOutcomes: ["preference"],
@@ -286,6 +287,18 @@ const englishAssessmentSchema = z.array(z.object({
   type: z.enum(campfitV3EnglishAssessmentTypes),
   value: z.union([z.number().finite(), z.string().trim().min(1).max(80)]),
 })).max(8)
+const activityPreferenceSchema = z.object({
+  category: z.enum(["stem_maker", "sports_physical", "nature_outdoor", "animals_ecology", "art_creative", "performance_music", "culture_lifestyle"]),
+  strength: z.enum(["strong", "positive", "neutral", "dislike"]),
+  rank: z.number().int().positive().nullable(),
+  mentionedActivities: z.array(z.string().trim().min(1).max(80)).max(8),
+  evidence: z.array(z.string().trim().min(1).max(240)).max(3),
+})
+const activityPreferenceProfileSchema = z.object({
+  preferences: z.array(activityPreferenceSchema).max(7),
+  varietyPreference: z.enum(["strong", "positive", "unspecified"]),
+  evidence: z.array(z.string().trim().min(1).max(240)).max(6),
+})
 const valueSchemas: Readonly<Record<(typeof campfitV3FactKeys)[number], z.ZodTypeAny>> = {
   childEnglishLevel: z.enum(["beginner", "basic", "intermediate", "advanced"]),
   childEnglishExperience: englishExperienceSchema,
@@ -301,6 +314,7 @@ const valueSchemas: Readonly<Record<(typeof campfitV3FactKeys)[number], z.ZodTyp
   isFirstOverseasEducationExperience: z.boolean(),
   dayProgramSeparationReadiness: z.enum(["needs_close_support", "with_initial_support", "ready"]),
   preferredActivities: z.array(z.string().trim().min(1).max(80)).max(12),
+  activityPreferences: activityPreferenceProfileSchema,
   destinationPreference: z.array(z.string().trim().min(1).max(80)).max(8),
   socialPreference: z.array(z.string().trim().min(1).max(80)).max(8),
   desiredOutcomes: z.array(z.string().trim().min(1).max(120)).max(8),
