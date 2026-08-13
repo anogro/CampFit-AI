@@ -112,7 +112,11 @@ describe("CampFit v3 conversational counselor flow", () => {
 
   it("promotes tentative information to confirmed and stops asking that question", () => {
     const tentative = createFact({ key: "childEnglishLevel", subject: "child", value: "beginner", source: "ai_inference", confidence: 0.4, evidence: "표현이 모호함" })
-    const tentativeState = mergeFacts(createInitialConversationState(), [tentative])
+    const tentativeState = {
+      ...mergeFacts(createInitialConversationState(), [tentative]),
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: ["child_english_level"],
+    }
     expect(tentativeState.facts.childEnglishLevel?.status).toBe("tentative")
     expect(selectNextQuestion(tentativeState)?.key).toBe("child_english_level")
 
@@ -123,7 +127,11 @@ describe("CampFit v3 conversational counselor flow", () => {
   })
 
   it("uses one high-value follow-up for low confidence and does not re-ask known facts", () => {
-    const lowConfidence = mergeFacts(createInitialConversationState(), [createFact({ key: "destinationPreference", subject: "preference", value: ["Singapore"], source: "ai_inference", confidence: 0.3, evidence: "도시 언급이 모호함" })])
+    const lowConfidence = {
+      ...mergeFacts(createInitialConversationState(), [createFact({ key: "destinationPreference", subject: "preference", value: ["Singapore"], source: "ai_inference", confidence: 0.3, evidence: "도시 언급이 모호함" })]),
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: ["child_english_level"],
+    }
     expect(selectNextQuestion(lowConfidence)?.key).toBe("child_english_level")
 
     const known = mergeFacts(lowConfidence, [createFact({ key: "childEnglishLevel", subject: "child", value: "beginner", source: "explicit_user_statement", evidence: "초급" })])
@@ -305,9 +313,14 @@ describe("CampFit v3 conversational counselor flow", () => {
 
   it("asks only for classroom comprehension after AR plus speaking-confidence evidence", async () => {
     const start = startConversation(basicInfo)
+    const englishState = {
+      ...start.updatedState,
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: [...start.updatedState.askedQuestionKeys, "child_english_level"],
+    }
     const response = await processConversationMessage({
       transcript: [],
-      currentState: start.updatedState,
+      currentState: englishState,
       basicInfo,
       userMessage: "AR은 3점대인데 영어로 말하는 건 별로 자신 없어해요.",
       quickReplyKey: null,
@@ -348,13 +361,13 @@ describe("CampFit v3 conversational counselor flow", () => {
         userMessage: "영어는 거의 처음이에요.",
         expectedFact: ["childEnglishLevel", "beginner"],
         acknowledgement: "아직 영어가 익숙하지 않은 단계군요.",
-        questionKey: "child_english_level",
+        questionKey: "primary_experience_goal",
       },
       {
         userMessage: "국제학교 다니고 영어로 수업 듣거나 발표하는 데 문제 없어요.",
         expectedFact: ["childEnglishSpeaking", "can_present_in_english"],
         acknowledgement: "영어로 수업을 듣고 발표하는 환경에도 무리 없이 참여하는 편이군요.",
-        questionKey: "preferred_region",
+        questionKey: "child_activity_preferences",
       },
       {
         userMessage: "영어책은 잘 읽는데 선생님이 영어로 설명하면 잘 못 알아들어요.",
@@ -368,7 +381,11 @@ describe("CampFit v3 conversational counselor flow", () => {
       const start = startConversation(basicInfo)
       const response = await processConversationMessage({
         transcript: [],
-        currentState: start.updatedState,
+        currentState: {
+          ...start.updatedState,
+          currentQuestionKey: "child_english_level" as const,
+          askedQuestionKeys: [...start.updatedState.askedQuestionKeys, "child_english_level"],
+        },
         basicInfo,
         userMessage: testCase.userMessage,
         quickReplyKey: null,
@@ -413,6 +430,11 @@ describe("CampFit v3 conversational counselor flow", () => {
 
   it("closes English questioning when a partial provider response is completed by grounded responsive-speaking evidence", async () => {
     const start = startConversation(basicInfo)
+    const englishState = {
+      ...start.updatedState,
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: [...start.updatedState.askedQuestionKeys, "child_english_level"],
+    }
     const provider: CampfitV3LLMProvider = {
       ...fallbackProvider,
       analyzeConversation: async () => ({
@@ -433,8 +455,8 @@ describe("CampFit v3 conversational counselor flow", () => {
       }),
     }
     const response = await processConversationMessage({
-      transcript: [{ role: "assistant", content: start.assistantMessage, questionKey: start.questionKey ?? undefined }],
-      currentState: start.updatedState,
+      transcript: [{ role: "assistant", content: start.assistantMessage, questionKey: "child_english_level" }],
+      currentState: englishState,
       basicInfo,
       userMessage: "선생님 설명을 이해하고 대답할 수 있어요.",
       quickReplyKey: null,
@@ -485,10 +507,10 @@ describe("CampFit v3 conversational counselor flow", () => {
     })
     expect(second.updatedState.facts.childEnglishSpeaking?.value).toBe("answers_simple_questions")
     expect(second.updatedState.completedQuestionKeys).toContain("child_english_level")
-    expect(second.questionKey).toBe("preferred_region")
+    expect(second.questionKey).toBe("child_activity_preferences")
     expect(second.questionKey).not.toBe("korean_support_need")
     expect(second.assistantMessage).toContain("영어로 진행되는 수업을 이해하고 질문에도 답할 수 있는 편이군요.")
-    expect(second.assistantMessage).toContain("마음에 두고 있는 나라나 도시")
+    expect(second.assistantMessage).toContain("아이가 평소 특히 좋아하거나 오래 집중하는 활동")
   })
 
   it("does not infer current English level from English-kindergarten experience alone", async () => {
@@ -513,9 +535,14 @@ describe("CampFit v3 conversational counselor flow", () => {
 
   it("keeps a genuinely unknown answer as one failed follow-up without duplicating the opening", async () => {
     const start = startConversation(basicInfo)
+    const englishState = {
+      ...start.updatedState,
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: [...start.updatedState.askedQuestionKeys, "child_english_level"],
+    }
     const response = await processConversationMessage({
       transcript: [{ role: "assistant", content: start.assistantMessage, questionKey: start.questionKey ?? undefined }],
-      currentState: start.updatedState,
+      currentState: englishState,
       basicInfo,
       userMessage: "그냥 잘 모르겠어요.",
       quickReplyKey: null,
@@ -606,7 +633,7 @@ describe("CampFit v3 conversational counselor flow", () => {
     expect(state.facts.budgetIncludesFlight?.value).toBe(true)
     expect(state.facts.destinationPreference?.value).toEqual(["Singapore", "Auckland"])
     expect(state.facts.preferredRegions?.value).toEqual(expect.arrayContaining(["southeast_asia", "oceania"]))
-    expect(state.askedQuestionKeys.filter((key) => key === "child_english_level")).toHaveLength(1)
+    expect(state.askedQuestionKeys.filter((key) => key === "child_english_level")).toHaveLength(0)
   })
 
   it("stores only a special-care follow-up flag when detailed health information is volunteered", async () => {

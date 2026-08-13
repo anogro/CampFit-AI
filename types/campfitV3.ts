@@ -29,6 +29,7 @@ export const campfitV3FactKeys = [
   "dayProgramSeparationReadiness",
   "preferredActivities",
   "activityPreferences",
+  "participationProfile",
   "destinationPreference",
   "socialPreference",
   "desiredOutcomes",
@@ -149,6 +150,61 @@ export type CampfitV3ActivityPreferenceProfile = {
   /** Variety/breadth is a child preference, not the program's multi_activity label. */
   readonly varietyPreference: CampfitV3VarietyPreference
   readonly evidence: readonly string[]
+}
+
+export const campfitV3ParticipationAdaptationLevels = [
+  "warm_up_needed",
+  "comfortable_after_warm_up",
+  "quick_to_adapt",
+  "unknown",
+] as const
+export type CampfitV3ParticipationAdaptationLevel = (typeof campfitV3ParticipationAdaptationLevels)[number]
+
+export const campfitV3PeerInteractionStyleLevels = [
+  "initially_cautious_after_warm_up",
+  "small_group_comfortable",
+  "initiates_easily",
+  "unknown",
+] as const
+export type CampfitV3PeerInteractionStyleLevel = (typeof campfitV3PeerInteractionStyleLevels)[number]
+
+export const campfitV3ParentDistanceComfortLevels = [
+  "comfortable_without_parent",
+  "proximity_needed",
+  "unknown",
+] as const
+export type CampfitV3ParentDistanceComfortLevel = (typeof campfitV3ParentDistanceComfortLevels)[number]
+
+export const campfitV3ParticipationStyleLevels = [
+  "observation_first",
+  "active_starter",
+  "structured_preferred",
+  "free_activity_preferred",
+  "unknown",
+] as const
+export type CampfitV3ParticipationStyleLevel = (typeof campfitV3ParticipationStyleLevels)[number]
+
+export const campfitV3ParticipationEvidenceSubjects = ["child_state", "parent_preference", "ambiguous"] as const
+export type CampfitV3ParticipationEvidenceSubject = (typeof campfitV3ParticipationEvidenceSubjects)[number]
+
+export type CampfitV3ParticipationAxis<T extends string> = {
+  readonly level: T
+  readonly evidence: readonly string[]
+  readonly confidence: number
+  readonly subject: CampfitV3ParticipationEvidenceSubject
+}
+
+export type CampfitV3ParticipationProfile = {
+  readonly adaptation_to_new_environment: CampfitV3ParticipationAxis<CampfitV3ParticipationAdaptationLevel>
+  readonly peer_interaction_style: CampfitV3ParticipationAxis<CampfitV3PeerInteractionStyleLevel>
+  readonly parent_distance_comfort: CampfitV3ParticipationAxis<CampfitV3ParentDistanceComfortLevel>
+  readonly participation_style: CampfitV3ParticipationAxis<CampfitV3ParticipationStyleLevel>
+  /** A separate child-state signal; class independence is not the same as parent proximity comfort. */
+  readonly independent_class_participation: "ready" | "needs_support" | "unknown"
+  readonly parent_preference_evidence: readonly string[]
+  readonly ambiguous_evidence: readonly string[]
+  /** Original short snippets retained for evidence audit and semantic synthesis. */
+  readonly raw_evidence: readonly string[]
 }
 
 export const campfitV3FactStatuses = ["known", "unknown", "tentative", "confirmed"] as const
@@ -289,6 +345,7 @@ export type CampfitV3CostEstimate = {
 export type CampfitV3DestinationRecommendation = {
   readonly cityId: string
   readonly cityName: string
+  readonly citySlug?: string | null | undefined
   readonly countryName: string
   readonly role: "가장 균형 잡힌 선택" | "원래 희망을 가장 잘 살리는 선택" | "비용·부모 체류 관점의 대안"
   readonly imageUrl: string | null
@@ -301,6 +358,8 @@ export type CampfitV3DestinationRecommendation = {
   readonly livingCostMonthlyKrw?: number | null | undefined
   readonly housingCostMonthlyKrw?: number | null | undefined
   readonly description?: string | null | undefined
+  /** Short comparison note derived from the selected catalog cities. */
+  readonly comparisonNote?: string | null | undefined
   readonly bullets?: readonly string[] | undefined
   readonly tripCost?: CampfitV3TripCost | undefined
 }
@@ -314,8 +373,14 @@ export type CampfitV3ProgramCandidate = {
   readonly ageLabel: string
   readonly durationLabel: string
   readonly priceLabel: string
+  /** Short catalog-backed introduction; absent when the catalog has no description. */
+  readonly description?: string | null | undefined
   readonly primaryDirection: string
   readonly reason: string
+  /** Personalized match evidence shown as secondary good points on the result card. */
+  readonly matchHighlights?: readonly string[] | undefined
+  /** At most one concise, user-readable trade-off for this candidate. */
+  readonly tradeoff?: string | undefined
   readonly verify: readonly string[]
   readonly englishRequirementLevel?: "no_requirement" | "beginner_friendly" | "general_english" | "academic_english" | "unknown" | undefined
   readonly englishRequirementSource?: "official" | "inferred" | "demo_fixture" | "unknown" | undefined

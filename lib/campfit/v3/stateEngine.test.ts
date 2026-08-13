@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { processConversationMessage, startConversation } from "@/lib/campfit/v3/conversationService"
+import { activityPreferenceProfileFromCategory } from "@/lib/campfit/v3/activityPreferences"
 import { calculateProgress, isReadyForRecommendation } from "@/lib/campfit/v3/progress"
 import { campfitV3QuestionBank, selectNextQuestion } from "@/lib/campfit/v3/questionBank"
 import { CampfitV3BasicInfoSchema } from "@/lib/campfit/v3/schemas"
@@ -27,15 +28,15 @@ const nullProvider: CampfitV3LLMProvider = {
 describe("CampFit v3 state and question engine", () => {
   it("opens with conversation-first guidance instead of a slot-style prompt", () => {
     const firstQuestion = campfitV3QuestionBank[0]
-    expect(firstQuestion?.title).toContain("아이의 영어 실력은 어느 정도인가요?")
-    expect(firstQuestion?.title).toContain("캠프 추천에 필요한 내용")
-    expect(firstQuestion?.title).toContain("부모가 현지에서 어떻게 지내고 싶은지")
-    expect(firstQuestion?.title).not.toContain("아이 영어 수준은 어느 정도인지도")
+    const goalQuestion = campfitV3QuestionBank.find((question) => question.key === "primary_experience_goal")
+    expect(goalQuestion?.title).toContain("아이에게 잘 맞는 해외 경험을 함께 찾아볼게요")
+    expect(goalQuestion?.title).toContain("생각나는 대로 편하게 말씀해주세요")
+    expect(goalQuestion?.title).not.toContain("학교·영어·프로젝트·문화활동 중 하나")
   })
 
   it("starts with the highest priority unanswered question", () => {
     const response = startConversation(basicInfo)
-    expect(response.questionKey).toBe("child_english_level")
+    expect(response.questionKey).toBe("primary_experience_goal")
     expect(response.progress).toBe(35)
   })
 
@@ -144,16 +145,16 @@ describe("CampFit v3 state and question engine", () => {
     expect(state.facts.regionImportance?.value).toBe("no_preference")
   })
 
-  it("asks regional importance only after a concrete region", () => {
+  it("does not ask optional regional importance before or after a concrete region", () => {
     const base = completeExcept(["preferredRegions", "regionImportance"])
     expect(selectNextQuestion(base)?.key).toBe("preferred_region")
     const region = applyQuickReply(base, "preferred_region", "oceania", "오세아니아")
-    expect(selectNextQuestion(region)?.key).toBe("region_importance")
+    expect(selectNextQuestion(region)).toBeNull()
   })
 
-  it("asks separation readiness only for a first experience", () => {
+  it("keeps separation readiness supplemental even for a first experience", () => {
     const first = mergeFacts(completeExcept(["dayProgramSeparationReadiness"]), [createFact({ key: "isFirstOverseasEducationExperience", subject: "child", value: true, source: "quick_reply", evidence: "첫 경험" })])
-    expect(selectNextQuestion(first)?.key).toBe("day_program_separation")
+    expect(selectNextQuestion(first)).toBeNull()
     const experienced = mergeFacts(completeExcept(["dayProgramSeparationReadiness"]), [createFact({ key: "isFirstOverseasEducationExperience", subject: "child", value: false, source: "quick_reply", evidence: "경험 있음" })])
     expect(selectNextQuestion(experienced)).toBeNull()
   })
@@ -189,9 +190,9 @@ describe("CampFit v3 state and question engine", () => {
     expect(isReadyForRecommendation(completeExcept(["experienceGoals"]))).toBe(false)
   })
 
-  it("gives at most half slot credit to a high-confidence inference", () => {
+  it("counts a stable inferred core area as one recommendation-ready area", () => {
     const state = mergeFacts(createInitialConversationState(), [createFact({ key: "experienceGoals", subject: "preference", value: goals("cultureActivity"), source: "ai_inference", confidence: 0.9, evidence: "활동을 원한다고 해석" })])
-    expect(calculateProgress(basicInfo, state)).toBe(43)
+    expect(calculateProgress(basicInfo, state)).toBe(51)
     expect(isReadyForRecommendation(state)).toBe(false)
   })
 
@@ -205,9 +206,9 @@ describe("CampFit v3 state and question engine", () => {
     const start = startConversation(basicInfo)
     const response = await processConversationMessage({ transcript: [], currentState: start.updatedState, basicInfo, userMessage: "아이 영어는 초급이에요", quickReplyKey: null, provider: nullProvider })
     expect(response.aiUsed).toBe(false)
-    expect(response.questionKey).toBe("korean_support_need")
+    expect(response.questionKey).toBe("primary_experience_goal")
     expect(response.updatedState.facts.childEnglishLevel?.value).toBe("beginner")
-    expect(response.warnings).toContain("말씀해주신 내용을 기준으로 상담을 이어갈게요.")
+    expect(response.warnings).toContain("AI 자유입력 분석을 사용할 수 없어 확인되지 않은 질문을 다시 표시합니다.")
     expect(response.warnings.join(" ")).not.toContain("같은 질문")
   })
 
@@ -292,7 +293,7 @@ describe("CampFit v3 state and question engine", () => {
       providerResponseReceived: true,
       providerResponseValidated: true,
       aiUsed: true,
-      fallbackReason: null,
+      fallbackReason: "target_slot_not_updated",
       providerHttpStatus: 200,
       providerErrorStatus: null,
       providerRequestCount: 1,
@@ -343,9 +344,9 @@ describe("CampFit v3 state and question engine", () => {
   it("re-asks the current question without moving progress when free text cannot update its slot", async () => {
     const start = startConversation(basicInfo)
     const response = await processConversationMessage({ transcript: [], currentState: start.updatedState, basicInfo, userMessage: "아직 생각 중이에요", quickReplyKey: null, provider: nullProvider })
-    expect(response.questionKey).toBe("child_english_level")
-    expect(response.updatedState.failedQuestionKeys).toContain("child_english_level")
-    expect(response.updatedState.completedQuestionKeys).not.toContain("child_english_level")
+    expect(response.questionKey).toBe("primary_experience_goal")
+    expect(response.updatedState.failedQuestionKeys).toContain("primary_experience_goal")
+    expect(response.updatedState.completedQuestionKeys).not.toContain("primary_experience_goal")
     expect(response.progress).toBe(start.progress)
     expect(response.readyForRecommendation).toBe(false)
     expect(response.diagnostics?.fallbackReason).toBe("provider_unavailable")
@@ -353,9 +354,14 @@ describe("CampFit v3 state and question engine", () => {
 
   it("lets a quick reply recover a question that previously failed free-text validation", async () => {
     const start = startConversation(basicInfo)
+    const englishStart = {
+      ...start.updatedState,
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: [...start.updatedState.askedQuestionKeys, "child_english_level"],
+    }
     const failed = await processConversationMessage({
       transcript: [],
-      currentState: start.updatedState,
+      currentState: englishStart,
       basicInfo,
       userMessage: "아직 생각 중이에요",
       quickReplyKey: null,
@@ -374,7 +380,7 @@ describe("CampFit v3 state and question engine", () => {
     expect(recovered.updatedState.facts.childEnglishLevel?.value).toBe("beginner")
     expect(recovered.updatedState.completedQuestionKeys).toContain("child_english_level")
     expect(recovered.updatedState.failedQuestionKeys).not.toContain("child_english_level")
-    expect(recovered.questionKey).toBe("korean_support_need")
+    expect(recovered.questionKey).toBe("primary_experience_goal")
   })
 
   it("applies conversational budget corrections to the returned basic info", async () => {
@@ -490,7 +496,7 @@ describe("CampFit v3 state and question engine", () => {
       "있어요. 상담할 때 별도로 확인할게요",
       "있어요. 상담할 때 별도로 확인할게요",
     ])
-    expect(response.questionKey).toBe("child_english_level")
+    expect(response.questionKey).toBe("primary_experience_goal")
     expect(response.updatedState.facts.specialCareFollowUp?.value).toBe("required")
     expect(Object.values(response.updatedState.facts).every((fact) => fact === undefined || !fact.evidence.includes("천식"))).toBe(true)
   })
@@ -527,6 +533,7 @@ describe("CampFit v3 state and question engine", () => {
 function completeExcept(excluded: readonly CampfitV3FactKey[]): CampfitV3ConversationState {
   const values: Partial<Record<CampfitV3FactKey, unknown>> = {
     childEnglishLevel: "basic",
+    activityPreferences: activityPreferenceProfileFromCategory("sports_physical", "테스트 활동"),
     experienceGoals: goals("cultureActivity"),
     preferredRegions: [],
     regionImportance: "no_preference",

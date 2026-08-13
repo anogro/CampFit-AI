@@ -69,6 +69,28 @@ describe("parent experience needs", () => {
     expect(facts.find((fact) => fact.key === "dayProgramSeparationReadiness")).toBeUndefined()
   })
 
+  it("keeps English secondary when the parent states peer interaction first", () => {
+    const facts = extractDeterministicFacts("외국 친구들과 어울리는 게 가장 중요하고 영어는 늘면 좋겠어요.")
+    const value = facts.find((fact) => fact.key === "parentExperienceNeeds")?.value as Record<string, { importance: string }> | undefined
+    expect(value?.["peer_interaction"]?.importance).toBe("primary")
+    expect(value?.["english_growth"]?.importance).toBe("nice_to_have")
+  })
+
+  it("treats a clear English-versus-peer contrast as a peer-first goal", () => {
+    const facts = extractDeterministicFacts("영어도 늘었으면 좋겠지만 외국 친구들이랑 많이 어울렸으면 좋겠어요.")
+    const value = facts.find((fact) => fact.key === "parentExperienceNeeds")?.value as Record<string, { importance: string }> | undefined
+    expect(value?.["peer_interaction"]?.importance).toBe("primary")
+    expect(value?.["english_growth"]?.importance).toBe("nice_to_have")
+  })
+
+  it("recognizes school learning as primary in a natural school-life sentence", () => {
+    const facts = extractDeterministicFacts("해외 학교생활과 수업 방식을 경험하는 게 가장 중요해요. 아이는 만들기와 과학실험을 아주 좋아하고, 영어 설명은 이해하고 질문에 영어로 대답할 수 있어요. 오세아니아가 좋아요.")
+    const value = facts.find((fact) => fact.key === "parentExperienceNeeds")?.value as Record<string, { importance: string }> | undefined
+    expect(value?.["school_learning_experience"]?.importance).toBe("primary")
+    const goals = facts.find((fact) => fact.key === "experienceGoals")?.value as Record<string, string> | undefined
+    expect(goals?.["schoolSchooling"]).toBe("primary")
+  })
+
   it("accepts a semantically generalized Solar-shaped fact when evidence is grounded", () => {
     const payload = {
       assistantMessage: "영어를 실제로 사용하면서 또래와 어울리는 경험을 기대하고 계시군요.",
@@ -133,7 +155,97 @@ describe("parent experience needs", () => {
       peer_interaction: { importance: "primary" },
     })
     expect(response.assistantMessage).toContain("또래와 어울리는 것을 가장 중요")
+    expect(response.assistantMessage).not.toContain("있으면 좋은 경험")
+    expect(response.assistantMessage).not.toContain("nice_to_have")
     expect(response.questionKey).not.toBe("primary_experience_goal")
+  })
+
+  it("keeps a grounded explicit peer priority when the provider reverses the priorities", async () => {
+    const start = startConversation(basicInfo)
+    const provider: CampfitV3LLMProvider = {
+      ...noProvider,
+      analyzeConversation: async () => ({
+        assistantMessage: "영어 성장을 가장 중요하게 보시는군요.",
+        facts: [needsFact(fullNeeds({
+          english_growth: { importance: "primary", evidence: ["영어는 늘면 좋겠어요"] },
+          peer_interaction: { importance: "nice_to_have", evidence: ["외국 친구들과 어울리는 게 좋겠어요"] },
+        }))],
+        unresolved: [],
+        conflicts: [],
+        suggestedNextQuestionKey: "child_english_level",
+        nextAction: "ask",
+        readyForRecommendation: false,
+      }),
+    }
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "외국 친구들과 어울리는 게 가장 중요하고 영어는 늘면 좋겠어요.",
+      quickReplyKey: null,
+      provider,
+    })
+    expect(response.updatedState.facts.parentExperienceNeeds?.value).toMatchObject({
+      english_growth: { importance: "nice_to_have" },
+      peer_interaction: { importance: "primary" },
+    })
+  })
+
+  it("keeps an explicit school primary when the provider lowers that same priority", async () => {
+    const start = startConversation(basicInfo)
+    const provider: CampfitV3LLMProvider = {
+      ...noProvider,
+      analyzeConversation: async () => ({
+        assistantMessage: "",
+        facts: [needsFact(fullNeeds({
+          english_growth: { importance: "primary", evidence: ["영어 설명을 이해해요"] },
+          school_learning_experience: { importance: "important", evidence: ["해외 학교생활을 경험하고 싶어요"] },
+        }))],
+        unresolved: [],
+        conflicts: [],
+        suggestedNextQuestionKey: "child_english_level",
+        nextAction: "ask",
+        readyForRecommendation: false,
+      }),
+    }
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "해외 학교생활과 수업 방식을 경험하는 게 가장 중요해요. 영어 설명은 이해하고 질문에 영어로 대답할 수 있어요.",
+      quickReplyKey: null,
+      provider,
+    })
+    expect(response.updatedState.facts.parentExperienceNeeds?.value).toMatchObject({
+      school_learning_experience: { importance: "primary" },
+    })
+  })
+
+  it("supplements an explicit parent goal when the provider omits it", async () => {
+    const start = startConversation(basicInfo)
+    const provider: CampfitV3LLMProvider = {
+      ...noProvider,
+      analyzeConversation: async () => ({
+        assistantMessage: "",
+        facts: [],
+        unresolved: [],
+        conflicts: [],
+        suggestedNextQuestionKey: "child_english_level",
+        nextAction: "ask",
+        readyForRecommendation: false,
+      }),
+    }
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "해외 학교생활과 수업 방식을 경험하는 게 가장 중요해요. 영어 설명은 이해하고 질문에 영어로 대답할 수 있어요.",
+      quickReplyKey: null,
+      provider,
+    })
+    expect(response.updatedState.facts.parentExperienceNeeds?.value).toMatchObject({
+      school_learning_experience: { importance: "primary" },
+    })
   })
 
   it("rejects an unsupported parent need even when the provider invents it", async () => {

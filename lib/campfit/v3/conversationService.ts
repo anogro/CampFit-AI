@@ -1,8 +1,9 @@
 import { allowedQuestionKeys, getQuestion, isQuestionCompleted, selectNextQuestion } from "@/lib/campfit/v3/questionBank"
 import { calculateProgress, isReadyForRecommendation, progressMessage } from "@/lib/campfit/v3/progress"
 import { englishEvidenceGap } from "@/lib/campfit/v3/englishReadiness"
-import { parentExperienceNeedsAcknowledgement, parentNeedEvidenceIsGrounded, hasParentExperienceNeeds } from "@/lib/campfit/v3/parentExperienceNeeds"
+import { parentExperienceNeedsAcknowledgement, parentNeedEvidenceIsGrounded, hasParentExperienceNeeds, isParentExperienceNeedsValue } from "@/lib/campfit/v3/parentExperienceNeeds"
 import { activityPreferenceAcknowledgement, activityPreferenceValueIsGrounded, hasMeaningfulActivityEvidence } from "@/lib/campfit/v3/activityPreferences"
+import { participationProfileAcknowledgement, participationProfileValueIsGrounded } from "@/lib/campfit/v3/participationProfile"
 import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/types/campfitV3"
 import {
   applyQuickReply,
@@ -113,13 +114,29 @@ export async function processConversationMessage(input: {
     providerDiagnostic = input.provider.getLastDiagnostic?.() ?? null
     if (model !== null) {
       acceptedModelFacts = acceptedFactsFromModel(state, model, safeUserMessage)
+      const deterministicParentNeeds = privacySafeFacts.find((fact) => fact.key === "parentExperienceNeeds")
+      const modelParentNeeds = acceptedModelFacts.find((fact) => fact.key === "parentExperienceNeeds")
+      const preferDeterministicParentNeeds = deterministicParentNeeds !== undefined && modelParentNeeds !== undefined
+        && parentNeedPriorityConflict(deterministicParentNeeds.value, modelParentNeeds.value)
+      if (preferDeterministicParentNeeds) {
+        // Keep a grounded explicit priority when the provider returns a
+        // contradictory priority for the same user sentence. This is a
+        // narrow normalization guard, not a provider replacement path.
+        acceptedModelFacts = acceptedModelFacts.filter((fact) => fact.key !== "parentExperienceNeeds")
+      }
       state = mergeModelResponse(state, model, acceptedModelFacts)
       // Solar remains the semantic extractor on the normal path, but grounded
       // deterministic English evidence supplements omitted model fields. A
       // partial provider response must not reopen an English question when the
-      // user's wording already contains enough recommendation evidence.
+      // user's wording already contains enough recommendation evidence. A
+      // grounded deterministic parent goal also fills an omitted provider
+      // field; it does not override a validated provider value for the same
+      // fact unless the two explicit priorities conflict.
       const acceptedKeys = new Set(acceptedModelFacts.map((fact) => fact.key))
-      deterministicFacts = privacySafeFacts.filter((fact) => isGroundedSupplementFactKey(fact.key) && !acceptedKeys.has(fact.key))
+      const modelMentionedParentNeeds = model.facts.some((fact) => fact.key === "parentExperienceNeeds")
+      deterministicFacts = privacySafeFacts.filter((fact) => (isGroundedSupplementFactKey(fact.key)
+        || fact.key === "parentExperienceNeeds" && (preferDeterministicParentNeeds || !modelMentionedParentNeeds))
+        && !acceptedKeys.has(fact.key))
       state = mergeFacts(state, deterministicFacts)
     } else {
       deterministicFacts = privacySafeFacts
@@ -134,17 +151,12 @@ export async function processConversationMessage(input: {
 
   state = syncEnglishReadiness(state)
 
-  const relevantDeterministicFacts = currentQuestion?.key === "child_english_level"
-    ? deterministicFacts.some((fact) => isEnglishEvidenceKey(fact.key)
-      || fact.key === "childEnglishLevel"
-      || fact.key === "activityPreferences" && hasMeaningfulActivityEvidence(fact.value)
-      || fact.key === "parentExperienceNeeds" && hasParentExperienceNeeds(fact.value))
-    : deterministicFacts.length > 0
-  const relevantModelFacts = currentQuestion?.key === "child_english_level"
-    ? acceptedModelFacts.some((fact) => isEnglishEvidenceKey(fact.key)
-      || fact.key === "childEnglishLevel"
-      || fact.key === "parentExperienceNeeds" && hasParentExperienceNeeds(fact.value))
-    : acceptedModelFacts.length > 0
+  const relevantDeterministicFacts = currentQuestion === null
+    ? deterministicFacts.length > 0
+    : hasQuestionRelevantFacts(currentQuestion.key, deterministicFacts)
+  const relevantModelFacts = currentQuestion === null
+    ? acceptedModelFacts.length > 0
+    : hasQuestionRelevantFacts(currentQuestion.key, acceptedModelFacts)
   const partialUnderstanding = relevantDeterministicFacts || relevantModelFacts
   if (currentQuestion !== null) {
     state = isQuestionCompleted(currentQuestion, state)
@@ -157,9 +169,13 @@ export async function processConversationMessage(input: {
   const updatedBasicInfo = applyBasicInfoFacts(input.basicInfo, state)
   const ready = isReadyForRecommendation(state)
   const continuingReadySession = input.currentState.currentQuestionKey === null && ready
+  const suggestedNextQuestionKey = model?.suggestedNextQuestionKey === "korean_support_need"
+    && !mentionsKoreanSupportNeed(input.userMessage)
+    ? null
+    : model?.suggestedNextQuestionKey ?? null
   const nextQuestion = ready && !continuingReadySession
     ? null
-    : selectNextQuestion(state, model?.suggestedNextQuestionKey ?? null)
+    : selectNextQuestion(state, suggestedNextQuestionKey)
   if (nextQuestion !== null) state = markQuestionAsked(state, nextQuestion.key)
   else state = { ...state, currentQuestionKey: null }
 
@@ -180,17 +196,21 @@ export async function processConversationMessage(input: {
   const maxReached = !ready && nextQuestion === null && state.questionCount >= 10
   if (maxReached) warnings.push("최대 질문 수에 도달했지만 필수 조건이 남아 있어 결과를 만들지 않았습니다.")
 
+  const plannedQuestionText = nextQuestion?.key === "child_english_level" && englishEvidenceGap(state) !== null
+    ? followUpQuestionText(nextQuestion, input.transcript, state)
+    : nextQuestion?.title ?? "확인이 필요한 조건을 다시 살펴보고 있어요."
   const nextQuestionText = currentQuestion === null || targetUpdated
-    ? nextQuestion?.title ?? "확인이 필요한 조건을 다시 살펴보고 있어요."
+    ? plannedQuestionText
     : followUpQuestionText(currentQuestion, input.transcript, state)
   const groundedAcknowledgement = buildGroundedAcknowledgement(
     [...deterministicFacts, ...acceptedModelFacts],
     input.userMessage,
   )
+  const canAcknowledgeGroundedFacts = partialUnderstanding || groundedAcknowledgement.evidence.length > 0
   const assistantMessage = ready
     ? "필요한 내용을 모두 확인했어요. 지금 조건에 맞는 경험 방향과 도시, 프로그램 후보를 정리해볼게요."
       : currentQuestion !== null && !targetUpdated
-      ? partialUnderstanding
+      ? canAcknowledgeGroundedFacts
         ? `${groundedAcknowledgement.text}\n\n${nextQuestionText}`
         : `아직 답변을 충분히 파악하지 못했어요.\n\n${nextQuestionText}`
       : `${groundedAcknowledgement.text}\n\n${nextQuestionText}`
@@ -220,9 +240,11 @@ function acceptedFactsFromModel(
   return model.facts.flatMap((fact): readonly CampfitV3Fact[] => {
     if (fact.key === "englishReadiness") return []
     if (fact.key === "parentEnglishCommunication" && !mentionsParentEnglishCommunication(userMessage)) return []
+    if (fact.key === "koreanSupportNeed" && !mentionsKoreanSupportNeed(userMessage)) return []
     if (isEnglishEvidenceKey(fact.key) && !isEnglishModelFactSupportedByUserText(fact, userMessage)) return []
     if (fact.key === "parentExperienceNeeds" && !parentNeedEvidenceIsGrounded(fact.value, fact.evidence, userMessage)) return []
     if (fact.key === "activityPreferences" && !activityPreferenceValueIsGrounded(fact.value, fact.evidence, userMessage)) return []
+    if (fact.key === "participationProfile" && !participationProfileValueIsGrounded(fact.value, fact.evidence, userMessage)) return []
     if (!isSemanticallyValidModelFact(fact)) return []
     const existing = state.facts[fact.key]
     if (existing !== undefined && existing.source !== "ai_inference" && !isCorrectionLanguage(userMessage)) {
@@ -449,6 +471,20 @@ function buildGroundedAcknowledgement(
   }
 
   const parentNeeds = facts.find((fact) => fact.key === "parentExperienceNeeds")
+  const participation = facts.find((fact) => fact.key === "participationProfile")
+  const participationText = participationProfileAcknowledgement(participation?.value)
+  if (participationText !== null && participation !== undefined) {
+    const parentText = parentNeeds !== undefined && hasParentExperienceNeeds(parentNeeds.value)
+      ? parentExperienceNeedsAcknowledgement(parentNeeds.value)
+      : null
+    if (parentNeeds !== undefined && parentText !== null && parentText !== participationText) {
+      return {
+        text: `${participationText} ${parentText}`,
+        evidence: [toAcknowledgementEvidence(participation), toAcknowledgementEvidence(parentNeeds)],
+      }
+    }
+    return { text: participationText, evidence: [toAcknowledgementEvidence(participation)] }
+  }
   if (parentNeeds !== undefined && hasParentExperienceNeeds(parentNeeds.value)) {
     const text = parentExperienceNeedsAcknowledgement(parentNeeds.value)
     if (text !== null) return { text, evidence: [toAcknowledgementEvidence(parentNeeds)] }
@@ -629,12 +665,17 @@ function acknowledgementEvidenceForFallback(facts: readonly CampfitV3Fact[]): re
     "worries",
     "programCommuteNeed",
     "programMealNeed",
+    "participationProfile",
   ])
   return facts.filter((fact) => renderedKeys.has(fact.key)).map(toAcknowledgementEvidence)
 }
 
 function mentionsParentEnglishCommunication(message: string): boolean {
   return /(?:저는|제가|본인|부모|부모님|엄마|아빠|보호자).{0,32}(?:영어|basic\s*communication|소통|대화)/iu.test(message)
+}
+
+function mentionsKoreanSupportNeed(message: string): boolean {
+  return /한국어\s*(?:지원|가능|통역|도움)|한국인\s*(?:매니저|스태프|선생님)|한국어가?\s*(?:필요|있으면|없어도)/iu.test(message)
 }
 
 function isEnglishEvidenceKey(key: CampfitV3FactKey): boolean {
@@ -649,7 +690,42 @@ function isEnglishEvidenceKey(key: CampfitV3FactKey): boolean {
 }
 
 function isGroundedSupplementFactKey(key: CampfitV3FactKey): boolean {
-  return isEnglishEvidenceKey(key) || key === "activityPreferences"
+  return isEnglishEvidenceKey(key) || key === "activityPreferences" || key === "participationProfile"
+}
+
+function parentNeedPriorityConflict(left: unknown, right: unknown): boolean {
+  if (!isParentExperienceNeedsValue(left) || !isParentExperienceNeedsValue(right)) return false
+  const primaryAxis = (value: typeof left): keyof typeof left | null => {
+    const axes = Object.keys(value) as Array<keyof typeof value>
+    return axes.find((axis) => value[axis].importance === "primary") ?? null
+  }
+  const leftPrimary = primaryAxis(left)
+  const rightPrimary = primaryAxis(right)
+  if (leftPrimary === null) return false
+  if (rightPrimary === null || leftPrimary !== rightPrimary) return true
+  const rightNeed = right[leftPrimary]
+  return rightNeed.importance !== "primary"
+}
+
+function hasQuestionRelevantFacts(questionKey: string, facts: readonly CampfitV3Fact[]): boolean {
+  return facts.some((fact) => {
+    if (questionKey === "primary_experience_goal") {
+      return fact.key === "parentExperienceNeeds"
+        && hasParentExperienceNeeds(fact.value)
+        || fact.key === "experienceGoals"
+    }
+    if (questionKey === "child_english_level") {
+      return isEnglishEvidenceKey(fact.key) || fact.key === "childEnglishLevel"
+    }
+    if (questionKey === "child_activity_preferences") {
+      return fact.key === "activityPreferences" && hasMeaningfulActivityEvidence(fact.value)
+    }
+    if (questionKey === "preferred_region") {
+      return fact.key === "preferredRegions" || fact.key === "excludedRegions" || fact.key === "destinationPreference"
+    }
+    const question = getQuestion(questionKey)
+    return question?.completedBy.includes(fact.key) ?? false
+  })
 }
 
 function isEnglishModelFactSupportedByUserText(
@@ -664,6 +740,7 @@ function isEnglishModelFactSupportedByUserText(
     return false
   }
   if (fact.key === "childEnglishSpeaking") {
+    if (fact.value === "answers_simple_questions" && /질문(?:에|에도|에는)?\s*(?:영어로\s*)?(?:답|대답)/iu.test(text)) return true
     if (fact.value === "difficulty_initiating") return /(?:먼저\s*말|말하기|영어로\s*말|대답).{0,20}(?:어려|힘들|잘\s*못|못|자신\s*없)/iu.test(text)
     if (fact.value === "rarely_speaks") return /(?:영어로\s*)?(?:말을?|말하기).{0,20}(?:거의\s*(?:안|못)|드물|기회가?\s*적)/iu.test(text)
     if (fact.value === "initiates_speech") return /(?:먼저\s*말|자발적으로\s*(?:영어로\s*)?말|스스로\s*(?:영어로\s*)?말)/iu.test(text) && !/(?:어려|힘들|못|않)/iu.test(text)

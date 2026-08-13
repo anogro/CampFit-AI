@@ -146,8 +146,7 @@ export function isActivityPreferenceProfileValue(value: unknown): value is Campf
 export function activityRecommendationSufficiency(value: unknown): boolean {
   if (!isActivityPreferenceProfileValue(value)) return false
   if (value.varietyPreference !== "unspecified") return true
-  const positive = value.preferences.filter((item) => item.strength === "positive" || item.strength === "strong")
-  return value.preferences.some((item) => item.strength === "strong") || positive.length >= 2
+  return value.preferences.some((item) => item.strength === "positive" || item.strength === "strong")
 }
 
 export function hasMeaningfulActivityEvidence(value: unknown): boolean {

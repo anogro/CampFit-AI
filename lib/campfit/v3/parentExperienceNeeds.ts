@@ -47,6 +47,7 @@ export function extractParentExperienceNeedsValue(message: string): CampfitV3Par
   for (const axis of campfitV3ParentExperienceNeedAxes) {
     const match = text.match(axisMatchers[axis])
     if (match?.index === undefined) continue
+    if (axis === "english_growth" && !hasEnglishGoalCue(text, match.index, match[0].length)) continue
     if (!hasParentGoalCue(text, match.index, match[0].length)) continue
     found = true
     const evidence = sentenceForMatch(text, match.index, match[0].length)
@@ -56,6 +57,13 @@ export function extractParentExperienceNeedsValue(message: string): CampfitV3Par
     }
   }
   return found ? needs : null
+}
+
+function hasEnglishGoalCue(text: string, matchIndex: number, matchLength: number): boolean {
+  const start = Math.max(0, matchIndex - 8)
+  const end = Math.min(text.length, matchIndex + Math.max(matchLength, 1) + 20)
+  const nearby = text.slice(start, end)
+  return /(?:영어|회화|말하기).{0,20}(?:늘|성장|자신감|자연스럽|접|배우|사용|쓰|경험|노출|좋|싶|했으면|원|유지|확대)/iu.test(nearby)
 }
 
 export function hasParentExperienceNeeds(value: unknown): value is CampfitV3ParentExperienceNeeds {
@@ -95,8 +103,13 @@ export function parentExperienceNeedsAcknowledgement(
     return "영어를 쓰고 친구를 만나는 것도 좋지만, 무엇보다 새로운 문화와 환경을 경험하는 것을 중요하게 보고 계시네요."
   }
   if (lead !== undefined) {
-    const qualifier = primary.includes(lead) ? "가장 중요한 목표" : important.includes(lead) ? "중요한 목표" : "있으면 좋은 경험"
-    return `${axisLabels[lead]}을 이번 경험의 ${qualifier}로 보고 계시네요.`
+    if (primary.includes(lead)) {
+      const secondary = niceToHave[0] ?? important[0]
+      if (secondary !== undefined) return `${axisLabels[lead]}을 가장 중요하게 보시고, ${axisLabels[secondary]}도 함께 기대하고 계시네요.`
+      return `${axisLabels[lead]}을 이번 경험에서 가장 중요하게 보고 계시네요.`
+    }
+    if (important.includes(lead)) return `${axisLabels[lead]}을 중요한 기준으로 보고 계시네요.`
+    return `${axisLabels[lead]}도 함께 기대하고 계시네요.`
   }
   if (avoid.includes("school_learning_experience")) {
     return "국제학교·학업 중심 경험은 꼭 필요하지 않은 것으로 이해했어요."
@@ -127,9 +140,14 @@ function axesWithImportance(value: CampfitV3ParentExperienceNeeds, importance: C
 }
 
 function hasParentGoalCue(text: string, matchIndex: number, matchLength: number): boolean {
+  // Keep the goal cue close to the matched axis. A later, unrelated phrase
+  // such as "동남아 쪽이면 좋겠어요" must not turn a child's "친구" mention
+  // into a parent peer-interaction goal.
   const start = Math.max(0, matchIndex - 36)
-  const end = Math.min(text.length, matchIndex + Math.max(matchLength, 1) + 64)
+  const end = Math.min(text.length, matchIndex + Math.max(matchLength, 1) + 36)
   const nearby = text.slice(start, end)
+  if (/(?:처음\s*보는\s*친구|낯을?\s*가리|친해지)/iu.test(nearby)
+    && !/(?:친구|또래).{0,24}(?:좋겠|중요|어울려|사귀어|싶|원)/iu.test(nearby)) return false
   const strongGoalCue = /(?:했으면|좋겠|원하|중요|목적|경험(?:하|했|해보)|싶|생겼으면|얻었으면|키웠으면|늘면|어울려?보|사귀어?보|굳이|안\s*가|필요\s*없|미리\s*경험)/iu.test(nearby)
   if (strongGoalCue) return true
   if (/(?:아이가|아이|자녀).{0,24}(?:좋아|잘해|활발|낯을?\s*가리)/iu.test(nearby)) return false
@@ -146,13 +164,24 @@ function inferFallbackImportance(
   const contrast = axis === "english_growth" && /영어.{0,28}(?:늘|좋|했으면).{0,12}(?:지만|는데|보다)/iu.test(text)
     || axis === "peer_interaction" && /(?:친구|또래).{0,28}(?:좋|했으면).{0,12}(?:지만|는데|보다)/iu.test(text)
   if (isAvoid(local, axis, text)) return "avoid"
+  // In natural Korean, a parent may state the primary peer goal first and
+  // append English as a secondary wish with "...가장 중요하고 영어는...".
+  // Do not let the primary cue leak forward to the later English phrase.
+  if (axis === "english_growth" && primaryPeerGoalAppearsBefore(text, matchIndex)) return "nice_to_have"
+  if (axis === "peer_interaction" && /영어.{0,40}(?:지만|는데).{0,40}(?:외국\s*친구|친구|또래|어울리|교류)/iu.test(text)) return "primary"
   if (isPrimary(local, text, axis, matchIndex, matchLength)) return "primary"
   if (contrast || /(?:되면|있으면|가능하면|같이).{0,14}좋|좋.{0,14}(?:지만|고|으면)/iu.test(local)) return "nice_to_have"
   if (/(중요|많이|꼭|하고\s*싶|경험했으면|사귀었으면|어울렸으면|늘었으면|생겼으면)/iu.test(local)) return "important"
   return "important"
 }
 
+function primaryPeerGoalAppearsBefore(text: string, matchIndex: number): boolean {
+  const before = text.slice(Math.max(0, matchIndex - 72), matchIndex)
+  return /(?:친구|또래|어울리).{0,30}(?:가장|제일|무엇보다).{0,14}(?:중요|우선).{0,8}(?:하고|하며|인데|지만)\s*$/iu.test(before)
+}
+
 function isPrimary(local: string, wholeText: string, axis: CampfitV3ParentExperienceNeedAxis, matchIndex: number, matchLength: number): boolean {
+  if (axis === "school_learning_experience" && /(?:(?:해외|국제|현지)?\s*학교(?:생활|수업)|수업\s*방식).{0,40}(?:가장|제일)\s*중요/iu.test(wholeText)) return true
   const before = wholeText.slice(Math.max(0, matchIndex - 36), matchIndex)
   const after = wholeText.slice(matchIndex + matchLength, matchIndex + matchLength + 42)
   const priorityBeforeAxis = /(?:가장\s*중요|제일\s*중요|무엇보다|이번\s*목적|꼭)/iu.test(before)

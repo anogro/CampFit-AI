@@ -157,6 +157,8 @@ export type V3CatalogProgram = {
   readonly hasScheduledSessionRows: boolean
   readonly sessionStatusNeedsConfirmation: boolean
   readonly imageUrl: string | null
+  /** Catalog-provided short/detailed description, when available. */
+  readonly description?: string | null
   readonly status: "active"
   readonly catalogSource: "supabase" | "demo"
   readonly updatedAt: string | null
@@ -405,6 +407,7 @@ function mapProductionProgram(input: {
     hasScheduledSessionRows: scheduledSessionRows.length > 0,
     sessionStatusNeedsConfirmation: sessionVariants.some((variant) => ["likely_available", "needs_inquiry", "unknown"].includes(variant.availabilityStatus)),
     imageUrl: readImage(input.row) ?? null,
+    description: programDescription(input.row, input.profile),
     status: "active",
     catalogSource: input.catalogSource,
     updatedAt: readString(input.row, ["last_verified_at", "updated_at"]) ?? null,
@@ -879,6 +882,15 @@ function programSourceText(row: Row, profile: Row | undefined): string {
   return values.filter((value): value is string => typeof value === "string" && value.trim().length > 0).join(" ")
 }
 
+function programDescription(row: Row, profile: Row | undefined): string | null {
+  const profileStrength = readStringArray(profile, ["strengths"])[0] ?? null
+  return [
+    profileStrength,
+    readString(row, ["short_description", "detailed_description", "item_education_program"]),
+    readString(profile, ["description", "summary", "highlights", "activity", "activities"]),
+  ].find((value): value is string => Boolean(value?.trim())) ?? null
+}
+
 function structuredDirectionText(row: Row): string {
   return [
     readString(row, ["program_type"]),
@@ -915,6 +927,12 @@ function experienceSources(
   add("program.curriculum", readTextValues(row, ["curriculum", "curriculum_type", "program_focus"]), "high")
   add("program.description", readTextValues(row, ["short_description", "detailed_description", "item_education_program"]), "low")
   add("program.name", [name], "low")
+  const detailPayloadText = row?.["detail_payload"] === undefined || row?.["detail_payload"] === null
+    ? ""
+    : typeof row["detail_payload"] === "string"
+      ? row["detail_payload"]
+      : JSON.stringify(row["detail_payload"])
+  add("program.detail_payload", detailPayloadText ? [detailPayloadText.slice(0, 4_000)] : [], "low")
   add("program_profile.activity", readTextValues(profile, ["activity", "activities", "highlights"]), "high")
 
   for (const [index, session] of sessionRows.entries()) {

@@ -1,9 +1,7 @@
 import type { CampfitV3ConversationState, CampfitV3QuickReply } from "@/types/campfitV3"
 import { questionReplies } from "@/lib/campfit/v3/stateEngine"
-import { isEnglishReadinessSufficient } from "@/lib/campfit/v3/progress"
+import { isActivityPreferenceSufficient, isEnglishReadinessSufficient, isParentExperienceNeedsSufficient, isPreferredRegionResolved } from "@/lib/campfit/v3/progress"
 import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
-import { hasParentExperienceNeeds } from "@/lib/campfit/v3/parentExperienceNeeds"
-import { activityRecommendationSufficiency } from "@/lib/campfit/v3/activityPreferences"
 
 export type CampfitV3Question = {
   readonly key: string
@@ -30,7 +28,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
     helper: "한 가지씩 답하지 않아도 괜찮아요. 떠오르는 내용을 자유롭게 적어주세요.",
     quickReplies: questionReplies([["beginner", "영어가 거의 낯설어요"], ["basic", "단어·짧은 표현 정도예요"], ["intermediate", "간단한 일상 대화가 가능해요"], ["advanced", "영어 수업도 참여할 수 있어요"]]),
     completedBy: ["childEnglishLevel"],
-    priority: 100,
+    priority: 90,
   },
   {
     key: "special_care_follow_up",
@@ -47,7 +45,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
     helper: "상시 지원과 비상 상황 지원을 구분해 주세요.",
     quickReplies: questionReplies([["must_daily", "매일 한국어 지원이 꼭 필요해요"], ["emergency_only", "비상 상황에서만 필요해요"], ["preferred", "있으면 더 안심돼요"], ["none", "중요하지 않아요"]]),
     completedBy: ["koreanSupportNeed"],
-    priority: 90,
+    priority: 45,
     shouldAsk: shouldAskKoreanSupport,
   },
   {
@@ -61,12 +59,13 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
   },
   {
     key: "primary_experience_goal",
-    title: "이번 경험을 통해 아이에게 어떤 변화가 생기면 가장 좋을까요? 학교·영어·프로젝트·문화활동 중 하나를 골라도 되고, 기대하는 모습을 편하게 설명해주셔도 됩니다.",
+    title: "안녕하세요 😊 아이에게 잘 맞는 해외 경험을 함께 찾아볼게요. 이번 캠프나 해외 경험을 통해 아이가 어떤 경험을 했으면 좋겠나요? 아직 구체적이지 않아도 괜찮아요. 영어, 친구, 새로운 경험처럼 생각나는 대로 편하게 말씀해주세요.",
+    followUpTitle: "이번 경험에서 아이에게 가장 기대하는 변화가 무엇인지 알려주세요. 영어·친구·문화·학교 경험 중 무엇이 가장 중요한지도 좋아요.",
     helper: "다른 목표가 함께 있다면 자유 입력으로 덧붙여도 좋아요.",
     quickReplies: questionReplies([["schoolSchooling", "국제학교·스쿨링 경험"], ["englishIntensive", "영어 자신감과 집중 노출"], ["subjectProject", "STEM·예술·프로젝트"], ["cultureActivity", "문화·활동과 즐거운 경험"]]),
     completedBy: ["experienceGoals"],
-    priority: 80,
-    shouldAsk: (state) => !hasParentExperienceNeeds(state.facts.parentExperienceNeeds?.value),
+    priority: 100,
+    shouldAsk: (state) => !isParentExperienceNeedsSufficient(state),
   },
   {
     key: "child_activity_preferences",
@@ -80,8 +79,8 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
       ["variety", "여러 활동을 다양하게 경험"],
     ]),
     completedBy: ["activityPreferences"],
-    priority: 72,
-    shouldAsk: (state) => state.currentQuestionKey !== null && state.askedQuestionKeys.length > 0 && state.facts.activityPreferences === undefined,
+    priority: 80,
+    shouldAsk: (state) => !isActivityPreferenceSufficient(state),
   },
   {
     key: "preferred_region",
@@ -97,8 +96,8 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
     helper: "지역을 고정하면 프로그램 후보가 크게 줄어들 수 있어요.",
     quickReplies: questionReplies([["must", "이 지역만 가능해요"], ["strong", "이 지역을 우선하고 싶어요"], ["soft", "가능하면 좋지만 다른 곳도 괜찮아요"]]),
     completedBy: ["regionImportance"],
-    priority: 74,
-    shouldAsk: (state) => Array.isArray(state.facts.preferredRegions?.value) && state.facts.preferredRegions.value.length > 0,
+    priority: 70,
+    askInPlanner: false,
   },
   {
     key: "parent_stay_goal",
@@ -107,6 +106,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
     quickReplies: questionReplies([["restWellness", "휴식·웰니스"], ["cafeDining", "카페·식당과 현지 생활"], ["tourismCulture", "관광·문화"], ["natureBeach", "자연·해변"], ["remoteWork", "원격근무"], ["childScheduleFirst", "아이 일정이 가장 중요해요"]]),
     completedBy: ["parentStayGoals"],
     priority: 60,
+    askInPlanner: false,
   },
   {
     key: "first_overseas_experience",
@@ -115,6 +115,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
     quickReplies: questionReplies([["first", "네, 첫 경험이에요"], ["experienced", "아니요, 비슷한 경험이 있어요"]]),
     completedBy: ["isFirstOverseasEducationExperience"],
     priority: 50,
+    askInPlanner: false,
   },
   {
     key: "day_program_separation",
@@ -123,6 +124,7 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
     quickReplies: questionReplies([["needs_close_support", "처음에는 가까운 도움이 많이 필요해요"], ["with_initial_support", "초반 안내가 있으면 가능해요"], ["ready", "새로운 일정에도 잘 참여해요"]]),
     completedBy: ["dayProgramSeparationReadiness"],
     priority: 45,
+    askInPlanner: false,
     shouldAsk: (state) => state.facts.isFirstOverseasEducationExperience?.value === true,
   },
 ]
@@ -130,8 +132,9 @@ export const campfitV3QuestionBank: readonly CampfitV3Question[] = [
 export function selectNextQuestion(state: CampfitV3ConversationState, suggestedQuestionKey: string | null = null): CampfitV3Question | null {
   const current = getQuestion(state.currentQuestionKey)
   if (current !== null && canPlan(current, state) && !isQuestionCompleted(current, state)) return current
-  const suggested = getQuestion(suggestedQuestionKey)
-  if (suggested !== null && canPlan(suggested, state) && !isQuestionCompleted(suggested, state)) return suggested
+  // The provider may suggest a key for diagnostics, but it cannot override
+  // the deterministic core-area priority below.
+  void suggestedQuestionKey
   const asked = new Set(state.askedQuestionKeys)
   const retry = [...campfitV3QuestionBank]
     .sort((left, right) => questionValue(right, state) - questionValue(left, state))
@@ -160,12 +163,9 @@ export function allowedQuestionKeys(state: CampfitV3ConversationState): readonly
 export function isQuestionCompleted(question: CampfitV3Question, state: CampfitV3ConversationState): boolean {
   if (state.completedQuestionKeys.includes(question.key)) return true
   if (question.key === "child_english_level") return isEnglishReadinessSufficient(state)
-  if (question.key === "child_activity_preferences") {
-    const activityFact = state.facts.activityPreferences
-    if (activityFact !== undefined) return activityFact.status === "confirmed" || activityRecommendationSufficiency(activityFact.value)
-    return false
-  }
-  if (question.key === "primary_experience_goal" && hasParentExperienceNeeds(state.facts.parentExperienceNeeds?.value)) return true
+  if (question.key === "child_activity_preferences") return isActivityPreferenceSufficient(state)
+  if (question.key === "primary_experience_goal") return isParentExperienceNeedsSufficient(state)
+  if (question.key === "preferred_region") return isPreferredRegionResolved(state)
   return question.completedBy.every((key) => {
     const fact = state.facts[key as keyof typeof state.facts]
     if (fact === undefined || fact.status === "unknown" || fact.status === "tentative") return false

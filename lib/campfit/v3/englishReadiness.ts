@@ -94,7 +94,14 @@ export function assessEnglishReadiness(state: CampfitV3ConversationState): Engli
   const expressiveEvidence = speaking !== null && speaking !== "unknown"
     || writing !== null && writing !== "unknown"
     || usage.length > 0
-  const recommendationSufficiency = receptiveEvidence && expressiveEvidence
+  // A clear support-required signal is already actionable for programme fit:
+  // it tells the recommender to surface beginner support and possible burden.
+  // Do not keep diagnosing classroom comprehension when the user has already
+  // clearly said the child is at the very beginning of speaking.
+  const supportRequiredEvidence = speaking === "rarely_speaks"
+    && !receptiveEvidence
+    && reading === null
+  const recommendationSufficiency = receptiveEvidence && expressiveEvidence || supportRequiredEvidence
 
   const lowEnglish = !hasAbilityEvidence && legacyLevel === "beginner"
     || (speaking === "rarely_speaks" && listeningScore <= 1 && readingScore <= 1)

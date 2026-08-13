@@ -2,6 +2,7 @@ import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS } from "@/
 import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
 import { extractParentExperienceNeedsValue, isParentExperienceNeedsValue } from "@/lib/campfit/v3/parentExperienceNeeds"
 import { activityPreferenceProfileFromCategory, extractActivityPreferenceProfile, isActivityPreferenceProfileValue } from "@/lib/campfit/v3/activityPreferences"
+import { extractParticipationProfile, isParticipationProfileValue } from "@/lib/campfit/v3/participationProfile"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationState,
@@ -185,6 +186,7 @@ export function isSemanticallyValidModelFact(input: {
     dayProgramSeparationReadiness: ["child"],
     preferredActivities: ["preference"],
     activityPreferences: ["preference"],
+    participationProfile: ["child"],
     destinationPreference: ["preference"],
     socialPreference: ["child", "preference"],
     desiredOutcomes: ["preference"],
@@ -245,6 +247,8 @@ export function isSemanticallyValidModelFact(input: {
       return isStringArray(input.value, 12)
     case "activityPreferences":
       return isActivityPreferenceProfileValue(input.value)
+    case "participationProfile":
+      return isParticipationProfileValue(input.value)
     case "destinationPreference":
       return isStringArray(input.value, 8)
     case "socialPreference":
@@ -348,15 +352,24 @@ export function extractDeterministicFacts(
     facts.push(createFact({ key, subject, value, source: "explicit_user_statement", evidence: evidence.slice(0, 240) }))
   }
 
-  const childEnglishText = /(아이|애|첫째|둘째|첫째 아이|둘째 아이).{0,40}(영어|수업|대화)/iu.test(text)
-    || currentQuestionKey === "child_english_level" && /(?:영어 수업|영어로 대화|단어나 짧은 표현|간단한 대화|일상 대화|초급|영어(?:는|가|를|에|로)\s*(?:거의\s*)?(?:처음|못|낯설)|중급|고급|beginner|basic|intermediate|advanced)/iu.test(text)
-  if (childEnglishText && /(초급|처음|거의 못|낯설|첨|단어나 짧은 표현|beginner)/iu.test(text)) push("childEnglishLevel", "child", "beginner")
+  const explicitEnglishEvidence = /(?:영어|영어로|영어책|영어\s*(?:유치원|학원|수업|실력|수준)|선생님|원어민|외국인).{0,64}(?:이해|알아듣|따라|대답|말|읽|쓰기|사용|쓰|어려|못|가능|수준|처음|낯설|잘|자신|곧잘)/iu.test(text)
+  const parentOnlyEnglishStatement = /^(?:저는|제가|부모님?은|엄마는|아빠는|보호자는?).{0,24}(?:영어|영어로|소통)/iu.test(text)
+    && !/(아이|자녀|첫째|둘째)/iu.test(text)
+  const childEnglishText = !parentOnlyEnglishStatement && (
+    /(아이|애|첫째|둘째|첫째 아이|둘째 아이).{0,40}(영어|수업|대화)/iu.test(text)
+      || explicitEnglishEvidence
+      || currentQuestionKey === "child_english_level" && /(?:영어 수업|영어로 대화|단어나 짧은 표현|간단한 대화|일상 대화|초급|영어(?:는|가|를|에|로)\s*(?:거의\s*)?(?:처음|못|낯설)|중급|고급|beginner|basic|intermediate|advanced)/iu.test(text)
+  )
+  const directEnglishBeginnerCue = /(?:영어(?:는|가|를|에)?\s*(?:거의\s*)?(?:초급|처음|못|낯설|첨|단어나\s*짧은\s*표현)|(?:영어로|영어\s*(?:수업|대화|말하기|실력|수준)).{0,16}(?:초급|처음|거의\s*못|낯설|첨|단어나\s*짧은\s*표현|beginner))/iu.test(text)
+  const shortEnglishBeginnerAnswer = currentQuestionKey === "child_english_level"
+    && /^(?:영어(?:는|가|를|에|로)?\s*)?(?:초급|처음|거의\s*못|낯설|첨|단어나\s*짧은\s*표현|beginner)(?:\s*(?:이에요|예요|정도예요|수준이에요))?[.!?]?$/iu.test(text)
+  const multipleChildBeginnerCue = /(?:첫째|둘째|셋째|아이\s*[1-9]).{0,30}(?:단어나\s*짧은\s*표현|초급|영어(?:는|가|를|에|로)?\s*(?:거의\s*)?(?:처음|못|낯설)|beginner)/iu.test(text)
+  if (childEnglishText && (directEnglishBeginnerCue || shortEnglishBeginnerAnswer || multipleChildBeginnerCue)) push("childEnglishLevel", "child", "beginner")
   else if (childEnglishText && /(간단한 문장|짧은 문장|듣고\s*말|이야기하고\s*듣|basic)/iu.test(text)) push("childEnglishLevel", "child", "basic")
   else if (childEnglishText && /(중급|간단한 대화|일상 대화|수업\s*(?:에|을)?\s*참여|영어\s*수업.{0,10}참여|참여할\s*정도|대화.*가능|intermediate)/iu.test(text)) push("childEnglishLevel", "child", "intermediate")
   else if (childEnglishText && /(고급|수업.*무리|편하게|advanced)/iu.test(text)) push("childEnglishLevel", "child", "advanced")
 
-  const childEnglishEvidenceContext = currentQuestionKey === "child_english_level"
-    || childEnglishText
+  const childEnglishEvidenceContext = childEnglishText
     || /(아이|애|자녀|첫째|둘째).{0,48}(영어|수업|대화|읽|말|쓰기)/iu.test(text)
     || /(영어\s*유치원|영어\s*학원|AR\s*\d|Lexile|국제학교|해외\s*(?:학교|캠프|거주)|영어책|파닉스)/iu.test(text)
   const englishExperience: Array<{ type: CampfitV3EnglishExperienceType; durationYears: number | null; ongoing: boolean | null }> = []
@@ -406,7 +419,7 @@ export function extractDeterministicFacts(
 
   const goals: Partial<Record<ExperienceDirectionKey, ExperienceGoalStrength>> = {}
   const englishExposureContext = /(영어유치원|영어\s*환경|영어를?\s*(?:자연스럽게|계속|자주)\s*(?:접|배우)|영어\s*노출|영어\s*사용\s*기회|영어\s*경험|영어\s*감|영어.{0,12}(?:유지|확대|늘리))/iu.test(text)
-  if (/(국제학교|현지학교|학교 분위기|학교 프로그램|학교 수업|스쿨링|학교처럼|시간표|수업 시간|학교식)/.test(text)) goals.schoolSchooling = "primary"
+  if (/(국제학교|현지학교|학교\s*(?:생활|수업|방식|프로그램)|학교 분위기|스쿨링|학교처럼|시간표|수업 시간|학교식)/.test(text)) goals.schoolSchooling = "primary"
   if (/(영어 실력|영어 자신감|영어 집중|영어.*늘)/.test(text)) goals.englishIntensive = goals.schoolSchooling ? "secondary" : "primary"
   if (englishExposureContext) goals.englishIntensive = goals.schoolSchooling ? "secondary" : "primary"
   if (/(STEM|코딩|로봇|프로젝트|미술|스포츠|관심 분야)/i.test(text)) goals.subjectProject = "primary"
@@ -439,6 +452,9 @@ export function extractDeterministicFacts(
 
   const activityPreferences = extractActivityPreferenceProfile(text)
   if (activityPreferences !== null) push("activityPreferences", "preference", activityPreferences)
+
+  const participationProfile = extractParticipationProfile(text)
+  if (participationProfile !== null) push("participationProfile", "child", participationProfile)
 
   // City selection priorities are separate from the child's program direction.
   // Keep them in the existing structured facts so extra consultation answers
@@ -526,7 +542,8 @@ export function extractDeterministicFacts(
   } else if (/(지역|나라는?).{0,8}(상관없|어디든)/.test(text)
     || /(^|[\s,])상관없(?:긴\s*한데|긴하지만|어도|어요|습니다)/.test(text)
     || /(딱히|특정).{0,16}(없|정하지|생각한 곳)/.test(text)
-    || /(마음에 두고 있는|정해 둔).{0,12}(곳|도시|나라).{0,8}(없|아직)/.test(text)) {
+    || /(마음에 두고 있는|정해 둔).{0,12}(곳|도시|나라).{0,8}(없|아직)/.test(text)
+    || /(?:지역|나라|도시).{0,16}(?:잘\s*모르|모르겠|추천받|추천해|맡길|정해주)/.test(text)) {
     push("preferredRegions", "preference", [])
     push("regionImportance", "preference", "no_preference")
   }
@@ -679,6 +696,8 @@ function listeningEvidence(text: string): "understands_simple_instructions" | "u
   if (/외국인\s*선생님.{0,20}(대충|조금|간단히).{0,12}(알아듣|이해)/iu.test(text)) return "understands_simple_instructions"
   if (/(원어민|외국인).{0,20}(말|설명).{0,12}(대충|조금|잘)?\s*(알아듣|이해)/iu.test(text)) return "understands_simple_instructions"
   if (/(선생님|교사|수업).{0,20}(설명|말).{0,20}(잘\s*)?(알아듣|이해|따라)/iu.test(text)
+    || /영어\s*(?:수업의?\s*)?설명(?:은|이|을)?\s*(?:대충|조금|잘)?\s*(알아듣|이해|따라)/iu.test(text)
+    || /영어로.{0,12}(?:수업|설명).{0,20}(이해|따라|들을|듣|참여)/iu.test(text)
     || /(영어로\s*(?:하는\s*)?(수업|설명)).{0,20}(이해|따라|들을|듣|참여)/iu.test(text)) return "understands_class_explanation"
   if (/(간단한\s*(지시|안내|설명)|외국인\s*선생님.{0,20}(알아듣|이해)|듣고\s*말|말을\s*듣)/iu.test(text)) return "understands_simple_instructions"
   return null
@@ -692,7 +711,7 @@ function speakingEvidence(text: string): "answers_simple_questions" | "can_conve
   if (/(?:외국인|원어민).{0,24}대화.{0,32}(?:문제(?:는)?\s*없|무리\s*없|가능)/iu.test(text)) return "can_converse"
   if (/(먼저\s*말|자발적으로\s*영어로\s*말|스스로\s*말)/iu.test(text)) return "initiates_speech"
   if (/(영어로\s*곧잘\s*말|영어로\s*편하게\s*(?:말|대화)|유창하게\s*말|영어로\s*대화가?\s*(?:잘\s*)?가능)/iu.test(text)) return "can_converse"
-  if (/(간단한\s*(?:질문|대화)|질문에\s*(?:답|대답)|짧은\s*대화|대화가?\s*가능|간단히\s*대답|대답(?:은|을)?\s*(?:할\s*수|가능|할\s*수\s*있))/iu.test(text)) return "answers_simple_questions"
+  if (/(간단한\s*(?:질문|대화)|질문(?:에|에도|에는)?\s*(?:영어로\s*)?(?:답|대답)|짧은\s*대화|대화가?\s*가능|간단히\s*대답|대답(?:은|을)?\s*(?:할\s*수|가능|할\s*수\s*있))/iu.test(text)) return "answers_simple_questions"
   if (/실제로\s*말.{0,16}(?:안\s*(?:나오|나와)|잘\s*안\s*(?:나오|나와))/iu.test(text)) return "rarely_speaks"
   if (/(영어는\s*거의\s*(?:처음|못)|영어로\s*말을?\s*거의\s*안)/iu.test(text)) return "rarely_speaks"
   return null
@@ -785,6 +804,7 @@ function parseDurationWeeks(text: string): number | null {
 export function summarizeFacts(state: CampfitV3ConversationState): readonly string[] {
   const labels: Partial<Record<CampfitV3FactKey, string>> = {
     childEnglishLevel: "아이 영어 수준",
+    participationProfile: "아이 참여 특성",
     parentExperienceNeeds: "부모가 기대하는 경험",
     experienceGoals: "원하는 경험",
     preferredRegions: "희망 지역",

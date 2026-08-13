@@ -73,7 +73,69 @@ describe("CampFit v3 recommendation engine", () => {
     expect(result.experienceDirections[0]?.key).toBe("cultureActivity")
     expect(result.destinationRecommendations[0]?.cityName).toBe("Cebu")
     expect(result.programCandidates[0]).toMatchObject({ programId: "culture-cebu", primaryDirection: "문화·활동 경험" })
-    expect(result.programCandidates[0]?.reason).toContain("실제 DB 후보")
+    expect(result.programCandidates[0]?.reason).toContain("후보예요")
+  })
+
+  it("uses parent need priority over a conflicting legacy direction hint", () => {
+    const state = stateFor("englishIntensive", {
+      parentExperienceNeeds: {
+        english_growth: { importance: "nice_to_have", evidence: ["영어는 늘면 좋겠어요"] },
+        peer_interaction: { importance: "primary", evidence: ["외국 친구들과 어울리는 게 가장 중요"] },
+        global_experience: { importance: "unspecified", evidence: [] },
+        independence_confidence: { importance: "unspecified", evidence: [] },
+        school_learning_experience: { importance: "unspecified", evidence: [] },
+      },
+    })
+    const directions = scoreExperienceDirections(state)
+    expect(directions[0]?.key).toBe("cultureActivity")
+    expect(directions.find((item) => item.key === "englishIntensive")?.score).toBeLessThan(directions[0]?.score ?? 0)
+  })
+
+  it("summarizes a peer primary goal without attributing unrelated activity evidence to it", () => {
+    const state = stateFor("englishIntensive", {
+      parentExperienceNeeds: {
+        english_growth: { importance: "nice_to_have", evidence: ["영어도 늘면 좋겠어요"] },
+        peer_interaction: { importance: "primary", evidence: ["외국 친구들과 어울리는 게 가장 중요해요"] },
+        global_experience: { importance: "unspecified", evidence: [] },
+        independence_confidence: { importance: "unspecified", evidence: [] },
+        school_learning_experience: { importance: "unspecified", evidence: [] },
+      },
+      activityPreferences: {
+        preferences: [{
+          category: "stem_maker",
+          strength: "strong",
+          rank: 1,
+          mentionedActivities: ["과학실험"],
+          evidence: ["과학실험을 좋아해요"],
+        }],
+        varietyPreference: "unspecified",
+        evidence: ["과학실험을 좋아해요"],
+      },
+    })
+    const result = buildRecommendation({
+      basicInfo,
+      state,
+      catalog: productionCatalog([program({ id: "stem-only", direction: "subjectProject", traits: ["STEM", "science"] })]),
+      now,
+    })
+    expect(result.experienceDirections[0]?.key).toBe("cultureActivity")
+    expect(result.consultingConclusion).toContain("또래 교류")
+    expect(result.programCandidates[0]?.reason).toContain("프로그램 정보에서 추가 확인이 필요해요")
+    expect(result.programCandidates[0]?.reason).not.toContain("또래 교류·협업 활동 정보와 잘 맞는 후보")
+    expect(result.programCandidates[0]?.reason).toContain("STEM")
+
+    const schoolState = stateFor("englishIntensive", {
+      parentExperienceNeeds: {
+        english_growth: { importance: "nice_to_have", evidence: ["영어도 늘면 좋겠어요"] },
+        peer_interaction: { importance: "unspecified", evidence: [] },
+        global_experience: { importance: "unspecified", evidence: [] },
+        independence_confidence: { importance: "unspecified", evidence: [] },
+        school_learning_experience: { importance: "primary", evidence: ["해외 학교생활이 가장 중요해요"] },
+      },
+    })
+    const schoolResult = buildRecommendation({ basicInfo, state: schoolState, catalog: productionCatalog([program({ id: "school-only", direction: "schoolSchooling" })]), now })
+    expect(schoolResult.experienceDirections[0]?.key).toBe("schoolSchooling")
+    expect(schoolResult.consultingConclusion).toContain("학교·스쿨링 경험")
   })
 
   it("scenario B selects the structured schooling program instead of a generic ESL program", () => {
