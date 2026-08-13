@@ -168,7 +168,7 @@ export function CampFitV3Result({
                       <span className="text-right font-bold text-[var(--text-primary)]">{getAxisDetail(axis.key, conversationState)}</span>
                     </div>
                   ))}
-                  <p className="mt-2 text-xs font-semibold leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{decisionAxesSummary(axes)}</p>
+                  <p className="mt-2 text-xs font-semibold leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{decisionAxesSummary(axes, conversationState)}</p>
                 </div>
               </div>
               <div className="mt-6 grid gap-5 border-t border-[var(--border-default)] pt-5 lg:grid-cols-2">
@@ -325,7 +325,7 @@ function CityCard({
   readonly result: CampfitV3RecommendationResult
 }) {
   const { city } = comparison
-  const href = buildAnogroCityHref(city.cityName)
+  const href = buildAnogroCityHref(city.cityName, undefined, city.citySlug)
   return (
     <article data-campfit-city-card data-city-name={city.cityName} className="apple-glass-soft flex flex-col overflow-hidden rounded-[22px]">
       <div className="flex items-start justify-between gap-3 p-5 pb-0 sm:p-6 sm:pb-0">
@@ -338,9 +338,12 @@ function CityCard({
       </div>
       <div className="flex flex-1 flex-col p-5 sm:p-6">
         {city.description ? (
-          <p className="mb-4 rounded-2xl bg-[var(--bg-secondary)] p-3 text-xs leading-5 text-[var(--text-secondary)] [word-break:keep-all]">
-            “ {city.description} ”
-          </p>
+          <div className="mb-4 [word-break:keep-all]">
+            <p className="text-xs leading-5 text-[var(--text-secondary)]">{city.description}</p>
+          </div>
+        ) : null}
+        {city.comparisonNote ? (
+          <p className="mb-4 text-xs font-semibold leading-5 text-[var(--accent-primary)] [word-break:keep-all]">{city.comparisonNote}</p>
         ) : null}
         <h4 className="text-sm font-black text-[var(--text-primary)]">추천 이유와 장점</h4>
         <ul className="mt-3 space-y-2.5">
@@ -391,11 +394,17 @@ function ProgramInlineCard({ program, index }: { readonly program: CampfitV3Prog
         )}
       </div>
       <div className="mt-3">
+        {program.description ? (
+          <div className="mb-3 rounded-2xl bg-[var(--bg-secondary)] p-3 [word-break:keep-all]">
+            <p className="text-xs font-black text-[var(--text-primary)]">프로그램 소개</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{program.description}</p>
+          </div>
+        ) : null}
         <p className="text-xs font-black text-[var(--text-primary)]">추천 이유</p>
         <p className="mt-1 text-sm leading-6 [word-break:keep-all]">{strengths[0]}</p>
         {program.englishMatchLabel ? (
           <div data-campfit-english-match={program.englishMatchStatus ?? "unknown"} className="mt-3 rounded-2xl border border-[var(--border-default)] bg-[var(--accent-soft)]/40 p-3">
-            <p className="text-xs font-black text-[var(--accent-primary)]">영어 부담도 · {program.englishRequirementSource === "official" ? "공식 확인" : program.englishRequirementSource === "inferred" ? "설명 기반 추론" : program.englishRequirementSource === "demo_fixture" ? "데모 테스트 데이터" : "확인되지 않음"}</p>
+            <p className="text-xs font-black text-[var(--accent-primary)]">영어 부담도{program.englishRequirementSource === "official" ? " · 공식 확인" : program.englishRequirementSource === "inferred" ? " · 설명 기반 추론" : ""}</p>
             <p className="mt-1 text-sm font-bold leading-6 [word-break:keep-all]">{program.englishMatchLabel}</p>
           </div>
         ) : null}

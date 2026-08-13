@@ -147,7 +147,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
             ) : (
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3 text-xs font-bold">
-                  <span className="truncate">CampFit AI · 추천 조건 정리 중</span>
+                  <span className="truncate">CampFit AI · 추천 조건 확인 중</span>
                   <span className="tabular-nums text-[var(--accent-primary)]">{progressLabel}</span>
                 </div>
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${conversation.progress}%` }} /></div>
@@ -168,7 +168,7 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
             <div><p className="font-extrabold">CampFit AI 컨설턴트</p><p className="mt-1 text-xs font-bold text-[var(--status-success)]">현재 상담 중</p></div>
           </div>
           <div className="mt-4">
-            <div className="flex items-center justify-between gap-2 text-xs font-bold"><span>추천 조건 정리 중</span><span className="shrink-0 tabular-nums text-[var(--accent-primary)]">{progressLabel}</span></div>
+            <div className="flex items-center justify-between gap-2 text-xs font-bold"><span>추천 조건 확인 중</span><span className="shrink-0 tabular-nums text-[var(--accent-primary)]">{progressLabel}</span></div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${conversation.progress}%` }} /></div>
             <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">{progressCopy}</p>
           </div>
@@ -213,8 +213,8 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
           <div className="shrink-0 border-t border-[var(--border-default)] bg-white/80 px-4 py-3 sm:px-7 sm:py-4">
             {conversation.readyForRecommendation && !continuing ? (
               <div className="mb-4 rounded-2xl border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)] px-4 py-3" role="status">
-                <p className="text-sm font-extrabold">추천을 시작할 핵심 조건이 모였어요.</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">지금 결과를 보거나, 아이 성향·선호 활동·부모 조건을 더 알려주고 추천을 정교하게 만들 수 있어요.</p>
+                <p className="text-sm font-extrabold">추천에 필요한 조건을 정리했어요.</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">지금 결과를 확인하거나, 더 알려주고 싶은 가족 조건을 이어서 말씀해 주세요.</p>
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                   <button className="glass-cta min-h-11 flex-1 rounded-full px-5 text-sm font-extrabold" type="button" onClick={onResult}>지금 결과 보기 →</button>
                   <button className="min-h-11 flex-1 rounded-full border border-[var(--border-default)] bg-white px-5 text-sm font-bold" type="button" onClick={() => setContinuing(true)}>상담 더 이어가기</button>
