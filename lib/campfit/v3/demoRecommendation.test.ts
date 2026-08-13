@@ -25,9 +25,29 @@ describe("CampFit v3 Demo Catalog recommendation coverage", () => {
     expect(result.destinationRecommendations).toHaveLength(3)
     expect(result.programCandidates).toHaveLength(3)
     expect(new Set(result.destinationRecommendations.map((city) => city.cityName)).size).toBe(3)
+    expect(result.destinationRecommendations.every((city) => city.citySlug)).toBe(true)
     expect(new Set(result.programCandidates.map((program) => program.programId)).size).toBe(result.programCandidates.length)
+    expect(result.programCandidates.every((program) => program.detailUrl?.includes("/program/campfit-demo-") === true)).toBe(true)
+    expect(result.programCandidates.every((program) => program.imageUrl !== null)).toBe(true)
     expect(result.programCandidates.every((program, index, programs) => programs.findIndex((candidate) => candidate.programId === program.programId) === index)).toBe(true)
     expect(result.programCandidates[1]?.reason).not.toContain("점수")
+  })
+
+  it("uses the matched catalog city image when a program row has no image", () => {
+    const catalog = loadDemoCatalog(2026)
+    const cityImages = new Map(catalog.cities.map((city) => [city.name, city.imageUrl]))
+    const result = buildRecommendation({
+      basicInfo: demoBasicInfo,
+      state: demoState,
+      catalog: {
+        ...catalog,
+        programs: catalog.programs.map((program) => ({ ...program, imageUrl: null })),
+      },
+      now: new Date("2026-07-19T00:00:00.000Z"),
+    })
+
+    expect(result.programCandidates.length).toBeGreaterThan(0)
+    expect(result.programCandidates.every((program) => program.imageUrl === cityImages.get(program.cityName))).toBe(true)
   })
 
   it.each([

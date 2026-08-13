@@ -44,6 +44,13 @@ export function loadDemoCatalog(referenceYear = new Date().getUTCFullYear()): V3
 }
 
 const demoCityImageUrls: Readonly<Record<string, string>> = {
+  "Auckland": "https://images.unsplash.com/photo-1507699622108-4be3abd695ad?auto=format&fit=crop&w=900&q=80",
+  "Gold Coast": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80",
+  "Seattle": "https://images.unsplash.com/photo-1506146332389-18140dc7b2fb?auto=format&fit=crop&w=900&q=80",
+  "Amsterdam": "https://images.unsplash.com/photo-1534351590666-13e3e96b5017?auto=format&fit=crop&w=900&q=80",
+  "Barcelona": "https://images.unsplash.com/photo-1583422409516-2895a77efded?auto=format&fit=crop&w=900&q=80",
+  "Guam": "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=900&q=80",
+  "Honolulu": "https://images.unsplash.com/photo-1505852679233-d9fd70aff56d?auto=format&fit=crop&w=900&q=80",
   "Christchurch": "https://images.unsplash.com/photo-1507699622108-4be3abd695ad?auto=format&fit=crop&w=900&q=80",
   "Osaka": "https://images.unsplash.com/photo-1590559899731-a382839e5549?auto=format&fit=crop&w=900&q=80",
   "Johor Bahru": "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=900&q=80",
@@ -58,7 +65,9 @@ function mapDemoProgram(definition: (typeof demoProgramDefinitions)[number], yea
   const priceOptions = buildPriceOptions(definition.priceBaseKrw, definition.priceQuality, definition.durations, definition.accommodations)
   return {
     id: definition.id,
-    slug: definition.anogroSlug ?? null,
+    // Keep the same deterministic slug used by tools/seed-campfit-v3-demo-programs.ts
+    // so the local fallback preserves the demo ANOGRO detail route when Supabase is unavailable.
+    slug: definition.anogroSlug ?? `campfit-demo-${definition.id.replace(/^demo-/, "")}`,
     name: definition.name,
     city: definition.city,
     country: definition.country,
@@ -81,8 +90,8 @@ function mapDemoProgram(definition: (typeof demoProgramDefinitions)[number], yea
     englishRequirement: {
       level: definition.englishRequirementLevel,
       source: "demo_fixture",
-      confidence: 0.95,
-      version: CAMPFIT_V3_DEMO_CATALOG_VERSION,
+      confidence: definition.englishRequirementConfidence,
+      version: definition.englishRequirementVersion || CAMPFIT_V3_DEMO_CATALOG_VERSION,
       officialVerified: false,
       officialText: null,
       officialQualification: null,
@@ -99,7 +108,8 @@ function mapDemoProgram(definition: (typeof demoProgramDefinitions)[number], yea
     hasSessionRows: true,
     hasScheduledSessionRows: true,
     sessionStatusNeedsConfirmation: false,
-    imageUrl: null,
+    imageUrl: demoCityImageUrl(definition.city),
+    description: definition.strengths[0] ?? null,
     status: "active",
     catalogSource: "demo",
     updatedAt: null,
