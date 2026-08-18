@@ -355,10 +355,13 @@ export function extractDeterministicFacts(
   const explicitEnglishEvidence = /(?:영어|영어로|영어책|영어\s*(?:유치원|학원|수업|실력|수준)|선생님|원어민|외국인).{0,64}(?:이해|알아듣|따라|대답|말|읽|쓰기|사용|쓰|어려|못|가능|수준|처음|낯설|잘|자신|곧잘)/iu.test(text)
   const parentOnlyEnglishStatement = /^(?:저는|제가|부모님?은|엄마는|아빠는|보호자는?).{0,24}(?:영어|영어로|소통)/iu.test(text)
     && !/(아이|자녀|첫째|둘째)/iu.test(text)
+  const directEnglishAnswerContext = currentQuestionKey === "child_english_level"
+    && /(?:수업|설명|지시|안내).{0,20}(?:알아듣|이해|따라|어려|힘들)|(?:질문을?\s*받으면|물어보면).{0,32}(?:대답|응답|단어|짧은\s*(?:문장|표현))/iu.test(text)
   const childEnglishText = !parentOnlyEnglishStatement && (
     /(아이|애|첫째|둘째|첫째 아이|둘째 아이).{0,40}(영어|수업|대화)/iu.test(text)
       || explicitEnglishEvidence
       || currentQuestionKey === "child_english_level" && /(?:영어 수업|영어로 대화|단어나 짧은 표현|간단한 대화|일상 대화|초급|영어(?:는|가|를|에|로)\s*(?:거의\s*)?(?:처음|못|낯설)|중급|고급|beginner|basic|intermediate|advanced)/iu.test(text)
+      || directEnglishAnswerContext
   )
   const directEnglishBeginnerCue = /(?:영어(?:는|가|를|에)?\s*(?:거의\s*)?(?:초급|처음|못|낯설|첨|단어나\s*짧은\s*표현)|(?:영어로|영어\s*(?:수업|대화|말하기|실력|수준)).{0,16}(?:초급|처음|거의\s*못|낯설|첨|단어나\s*짧은\s*표현|beginner))/iu.test(text)
   const shortEnglishBeginnerAnswer = currentQuestionKey === "child_english_level"
@@ -688,8 +691,12 @@ function experienceDurationContext(text: string, context: RegExp): string {
 }
 
 function listeningEvidence(text: string): "understands_simple_instructions" | "understands_class_explanation" | "struggles_with_class_explanation" | null {
-  if (/(?:선생님|교사|수업).{0,24}(?:설명|말).{0,10}(?:잘\s*)?(?:못\s*알아(?:듣|들)|이해\s*못)/iu.test(text)
-    || /(?:선생님|교사).{0,24}설명(?:은|이|을)?\s*(?:어려|힘들)/iu.test(text)) return "struggles_with_class_explanation"
+  if (/(?:선생님|교사|수업|설명|말).{0,32}(?:길게|긴|오래).{0,16}(?:설명|말)?(?:하면|은|이|을)?\s*(?:어려|힘들|부담|버거)/iu.test(text)
+    || /(?:길게|긴|오래)\s*(?:설명|말).{0,16}(?:어려|힘들|부담|버거)/iu.test(text)
+    || /(?:설명|말|지시|안내).{0,16}(?:이해|알아듣|따라).{0,6}(?:못|안|않)/iu.test(text)
+    || /(?:선생님|교사|수업).{0,24}(?:설명|말).{0,10}(?:잘\s*)?(?:못\s*알아(?:듣|들)|이해\s*못)/iu.test(text)
+    || /(?:선생님|교사).{0,24}설명(?:은|이|을)?\s*(?:어려|힘들)/iu.test(text)
+    || /영어로\s*(?:하는\s*)?설명(?:은|이|을)?\s*(?:어려|힘들)/iu.test(text)) return "struggles_with_class_explanation"
   if (/(영어로\s*(?:하는\s*)?(?:수업|설명)).{0,10}(?:잘\s*)?(?:못\s*알아(?:듣|들)|이해\s*못)/iu.test(text)
     || /영어로\s*(?:하는\s*)?설명(?:은|이|을)?\s*(?:어려|힘들)/iu.test(text)) return "struggles_with_class_explanation"
   if (/외국인\s*선생님.{0,20}(?:설명|수업).{0,16}(?:잘\s*)?(?:알아듣|이해|따라)/iu.test(text)) return "understands_class_explanation"
@@ -699,19 +706,21 @@ function listeningEvidence(text: string): "understands_simple_instructions" | "u
     || /영어\s*(?:수업의?\s*)?설명(?:은|이|을)?\s*(?:대충|조금|잘)?\s*(알아듣|이해|따라)/iu.test(text)
     || /영어로.{0,12}(?:수업|설명).{0,20}(이해|따라|들을|듣|참여)/iu.test(text)
     || /(영어로\s*(?:하는\s*)?(수업|설명)).{0,20}(이해|따라|들을|듣|참여)/iu.test(text)) return "understands_class_explanation"
-  if (/(간단한\s*(지시|안내|설명)|외국인\s*선생님.{0,20}(알아듣|이해)|듣고\s*말|말을\s*듣)/iu.test(text)) return "understands_simple_instructions"
+  if (/(간단한|짧은)\s*(?:수업\s*)?(지시|안내|설명).{0,16}(알아듣|이해|따라)/iu.test(text)
+    || /(간단한\s*(지시|안내|설명)|외국인\s*선생님.{0,20}(알아듣|이해)|듣고\s*말|말을\s*듣)/iu.test(text)) return "understands_simple_instructions"
   return null
 }
 
 function speakingEvidence(text: string): "answers_simple_questions" | "can_converse" | "initiates_speech" | "can_present_in_english" | "difficulty_initiating" | "rarely_speaks" | null {
   if (/(먼저\s*말|말을?\s*먼저|자발적으로\s*말)/iu.test(text) && /(잘\s*못|어려|힘들|않)/iu.test(text)) return "difficulty_initiating"
   if (/(말하기|영어로\s*말|회화).{0,20}(어려|힘들|잘\s*못|자신\s*없)|먼저\s*말하.{0,8}(못|어려|자신\s*없)/iu.test(text)) return "difficulty_initiating"
-  if (/(대답|질문에\s*답).{0,12}(잘\s*못|어려|힘들)/iu.test(text)) return "difficulty_initiating"
+  if (/(대답|질문에\s*답|응답).{0,12}(?:잘\s*)?(?:못|안|어려|힘들)/iu.test(text)) return "difficulty_initiating"
   if (/영어로\s*(?:수업|발표).{0,24}(?:문제(?:는)?\s*없|무리\s*없|가능)/iu.test(text)) return "can_present_in_english"
   if (/(?:외국인|원어민).{0,24}대화.{0,32}(?:문제(?:는)?\s*없|무리\s*없|가능)/iu.test(text)) return "can_converse"
   if (/(먼저\s*말|자발적으로\s*영어로\s*말|스스로\s*말)/iu.test(text)) return "initiates_speech"
   if (/(영어로\s*곧잘\s*말|영어로\s*편하게\s*(?:말|대화)|유창하게\s*말|영어로\s*대화가?\s*(?:잘\s*)?가능)/iu.test(text)) return "can_converse"
-  if (/(간단한\s*(?:질문|대화)|질문(?:에|에도|에는)?\s*(?:영어로\s*)?(?:답|대답)|짧은\s*대화|대화가?\s*가능|간단히\s*대답|대답(?:은|을)?\s*(?:할\s*수|가능|할\s*수\s*있))/iu.test(text)) return "answers_simple_questions"
+  if (/(?:질문을?\s*받으면|물어보면).{0,32}(?:단어|짧은\s*(?:문장|표현)|답|대답|응답)/iu.test(text)
+    || /(간단한\s*(?:질문|대화)|질문(?:에|에도|에는)?\s*(?:영어로\s*)?(?:답|대답)|짧은\s*대화|대화가?\s*가능|간단히\s*대답|대답(?:은|을)?\s*(?:할\s*수|가능|할\s*수\s*있))/iu.test(text)) return "answers_simple_questions"
   if (/실제로\s*말.{0,16}(?:안\s*(?:나오|나와)|잘\s*안\s*(?:나오|나와))/iu.test(text)) return "rarely_speaks"
   if (/(영어는\s*거의\s*(?:처음|못)|영어로\s*말을?\s*거의\s*안)/iu.test(text)) return "rarely_speaks"
   return null

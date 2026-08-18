@@ -124,14 +124,12 @@ export function parentNeedEvidenceIsGrounded(value: unknown, factEvidence: strin
   return campfitV3ParentExperienceNeedAxes.some((axis) => {
     const need = value[axis]
     if (need.importance === "unspecified" || need.evidence.length === 0) return false
-    const axisMentioned = axisMatchers[axis].test(userMessage)
-    if (!hasParentGoalCue(userMessage, userMessage.indexOf(need.evidence[0] ?? ""), need.evidence[0]?.length ?? 0)) return false
-    const evidenceOverlaps = need.evidence.some((evidence) => {
-      const tokens = normalizeForEvidence(evidence).split(" ").filter((token) => token.length >= 2)
-      return tokens.some((token) => normalizedMessage.includes(token))
-        || normalizedFactEvidence.split(" ").some((token) => token.length >= 2 && normalizedMessage.includes(token))
+    const evidenceIsPresent = need.evidence.some((evidence) => {
+      const normalizedEvidence = normalizeForEvidence(evidence)
+      return normalizedEvidence.length > 0 && normalizedMessage.includes(normalizedEvidence)
     })
-    return axisMentioned && evidenceOverlaps
+    return evidenceIsPresent
+      || normalizedFactEvidence.length > 0 && normalizedMessage.includes(normalizedFactEvidence)
   })
 }
 
@@ -148,7 +146,7 @@ function hasParentGoalCue(text: string, matchIndex: number, matchLength: number)
   const nearby = text.slice(start, end)
   if (/(?:처음\s*보는\s*친구|낯을?\s*가리|친해지)/iu.test(nearby)
     && !/(?:친구|또래).{0,24}(?:좋겠|중요|어울려|사귀어|싶|원)/iu.test(nearby)) return false
-  const strongGoalCue = /(?:했으면|좋겠|원하|중요|목적|경험(?:하|했|해보)|싶|생겼으면|얻었으면|키웠으면|늘면|어울려?보|사귀어?보|굳이|안\s*가|필요\s*없|미리\s*경험)/iu.test(nearby)
+  const strongGoalCue = /(?:했으면|좋겠|좋지만|원하|중요|목적|경험(?:하|했|해보)|싶|생겼으면|얻었으면|키웠으면|늘면|어울려?보|사귀어?보|굳이|안\s*가|필요\s*없|미리\s*경험)/iu.test(nearby)
   if (strongGoalCue) return true
   if (/(?:아이가|아이|자녀).{0,24}(?:좋아|잘해|활발|낯을?\s*가리)/iu.test(nearby)) return false
   return /(?:되면|있으면|가능하면|같이).{0,14}좋/iu.test(nearby)
@@ -161,16 +159,23 @@ function inferFallbackImportance(
   matchLength: number,
 ): CampfitV3ParentNeedImportance {
   const local = text.slice(Math.max(0, matchIndex - 34), Math.min(text.length, matchIndex + matchLength + 64))
-  const contrast = axis === "english_growth" && /영어.{0,28}(?:늘|좋|했으면).{0,12}(?:지만|는데|보다)/iu.test(text)
-    || axis === "peer_interaction" && /(?:친구|또래).{0,28}(?:좋|했으면).{0,12}(?:지만|는데|보다)/iu.test(text)
+  const contrast = axis === "english_growth"
+    && /(?:영어|회화|말하기).{0,20}(?:늘|성장|자신감|자연스럽|접|배우|사용|쓰|경험|노출|좋|싶|했으면|원|유지|확대).{0,8}(?:지만|는데|보다)/iu.test(text)
+    || axis === "peer_interaction"
+    && /(?:친구|또래|어울리|교류).{0,20}(?:좋|했으면|원|싶|어울려|사귀어).{0,8}(?:지만|는데|보다)/iu.test(text)
   if (isAvoid(local, axis, text)) return "avoid"
   // In natural Korean, a parent may state the primary peer goal first and
   // append English as a secondary wish with "...가장 중요하고 영어는...".
   // Do not let the primary cue leak forward to the later English phrase.
   if (axis === "english_growth" && primaryPeerGoalAppearsBefore(text, matchIndex)) return "nice_to_have"
   if (axis === "peer_interaction" && /영어.{0,40}(?:지만|는데).{0,40}(?:외국\s*친구|친구|또래|어울리|교류)/iu.test(text)) return "primary"
+  // A contrast cue belongs to the axis named after the contrast, even when
+  // a later "가장 중요" phrase is close enough to fool the generic priority
+  // matcher. For example, "영어도 좋겠지만 ... 친구들과 어울리는 경험이
+  // 가장 중요" makes English secondary, not primary.
+  if (contrast) return "nice_to_have"
   if (isPrimary(local, text, axis, matchIndex, matchLength)) return "primary"
-  if (contrast || /(?:되면|있으면|가능하면|같이).{0,14}좋|좋.{0,14}(?:지만|고|으면)/iu.test(local)) return "nice_to_have"
+  if (/(?:되면|있으면|가능하면|같이).{0,14}좋|좋.{0,14}(?:지만|고|으면)/iu.test(local)) return "nice_to_have"
   if (/(중요|많이|꼭|하고\s*싶|경험했으면|사귀었으면|어울렸으면|늘었으면|생겼으면)/iu.test(local)) return "important"
   return "important"
 }

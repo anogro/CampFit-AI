@@ -83,6 +83,73 @@ describe("parent experience needs", () => {
     expect(value?.["english_growth"]?.importance).toBe("nice_to_have")
   })
 
+  it.each([
+    [
+      "영어도 늘면 좋겠지만, 이번에는 외국 친구들과 자연스럽게 어울려보는 경험이 가장 중요해요.",
+      "peer_interaction",
+      "english_growth",
+    ],
+    [
+      "외국 친구들과 어울리는 것도 좋지만, 이번에는 영어 실력을 늘리는 것이 가장 중요해요.",
+      "english_growth",
+      "peer_interaction",
+    ],
+  ] as const)("follows the explicit priority in %s", (message, primary, secondary) => {
+    const value = extractDeterministicFacts(message).find((fact) => fact.key === "parentExperienceNeeds")?.value as Record<string, { importance: string }> | undefined
+
+    expect(value?.[primary]?.importance).toBe("primary")
+    expect(value?.[secondary]?.importance).toBe("nice_to_have")
+  })
+
+  it.each([
+    [
+      "영어도 늘면 좋겠지만, 이번에는 외국 친구들과 자연스럽게 어울려보는 경험이 가장 중요해요.",
+      "또래와 어울리는 것을 가장 중요",
+    ],
+    [
+      "외국 친구들과 어울리는 것도 좋지만, 이번에는 영어 실력을 늘리는 것이 가장 중요해요.",
+      "영어를 실제로 사용하며 자연스럽게 늘리는 경험을 가장 중요",
+    ],
+  ] as const)("acknowledges the final primary goal for %s", async (userMessage, acknowledgement) => {
+    const start = startConversation(basicInfo)
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage,
+      quickReplyKey: null,
+      provider: noProvider,
+    })
+
+    expect(response.assistantMessage).toContain(acknowledgement)
+  })
+
+  it("lets an explicit correction update an existing primary goal", async () => {
+    const start = startConversation(basicInfo)
+    const first = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: "영어도 늘면 좋겠지만, 이번에는 외국 친구들과 자연스럽게 어울려보는 경험이 가장 중요해요.",
+      quickReplyKey: null,
+      provider: noProvider,
+    })
+    const corrected = await processConversationMessage({
+      transcript: [],
+      currentState: first.updatedState,
+      basicInfo,
+      userMessage: "아니라, 이번에는 영어 실력을 늘리는 것이 가장 중요해요.",
+      quickReplyKey: null,
+      provider: noProvider,
+    })
+
+    expect(corrected.updatedState.facts.parentExperienceNeeds?.value).toMatchObject({
+      english_growth: { importance: "primary" },
+    })
+    expect(corrected.updatedState.facts.parentExperienceNeeds?.source).toBe("user_correction")
+    expect(corrected.assistantMessage).toContain("영어를 실제로 사용하며 자연스럽게 늘리는 경험을 이번 경험에서 가장 중요")
+  })
+
   it("recognizes school learning as primary in a natural school-life sentence", () => {
     const facts = extractDeterministicFacts("해외 학교생활과 수업 방식을 경험하는 게 가장 중요해요. 아이는 만들기와 과학실험을 아주 좋아하고, 영어 설명은 이해하고 질문에 영어로 대답할 수 있어요. 오세아니아가 좋아요.")
     const value = facts.find((fact) => fact.key === "parentExperienceNeeds")?.value as Record<string, { importance: string }> | undefined
@@ -272,7 +339,12 @@ describe("parent experience needs", () => {
       quickReplyKey: null,
       provider,
     })
-    expect(response.updatedState.facts.parentExperienceNeeds).toBeUndefined()
+    expect(response.updatedState.facts.parentExperienceNeeds?.value).toMatchObject({
+      english_growth: { importance: "important" },
+    })
+    expect(response.updatedState.facts.parentExperienceNeeds?.value).not.toMatchObject({
+      school_learning_experience: { importance: "primary" },
+    })
     expect(response.assistantMessage).not.toContain("국제학교")
   })
 })

@@ -160,4 +160,39 @@ describe("CampFit v3 English readiness", () => {
       expect(englishEvidenceGap(state)).toBe(testCase.expected.gap)
     }
   })
+
+  it("preserves positive listening and low-level response evidence in one constrained answer", () => {
+    const text = "간단한 수업 지시는 알아듣지만 길게 설명하면 어려워요. 질문을 받으면 단어나 짧은 문장으로 대답하는 정도예요."
+    const facts = extractDeterministicFacts(text, undefined, "child_english_level")
+    const state = syncEnglishReadiness(mergeFacts(createInitialConversationState(), facts))
+    const listening = state.facts.childEnglishListening
+    const speaking = state.facts.childEnglishSpeaking
+
+    expect(listening?.value).toBe("struggles_with_class_explanation")
+    expect(listening?.evidence).toContain(text)
+    expect(listening?.evidence).toContain("간단한 수업 지시는 알아듣지만")
+    expect(listening?.evidence).toContain("길게 설명하면 어려워요")
+    expect(speaking?.value).toBe("answers_simple_questions")
+    expect(speaking?.evidence).toContain(text)
+    expect(assessEnglishReadiness(state)).toMatchObject({
+      readiness: "beginner_friendly",
+      sufficientForRecommendation: true,
+      recommendationSufficiency: true,
+    })
+    expect(englishEvidenceGap(state)).toBeNull()
+  })
+
+  it("does not treat a parent-only English statement as the child's readiness evidence", () => {
+    const facts = extractDeterministicFacts("저는 영어로 소통할 수 있지만 아이의 영어 수준은 아직 잘 몰라요.")
+
+    expect(facts.some((fact) => fact.key === "childEnglishListening" || fact.key === "childEnglishSpeaking")).toBe(false)
+  })
+
+  it("does not turn negative response or comprehension into positive English facts", () => {
+    const responseFacts = extractDeterministicFacts("질문을 받으면 긴장해서 대답을 못해요.", undefined, "child_english_level")
+    const listeningFacts = extractDeterministicFacts("선생님 설명을 이해하지 못해요.", undefined, "child_english_level")
+
+    expect(responseFacts.find((fact) => fact.key === "childEnglishSpeaking")?.value).toBe("difficulty_initiating")
+    expect(listeningFacts.find((fact) => fact.key === "childEnglishListening")?.value).toBe("struggles_with_class_explanation")
+  })
 })

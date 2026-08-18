@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest"
 import {
   assessEnglishRequirementMatch,
+  englishRequirementLevels,
   englishMatchLabels,
+  isEnglishRequirementLevel,
   type V3ProgramEnglishRequirement,
 } from "@/lib/campfit/v3/englishRequirement"
+import { campfitV3EnglishReadinessValues } from "@/types/campfitV3"
 
 const inferred = (level: V3ProgramEnglishRequirement["level"]): V3ProgramEnglishRequirement => ({
   level,
@@ -19,6 +22,26 @@ const inferred = (level: V3ProgramEnglishRequirement["level"]): V3ProgramEnglish
 })
 
 describe("CampFit English requirement matching", () => {
+  it("keeps child readiness and program requirement taxonomies separate", () => {
+    expect(campfitV3EnglishReadinessValues).toEqual([
+      "support_required",
+      "beginner_friendly",
+      "general_program_ready",
+      "academic_ready",
+      "unknown",
+    ])
+    expect(englishRequirementLevels).toEqual([
+      "no_requirement",
+      "beginner_friendly",
+      "general_english",
+      "academic_english",
+      "unknown",
+    ])
+    expect(isEnglishRequirementLevel("beginner_friendly")).toBe(true)
+    expect(isEnglishRequirementLevel("academic_ready")).toBe(false)
+    expect(isEnglishRequirementLevel("general_program_ready")).toBe(false)
+  })
+
   it("keeps English burden as an explanation instead of a hard filter", () => {
     const result = assessEnglishRequirementMatch("beginner_friendly", inferred("academic_english"))
     expect(result.status).toBe("english_burden_possible")

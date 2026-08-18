@@ -46,6 +46,7 @@ export function assessEnglishReadiness(state: CampfitV3ConversationState): Engli
   const environment = stringArrayValue(facts.childEnglishEnvironment?.value)
   const assessments = objectArrayValue(facts.childEnglishAssessment?.value)
   const listening = stringValue(facts.childEnglishListening?.value)
+  const listeningEvidence = facts.childEnglishListening?.evidence ?? null
   const speaking = stringValue(facts.childEnglishSpeaking?.value)
   const reading = stringValue(facts.childEnglishReading?.value)
   const writing = stringValue(facts.childEnglishWriting?.value)
@@ -85,12 +86,17 @@ export function assessEnglishReadiness(state: CampfitV3ConversationState): Engli
     }
   }
 
-  const listeningScore = scoreListening(listening)
+  const listeningScore = scoreListening(listening, listeningEvidence)
   const speakingScore = scoreSpeaking(speaking)
   const readingScore = scoreReading(reading)
   const writingScore = scoreWriting(writing)
   const usageScore = scoreUsage(usage)
-  const receptiveEvidence = listeningScore > 0 || readingScore > 0
+  // Proficiency score and evidence presence are separate. A child who
+  // struggles with long explanations still has known listening evidence;
+  // that evidence should count toward sufficiency without raising the
+  // proficiency level.
+  const receptiveEvidence = listening !== null && listening !== "unknown"
+    || reading !== null && reading !== "unknown"
   const expressiveEvidence = speaking !== null && speaking !== "unknown"
     || writing !== null && writing !== "unknown"
     || usage.length > 0
@@ -167,9 +173,15 @@ function readinessReason(
   return `현재 확인된 영어 evidence ${evidenceKeys.length}개만으로는 준비도를 확정하지 않습니다.`
 }
 
-function scoreListening(value: string | null): number {
+function scoreListening(value: string | null, evidence: string | null): number {
   if (value === "understands_class_explanation") return 3
   if (value === "understands_simple_instructions") return 1
+  // Keep the limitation as the semantic value, but retain a computable
+  // partial signal when the same evidence also says short instructions are
+  // understood. This avoids turning mixed evidence into either all-positive
+  // or all-unknown listening.
+  if (value === "struggles_with_class_explanation"
+    && /(?:간단한|짧은)\s*(?:수업\s*)?(?:지시|안내|설명).{0,16}(?:알아듣|이해|따라)/iu.test(evidence ?? "")) return 1
   return 0
 }
 

@@ -133,7 +133,7 @@ export async function processConversationMessage(input: {
       // field; it does not override a validated provider value for the same
       // fact unless the two explicit priorities conflict.
       const acceptedKeys = new Set(acceptedModelFacts.map((fact) => fact.key))
-      const modelMentionedParentNeeds = model.facts.some((fact) => fact.key === "parentExperienceNeeds")
+      const modelMentionedParentNeeds = acceptedModelFacts.some((fact) => fact.key === "parentExperienceNeeds")
       deterministicFacts = privacySafeFacts.filter((fact) => (isGroundedSupplementFactKey(fact.key)
         || fact.key === "parentExperienceNeeds" && (preferDeterministicParentNeeds || !modelMentionedParentNeeds))
         && !acceptedKeys.has(fact.key))
@@ -535,6 +535,14 @@ function englishAcknowledgement(
       [listening, speaking],
     )
   }
+  if (listening !== undefined && speaking !== undefined
+    && isValue(listening, "struggles_with_class_explanation")
+    && isValue(speaking, "answers_simple_questions")) {
+    return compact(
+      "간단한 수업 지시는 이해하지만 긴 설명은 어려워하고, 질문에는 단어나 짧은 문장으로 답할 수 있는 편이군요.",
+      [listening, speaking],
+    )
+  }
   if (listening !== undefined && speaking !== undefined && isPositiveListening(listening) && isValue(speaking, "answers_simple_questions")) {
     return compact(
       "영어로 진행되는 수업을 이해하고 질문에도 답할 수 있는 편이군요.",
@@ -733,27 +741,24 @@ function isEnglishModelFactSupportedByUserText(
   userMessage: string,
 ): boolean {
   const text = userMessage
+  const normalizedMessage = normalizeForEnglishEvidence(userMessage)
+  const normalizedEvidence = normalizeForEnglishEvidence(fact.evidence)
+  if (normalizedEvidence.length === 0 || !normalizedMessage.includes(normalizedEvidence)) return false
   if (fact.key === "childEnglishListening") {
-    if (fact.value === "struggles_with_class_explanation") return /(?:선생님|교사|수업).{0,24}(?:설명|말).{0,10}(?:잘\s*)?(?:못\s*알아(?:듣|들)|이해\s*못)|(?:선생님|교사).{0,24}설명(?:은|이|을)?\s*(?:어려|힘들)/iu.test(text)
-    if (fact.value === "understands_class_explanation") return /(?:선생님|교사|수업).{0,24}(?:설명|말).{0,20}(?:잘\s*)?(?:알아듣|이해|따라)/iu.test(text)
-    if (fact.value === "understands_simple_instructions") return /(?:알아듣|이해|따라|듣고\s*말|간단한\s*(?:지시|안내|설명))/iu.test(text)
-    return false
+    const negativeListening = /(?:이해|알아듣|따라|듣).{0,6}(?:못|안|않|어려|힘들)/iu.test(fact.evidence)
+    if (negativeListening && fact.value !== "struggles_with_class_explanation") return false
+    return /알아듣|이해|설명|지시|안내|수업|듣/iu.test(fact.evidence)
   }
   if (fact.key === "childEnglishSpeaking") {
-    if (fact.value === "answers_simple_questions" && /질문(?:에|에도|에는)?\s*(?:영어로\s*)?(?:답|대답)/iu.test(text)) return true
-    if (fact.value === "difficulty_initiating") return /(?:먼저\s*말|말하기|영어로\s*말|대답).{0,20}(?:어려|힘들|잘\s*못|못|자신\s*없)/iu.test(text)
-    if (fact.value === "rarely_speaks") return /(?:영어로\s*)?(?:말을?|말하기).{0,20}(?:거의\s*(?:안|못)|드물|기회가?\s*적)/iu.test(text)
-    if (fact.value === "initiates_speech") return /(?:먼저\s*말|자발적으로\s*(?:영어로\s*)?말|스스로\s*(?:영어로\s*)?말)/iu.test(text) && !/(?:어려|힘들|못|않)/iu.test(text)
-    if (fact.value === "can_converse") return /(?:영어로\s*(?:곧잘|편하게|유창하게)?\s*(?:말|대화)|영어로\s*(?:대화|소통)이?\s*(?:잘\s*)?가능|(?:외국인|원어민).{0,24}대화.{0,32}(?:문제(?:는)?\s*없|무리\s*없|가능))/iu.test(text) && !/(?:어려|힘들|잘\s*못|못)/iu.test(text)
-    if (fact.value === "can_present_in_english") return /영어로\s*(?:수업|발표).{0,24}(?:문제(?:는)?\s*없|무리\s*없|가능)/iu.test(text)
-    if (fact.value === "answers_simple_questions") return /(?:간단한\s*(?:질문|대화)|질문에\s*(?:답|대답)|간단히\s*대답|대답(?:은|을)?\s*(?:할\s*수|가능|할\s*수\s*있))/iu.test(text) && !/(?:어려|힘들|잘\s*못|못)/iu.test(text)
-    return false
+    const negativeSpeaking = /(?:대답|답|응답).{0,12}(?:긴장|못|안|않|어려|힘들)/iu.test(fact.evidence)
+    if (negativeSpeaking && !["difficulty_initiating", "rarely_speaks"].includes(fact.value as string)) return false
+    return /질문|대답|답|응답|말|문장|표현/iu.test(fact.evidence)
   }
-  if (fact.key === "childEnglishReading") return /읽|책|파닉스|독해/iu.test(text)
-  if (fact.key === "childEnglishWriting") return /쓰|작문|문장/iu.test(text)
-  if (fact.key === "childEnglishUsage") return /쓰|사용|외국|원어민|친구|대화/iu.test(text)
-  if (fact.key === "childEnglishEnvironment") return /국제학교|해외\s*(?:학교|캠프|거주)|외국\s*학교/iu.test(text)
-  if (fact.key === "childEnglishAssessment") return /AR|Lexile|시험|학교\s*영어|레벨|수준/iu.test(text)
+  if (fact.key === "childEnglishReading") return /읽|책|파닉스|독해/iu.test(fact.evidence)
+  if (fact.key === "childEnglishWriting") return /쓰|작문|문장/iu.test(fact.evidence)
+  if (fact.key === "childEnglishUsage") return /쓰|사용|외국|원어민|친구|대화|질문|답|말/iu.test(fact.evidence)
+  if (fact.key === "childEnglishEnvironment") return /국제학교|해외\s*(?:학교|캠프|거주)|외국\s*학교/iu.test(fact.evidence)
+  if (fact.key === "childEnglishAssessment") return /AR|Lexile|시험|학교\s*영어|레벨|수준/iu.test(fact.evidence)
   if (fact.key === "childEnglishExperience") {
     const values = Array.isArray(fact.value) ? fact.value : [fact.value]
     return values.every((value) => {
@@ -780,6 +785,14 @@ function isEnglishModelFactSupportedByUserText(
     })
   }
   return true
+}
+
+function normalizeForEnglishEvidence(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[.,!?;:()[\]{}"'`~\n\r\t]/gu, "")
+    .replace(/\s+/gu, "")
 }
 
 function fallbackAcknowledgement(facts: readonly CampfitV3Fact[], userMessage: string): string {
