@@ -18,6 +18,104 @@ const basicInfo: CampfitV3BasicInfo = {
 }
 
 describe("CampFit v3 recommendation engine", () => {
+  it("keeps constrained December candidates stable without unrelated hard filters", () => {
+    const inferredAcademicRequirement: NonNullable<V3CatalogProgram["englishRequirement"]> = {
+      level: "academic_english",
+      source: "inferred",
+      confidence: 0.8,
+      version: "fixture-v1",
+      officialVerified: false,
+      officialText: null,
+      officialQualification: null,
+      instructionLanguageMode: null,
+      beginnerParticipation: null,
+      officialMinimumReadiness: null,
+    }
+    const matchingPrograms = [
+      program({
+        id: "december-cebu-four-week",
+        city: "Cebu",
+        country: "Philippines",
+        direction: "englishIntensive",
+        durationWeeks: [4],
+        price: 3_000_000,
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 4, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-12-01", "2026-12-28", 4)],
+        englishRequirement: inferredAcademicRequirement,
+      }),
+      program({
+        id: "december-auckland-four-week",
+        city: "Auckland",
+        country: "New Zealand",
+        direction: "englishIntensive",
+        durationWeeks: [4],
+        price: 3_000_000,
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 4, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-12-01", "2026-12-28", 4)],
+      }),
+    ] as const
+    const excludedPrograms = [
+      program({
+        id: "august-cebu-four-week",
+        city: "Singapore",
+        country: "Singapore",
+        direction: "englishIntensive",
+        durationWeeks: [4],
+        price: 3_000_000,
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 4, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-08-01", "2026-08-28", 4)],
+      }),
+      program({
+        id: "december-cebu-three-week",
+        city: "Osaka",
+        country: "Japan",
+        direction: "englishIntensive",
+        durationWeeks: [3],
+        price: 3_000_000,
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 3, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-12-01", "2026-12-21", 3)],
+      }),
+    ] as const
+    const state = stateFor("englishIntensive", {
+      childEnglishLevel: "advanced",
+      activityPreferences: {
+        preferences: [{ category: "culture_lifestyle", strength: "positive", rank: 1, mentionedActivities: ["문화"], evidence: ["문화를 좋아해요"] }],
+        varietyPreference: "unspecified",
+        evidence: ["문화를 좋아해요"],
+      },
+    })
+    const catalog = productionCatalog([...matchingPrograms, ...excludedPrograms])
+    const base = { ...basicInfo, childAges: [8], departureWindow: "2026년 12월", durationWeeks: 4, budgetMinKrw: 8_000_000, budgetMaxKrw: 12_000_000 }
+    const narrowerBudget = buildRecommendation({ basicInfo: base, state, catalog, now })
+    const widerBudget = buildRecommendation({ basicInfo: { ...base, budgetMinKrw: 12_000_000, budgetMaxKrw: 20_000_000 }, state, catalog, now })
+    const narrowerIds = narrowerBudget.programCandidates.map((item) => item.programId)
+
+    expect(narrowerBudget.programCandidates).toHaveLength(2)
+    expect(narrowerBudget.limitedResult).toBe(true)
+    expect(narrowerIds).toContain("december-cebu-four-week")
+    expect(narrowerIds).toContain("december-auckland-four-week")
+    expect(narrowerIds).not.toContain("august-cebu-four-week")
+    expect(narrowerIds).not.toContain("december-cebu-three-week")
+    expect(narrowerIds).toEqual(widerBudget.programCandidates.map((item) => item.programId))
+
+    const threeEligible = buildRecommendation({
+      basicInfo: base,
+      state,
+      catalog: productionCatalog([...matchingPrograms, program({
+        id: "december-singapore-four-week",
+        city: "Singapore",
+        country: "Singapore",
+        direction: "englishIntensive",
+        durationWeeks: [4],
+        price: 3_000_000,
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 4, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-12-01", "2026-12-28", 4)],
+      })]),
+      now,
+    })
+    expect(threeEligible.programCandidates).toHaveLength(3)
+  })
+
   it("keeps three city recommendations when the independent program list is empty", () => {
     const catalog = productionCatalog([])
     const cities = [
@@ -789,6 +887,7 @@ function program(input: {
   readonly traits?: readonly string[]
   readonly directionSignals?: V3CatalogProgram["directionSignals"]
   readonly experienceAssessment?: V3CatalogProgram["experienceAssessment"]
+  readonly englishRequirement?: V3CatalogProgram["englishRequirement"]
   readonly hasSessionRows?: boolean
   readonly hasScheduledSessionRows?: boolean
   readonly catalogSource?: V3CatalogProgram["catalogSource"]
@@ -813,6 +912,7 @@ function program(input: {
       cultureActivity: signal("cultureActivity"),
     },
     ...(input.experienceAssessment === undefined ? {} : { experienceAssessment: input.experienceAssessment }),
+    ...(input.englishRequirement === undefined ? {} : { englishRequirement: input.englishRequirement }),
     ageMin: input.ageMin === undefined ? 5 : input.ageMin,
     ageMax: input.ageMax === undefined ? 12 : input.ageMax,
     ageSource: input.ageSource ?? "program",
