@@ -451,7 +451,7 @@ function ProgramInlineCard({
         {program.imageUrl ? (
           <img className="h-14 w-16 shrink-0 rounded-xl object-cover" src={program.imageUrl} alt="" />
         ) : (
-          <img className="h-14 w-16 shrink-0 rounded-xl object-cover opacity-80 bg-[var(--accent-soft)]" src="/campfit/campfit-guide-illustration.png" alt="" />
+          <div className="grid h-14 w-16 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-lg font-black text-[var(--accent-primary)]" aria-hidden>{program.cityName.slice(0, 1)}</div>
         )}
       </div>
       <div className="mt-3">
