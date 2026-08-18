@@ -27,10 +27,12 @@ import type {
   CampfitV3ProgramCandidate,
   CampfitV3RecommendationResult,
 } from "@/types/campfitV3"
+import { trackCampfitV3AnalyticsEvent } from "@/components/campfit/v3/analyticsClient"
 import type { CampfitV3CityComparison } from "@/components/campfit/v3/resultPresentation"
 
 type CampFitV3ResultProps = {
   readonly result: CampfitV3RecommendationResult
+  readonly resultId?: string | null
   readonly basicInfo: CampfitV3BasicInfo
   readonly conversationState: CampfitV3ConversationState
   readonly onBack: () => void
@@ -127,6 +129,7 @@ function importantCriteria(
 
 export function CampFitV3Result({
   result,
+  resultId,
   basicInfo,
   conversationState,
   onBack,
@@ -141,11 +144,56 @@ export function CampFitV3Result({
   const cityComparisons = useMemo(() => buildCityComparisons(result), [result])
   const catalogPresentation = programCatalogPresentation(result.catalogSource)
 
+  function handleResultClick(event: React.MouseEvent<HTMLDivElement>): void {
+    const anchor = (event.target as HTMLElement).closest("a")
+    if (!anchor) return
+
+    const programCard = anchor.closest<HTMLElement>("[data-campfit-program-card]")
+    if (programCard?.dataset["programId"]) {
+      const program = result.programCandidates.find((candidate) => candidate.programId === programCard.dataset["programId"])
+      const rank = result.programCandidates.findIndex((candidate) => candidate.programId === programCard.dataset["programId"])
+      trackCampfitV3AnalyticsEvent({
+        eventName: "campfit_program_clicked",
+        stage: "result",
+        resultId: resultId ?? null,
+        itemType: "program",
+        itemId: programCard.dataset["programId"],
+        itemNameSnapshot: program?.name ?? null,
+        cityNameSnapshot: program?.cityName ?? null,
+        countryNameSnapshot: program?.countryName ?? null,
+        itemRank: rank >= 0 ? rank + 1 : null,
+        linkTarget: "program_detail",
+        catalogSource: result.catalogSource,
+      })
+      return
+    }
+
+    const cityCard = anchor.closest<HTMLElement>("[data-campfit-city-card]")
+    if (cityCard?.dataset["cityName"]) {
+      const city = result.destinationRecommendations.find((candidate) => candidate.cityName === cityCard.dataset["cityName"])
+      const rank = result.destinationRecommendations.findIndex((candidate) => candidate.cityName === cityCard.dataset["cityName"])
+      trackCampfitV3AnalyticsEvent({
+        eventName: "campfit_city_clicked",
+        stage: "result",
+        resultId: resultId ?? null,
+        itemType: "city",
+        itemId: city?.cityId ?? cityCard.dataset["cityName"],
+        itemNameSnapshot: cityCard.dataset["cityName"],
+        cityId: city?.cityId ?? null,
+        cityNameSnapshot: cityCard.dataset["cityName"],
+        countryNameSnapshot: city?.countryName ?? null,
+        itemRank: rank >= 0 ? rank + 1 : null,
+        linkTarget: "anogro_city",
+        catalogSource: result.catalogSource,
+      })
+    }
+  }
+
   return (
     <CampFitV3Frame className="!h-auto !min-h-dvh !overflow-visible pb-10 sm:pb-16" contentClassName="!h-auto !min-h-full !overflow-visible">
       <V3Header />
       <div className="flex-1">
-        <div ref={reportRef} data-campfit-result-report data-campfit-export-root="true" className="mx-auto max-w-[1120px] px-0 py-7 sm:py-10">
+          <div ref={reportRef} onClickCapture={handleResultClick} data-campfit-result-report data-campfit-export-root="true" className="mx-auto max-w-[1120px] px-0 py-7 sm:py-10">
           <section data-campfit-report-section="title" className="rounded-[24px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 sm:p-7">
             <div className="flex flex-wrap items-center gap-2 text-xs font-black tracking-[.12em] text-[var(--accent-primary)]">
               <img className="h-6 w-auto object-contain" src="/images/Small Logo.png" alt="" />
@@ -192,8 +240,8 @@ export function CampFitV3Result({
             ) : null}
             {cityComparisons.length ? (
               <div className="grid gap-5 lg:grid-cols-3">
-                {cityComparisons.map((comparison, index) => (
-                  <CityCard comparison={comparison} index={index} basicInfo={basicInfo} conversationState={conversationState} result={result} key={comparison.city.cityId} />
+                  {cityComparisons.map((comparison, index) => (
+                  <CityCard comparison={comparison} index={index} basicInfo={basicInfo} conversationState={conversationState} result={result} resultId={resultId ?? null} key={comparison.city.cityId} />
                 ))}
               </div>
             ) : (
@@ -205,7 +253,7 @@ export function CampFitV3Result({
             <div data-campfit-program-section="top3">
               {catalogPresentation.showProgramCards && result.programCandidates.length ? (
                 <div className="grid gap-5 lg:grid-cols-3">
-                  {result.programCandidates.slice(0, 3).map((program, index) => <ProgramInlineCard program={program} index={index} key={program.programId} />)}
+                  {result.programCandidates.slice(0, 3).map((program, index) => <ProgramInlineCard program={program} index={index} result={result} resultId={resultId ?? null} key={program.programId} />)}
                 </div>
               ) : <Empty text="현재 조건에 맞는 프로그램 후보를 확인하지 못했습니다." />}
             </div>
@@ -228,6 +276,7 @@ export function CampFitV3Result({
             {...(onRequestEmail ? { onRequestEmail } : {})}
             onBack={onBack}
             onRestart={onRestart}
+            resultId={resultId ?? null}
           />
         </div>
       </div>
@@ -317,12 +366,14 @@ function CityCard({
   basicInfo,
   conversationState,
   result,
+  resultId,
 }: {
   readonly comparison: CampfitV3CityComparison
   readonly index: number
   readonly basicInfo: CampfitV3BasicInfo
   readonly conversationState: CampfitV3ConversationState
   readonly result: CampfitV3RecommendationResult
+  readonly resultId: string | null
 }) {
   const { city } = comparison
   const href = buildAnogroCityHref(city.cityName, undefined, city.citySlug)
@@ -355,7 +406,7 @@ function CityCard({
           ))}
         </ul>
         <CityLivingCostSummary city={city} />
-        {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" aria-label={`${city.cityName} 도시 자세히 보기 (새 창 열림)`}>도시 자세히 보기<span className="ml-1.5" aria-hidden>↗</span></a> : null}
+        {href ? <a href={href} target="_blank" rel="noopener noreferrer" onClick={() => trackCampfitV3AnalyticsEvent({ eventName: "campfit_city_clicked", stage: "result", resultId, itemType: "city", itemId: city.cityId, itemNameSnapshot: city.cityName, cityId: city.cityId, cityNameSnapshot: city.cityName, countryNameSnapshot: city.countryName, itemRank: index + 1, linkTarget: "anogro_city", catalogSource: result.catalogSource })} className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" aria-label={`${city.cityName} 도시 자세히 보기 (새 창 열림)`}>도시 자세히 보기<span className="ml-1.5" aria-hidden>↗</span></a> : null}
       </div>
     </article>
   )
@@ -375,7 +426,17 @@ function CityLivingCostSummary({ city }: { readonly city: CampfitV3DestinationRe
   )
 }
 
-function ProgramInlineCard({ program, index }: { readonly program: CampfitV3ProgramCandidate; readonly index: number }) {
+function ProgramInlineCard({
+  program,
+  index,
+  result,
+  resultId,
+}: {
+  readonly program: CampfitV3ProgramCandidate
+  readonly index: number
+  readonly result: CampfitV3RecommendationResult
+  readonly resultId: string | null
+}) {
   const href = safeProgramDetailHref(program.detailUrl)
   const strengths = programStrengths(program)
   const cautions = programCautions(program)

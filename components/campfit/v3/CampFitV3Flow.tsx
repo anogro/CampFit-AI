@@ -16,6 +16,12 @@ import {
 } from "@/components/campfit/v3/sessionMode"
 import { AiAvatar } from "@/components/campfit/v3/AiAvatar"
 import {
+  clearCampfitV3AnalyticsJourney,
+  createCampfitV3AnalyticsId,
+  startCampfitV3AnalyticsJourney,
+  trackCampfitV3AnalyticsEvent,
+} from "@/components/campfit/v3/analyticsClient"
+import {
   emptyCampfitV3IntakeDraft,
   intakeDraftFromBasicInfo,
   parseStoredIntakeDraft,
@@ -43,6 +49,7 @@ type StoredSession = {
   readonly conversation: CampfitV3ConversationResponse | null
   readonly transcript: readonly CampfitV3TranscriptMessage[]
   readonly result: CampfitV3RecommendationResult | null
+  readonly resultId?: string | null
   readonly demoMode?: boolean
 }
 
@@ -56,10 +63,13 @@ export function CampFitV3Flow() {
   const [conversation, setConversation] = useState<CampfitV3ConversationResponse | null>(null)
   const [transcript, setTranscript] = useState<readonly CampfitV3TranscriptMessage[]>([])
   const [result, setResult] = useState<CampfitV3RecommendationResult | null>(null)
+  const [resultId, setResultId] = useState<string | null>(null)
   const [demoMode, setDemoMode] = useState(false)
   const [hydrated, setHydrated] = useState(false)
   const [error, setError] = useState("")
   const skipNextSessionWriteRef = useRef(false)
+  const openedEventSentRef = useRef(false)
+  const resultViewedKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     try {
@@ -98,6 +108,7 @@ export function CampFitV3Flow() {
           } else if (parsedResult.success) {
             setResult(parsedResult.data)
           }
+          if (typeof saved.resultId === "string") setResultId(saved.resultId)
           if ((saved.basicInfo && !parsedBasic.success) || (saved.conversation && !parsedConversation.success) || (saved.result && !parsedResult.success)) {
             throw new Error("invalid stored session")
           }
@@ -118,9 +129,46 @@ export function CampFitV3Flow() {
       sessionStorage.removeItem(storageKey)
       return
     }
-    const value: StoredSession = { stage, intakeDraft, basicInfo, conversation, transcript, result, demoMode }
+    const value: StoredSession = { stage, intakeDraft, basicInfo, conversation, transcript, result, resultId, demoMode }
     sessionStorage.setItem(storageKey, JSON.stringify(value))
-  }, [basicInfo, conversation, demoMode, hydrated, intakeDraft, result, stage, transcript])
+  }, [basicInfo, conversation, demoMode, hydrated, intakeDraft, result, resultId, stage, transcript])
+
+  useEffect(() => {
+    if (!hydrated || openedEventSentRef.current) return
+    openedEventSentRef.current = true
+    trackCampfitV3AnalyticsEvent({ eventName: "campfit_opened", stage, mode: demoMode ? "demo" : "production" })
+  }, [demoMode, hydrated, stage])
+
+  useEffect(() => {
+    if (!hydrated || stage === "start") return
+    const sendHeartbeat = () => trackCampfitV3AnalyticsEvent({
+      eventName: "campfit_heartbeat",
+      stage,
+      progress: conversation?.progress ?? null,
+      mode: demoMode ? "demo" : "production",
+    })
+    sendHeartbeat()
+    window.addEventListener("pagehide", sendHeartbeat)
+    return () => window.removeEventListener("pagehide", sendHeartbeat)
+  }, [conversation?.progress, demoMode, hydrated, stage])
+
+  useEffect(() => {
+    if (stage !== "result" || result === null || resultId === null || resultViewedKeyRef.current === resultId) return
+    resultViewedKeyRef.current = resultId
+    trackCampfitV3AnalyticsEvent({
+      eventName: "campfit_result_viewed",
+      stage: "result",
+      resultId,
+      catalogSource: result.catalogSource,
+      mode: demoMode ? "demo" : "production",
+    })
+  }, [demoMode, result, resultId, stage])
+
+  function startIntake(): void {
+    startCampfitV3AnalyticsJourney()
+    trackCampfitV3AnalyticsEvent({ eventName: "campfit_started", stage: "start", mode: demoMode ? "demo" : "production" })
+    setStage("intake")
+  }
 
   async function beginConversation(info: CampfitV3BasicInfo): Promise<void> {
     setError("")
@@ -134,7 +182,10 @@ export function CampFitV3Flow() {
       setConversation(response)
       setTranscript([first])
       setResult(null)
+      setResultId(null)
       setStage("chat")
+      trackCampfitV3AnalyticsEvent({ eventName: "campfit_intake_submitted", stage: "intake", progress: response.progress, mode: demoMode ? "demo" : "production" })
+      trackCampfitV3AnalyticsEvent({ eventName: "campfit_conversation_started", stage: "chat", progress: response.progress, mode: demoMode ? "demo" : "production" })
     } catch (caught) {
       setError(errorMessage(caught))
     }
@@ -152,6 +203,15 @@ export function CampFitV3Flow() {
       : transcript
     const nextTranscript = appendOptimisticUserMessage(promptTranscript, safeMessage, conversation.questionKey)
     setTranscript(nextTranscript)
+    trackCampfitV3AnalyticsEvent({
+      eventName: "campfit_question_answered",
+      stage: "chat",
+      questionKey: conversation.questionKey,
+      questionIndex: conversation.updatedState.questionCount,
+      progress: conversation.progress,
+      answerKind: quickReplyKey ? "quick_reply" : "free_text",
+      mode: demoMode ? "demo" : "production",
+    })
     if (conversation.readyForRecommendation && conversation.updatedState.currentQuestionKey === null && quickReplyKey === null) {
       setTranscript([...nextTranscript, { role: "assistant", content: `“${safeMessage}”라고 말씀해주셨군요. 이 조건도 기록해둘게요.` }])
       return true
@@ -182,6 +242,12 @@ export function CampFitV3Flow() {
     if (!basicInfo || !conversation) return
     setStage("loading")
     setError("")
+    trackCampfitV3AnalyticsEvent({
+      eventName: "campfit_recommendation_requested",
+      stage: "chat",
+      progress: conversation.progress,
+      mode: demoMode ? "demo" : "production",
+    })
     try {
       const response = await postJson<CampfitV3RecommendationResult>("/api/campfit/v3/recommend", {
         transcript,
@@ -189,7 +255,34 @@ export function CampFitV3Flow() {
         basicInfo,
         demo: demoMode,
       })
+      const nextResultId = createCampfitV3AnalyticsId()
       setResult(response)
+      setResultId(nextResultId)
+      trackCampfitV3AnalyticsEvent({
+        eventName: "campfit_recommendation_completed",
+        stage: "loading",
+        resultId: nextResultId,
+        catalogSource: response.catalogSource,
+        limitedResult: response.limitedResult,
+        cityRecommendations: response.destinationRecommendations.map((city, index) => ({
+          itemType: "city" as const,
+          itemId: city.cityId,
+          itemNameSnapshot: city.cityName,
+          cityId: city.cityId,
+          cityNameSnapshot: city.cityName,
+          countryNameSnapshot: city.countryName,
+          itemRank: index + 1,
+        })),
+        programRecommendations: response.programCandidates.slice(0, 9).map((program, index) => ({
+          itemType: "program" as const,
+          itemId: program.programId,
+          itemNameSnapshot: program.name,
+          cityNameSnapshot: program.cityName,
+          countryNameSnapshot: program.countryName,
+          itemRank: index + 1,
+        })),
+        mode: demoMode ? "demo" : "production",
+      })
       setStage("result")
     } catch (caught) {
       setStage("chat")
@@ -198,6 +291,8 @@ export function CampFitV3Flow() {
   }
 
   function reset(): void {
+    trackCampfitV3AnalyticsEvent({ eventName: "campfit_restart", stage, resultId, mode: demoMode ? "demo" : "production" })
+    clearCampfitV3AnalyticsJourney()
     skipNextSessionWriteRef.current = true
     sessionStorage.removeItem(storageKey)
     setStage("start")
@@ -206,11 +301,12 @@ export function CampFitV3Flow() {
     setConversation(null)
     setTranscript([])
     setResult(null)
+    setResultId(null)
     setError("")
   }
 
   const content = useMemo(() => {
-    if (stage === "start") return <StartScreen demoMode={demoMode} onStart={() => setStage("intake")} />
+    if (stage === "start") return <StartScreen demoMode={demoMode} onStart={startIntake} />
     if (stage === "intake") return <CampFitV3Intake draft={intakeDraft} onDraftChange={setIntakeDraft} onBack={() => setStage("start")} onSubmit={beginConversation} />
     if (stage === "chat" && conversation && basicInfo) {
       return <CampFitV3Chat basicInfo={basicInfo} conversation={conversation} transcript={transcript} onAnswer={submitAnswer} onEditBasic={() => setStage("intake")} onResult={generateResult} />
@@ -220,15 +316,19 @@ export function CampFitV3Flow() {
       return (
         <CampFitV3Result
           result={result}
+          resultId={resultId}
           basicInfo={basicInfo}
           conversationState={conversation.updatedState}
-          onBack={() => setStage("chat")}
+          onBack={() => {
+            trackCampfitV3AnalyticsEvent({ eventName: "campfit_back_to_chat", stage: "result", resultId, mode: demoMode ? "demo" : "production" })
+            setStage("chat")
+          }}
           onRestart={reset}
         />
       )
     }
-    return <StartScreen demoMode={demoMode} onStart={() => setStage("intake")} />
-  }, [basicInfo, conversation, demoMode, intakeDraft, result, stage, transcript])
+    return <StartScreen demoMode={demoMode} onStart={startIntake} />
+  }, [basicInfo, conversation, demoMode, intakeDraft, result, resultId, stage, transcript])
 
   return (
     <div
