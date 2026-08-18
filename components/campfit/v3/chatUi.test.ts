@@ -1,7 +1,30 @@
 import { describe, expect, it } from "vitest"
-import { appendOptimisticUserMessage, isChatNearBottom, shouldSendChatMessage } from "@/components/campfit/v3/chatUi"
+import { appendOptimisticUserMessage, getCampfitV3ChatStatus, isChatNearBottom, shouldSendChatMessage } from "@/components/campfit/v3/chatUi"
 
 describe("CampFit v3 chat UI helpers", () => {
+  it("uses the same in-progress status for desktop and mobile", () => {
+    expect(getCampfitV3ChatStatus(false, 68)).toEqual({
+      statusLabel: "현재 상담 중",
+      title: "상담 정보 정리",
+      valueLabel: "68%",
+      description: "아이에게 맞는 선택지를 찾기 위해 몇 가지만 더 여쭤볼게요.",
+    })
+  })
+
+  it("uses readyForRecommendation for the completed status instead of progress", () => {
+    const status = getCampfitV3ChatStatus(true, 68)
+
+    expect(status).toEqual({
+      statusLabel: "결과 준비 완료",
+      title: "상담 정보 정리",
+      valueLabel: "추천 준비 완료",
+      description: "필요한 정보를 모두 확인했어요. 맞춤 결과를 확인해 보세요.",
+    })
+    expect(JSON.stringify(status)).not.toContain("현재 상담 중")
+    expect(JSON.stringify(status)).not.toContain("추천 조건 확인 중")
+    expect(status.valueLabel).not.toContain("%")
+  })
+
   it("sends a plain Enter key", () => {
     expect(shouldSendChatMessage({ key: "Enter", shiftKey: false, isComposing: false, keyCode: 13, repeat: false })).toBe(true)
   })
