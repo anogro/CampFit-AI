@@ -146,6 +146,7 @@ describe("CampFitV3Result UI component", () => {
           programId: "demo-1",
           name: "Demo example program",
           catalogSource: "demo",
+          description: "이 설명은 기준 카드에 표시되지 않아야 합니다.",
           detailUrl: "https://www.anogro.com/program/demo-should-not-open",
         },
       ],
@@ -160,9 +161,11 @@ describe("CampFitV3Result UI component", () => {
       })
     )
 
-    expect(markup).toContain("예시 프로그램")
+    expect(markup).not.toContain("예시 프로그램")
     expect(markup).toContain("href=\"https://www.anogro.com/program/production-in-mixed-result\"")
     expect(markup).toContain("href=\"https://www.anogro.com/program/demo-should-not-open\"")
+    expect(markup).not.toContain("프로그램 소개")
+    expect(markup).not.toContain("이 설명은 기준 카드에 표시되지 않아야 합니다.")
     expect(markup).not.toContain("상세 정보 준비 중")
   })
 

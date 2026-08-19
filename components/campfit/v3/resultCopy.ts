@@ -5,7 +5,6 @@ import type {
   CampfitV3ProgramCandidate,
   CampfitV3RecommendationResult,
 } from "@/types/campfitV3"
-import { englishMatchLabels } from "@/lib/campfit/v3/englishRequirement"
 
 export function cityWhyBullets(
   city: CampfitV3DestinationRecommendation,
@@ -45,26 +44,19 @@ export function cityCostDetails(city: CampfitV3DestinationRecommendation): {
 }
 
 export function programReason(program: CampfitV3ProgramCandidate): string {
-  if (program.reason.trim() && !program.reason.includes("실제 DB 후보") && !program.reason.includes("대안으로만")) return program.reason
-  if (program.group === "함께 비교할 대안") return "가족의 핵심 목표와 일부 조건이 달라, 확인할 점이 있는 대안으로 표시했어요."
+  if (program.reason.includes("대안으로만") || program.group === "함께 비교할 대안") return "원하는 방향과는 조금 다르지만, 이런 점이 괜찮다면 충분히 고려할 수 있는 선택지예요."
   return `${directionObjectPhrase(friendlyDirectionLabel(program.primaryDirection))} 중심으로 아이의 조건을 살펴볼 수 있어요.`
 }
 
 export function programStrengths(program: CampfitV3ProgramCandidate): readonly string[] {
-  const matchHighlights = program.matchHighlights ?? []
-  const strengths: string[] = [programReason(program), ...matchHighlights]
-  if (matchHighlights.length === 0 && program.ageLabel !== "연령 확인 필요") strengths.push("아이 연령에 맞는 범위를 확인했어요.")
-  if (matchHighlights.length === 0 && program.durationLabel !== "기간 확인 필요") strengths.push(`${program.durationLabel} 선택지를 확인했어요.`)
+  const strengths: string[] = [programReason(program)]
+  if (program.ageLabel !== "연령 확인 필요") strengths.push("아이 연령에 맞는 범위를 확인했어요.")
+  if (program.durationLabel !== "기간 확인 필요") strengths.push(`${program.durationLabel} 선택지를 확인했어요.`)
   return unique(strengths).slice(0, 3)
 }
 
 export function programCautions(program: CampfitV3ProgramCandidate): readonly string[] {
-  const englishCaution = program.englishMatchStatus === "manageable_with_support"
-    || program.englishMatchStatus === "english_burden_possible"
-    || program.englishMatchStatus === "official_requirement_mismatch"
-    ? englishMatchLabels[program.englishMatchStatus]
-    : null
-  const cautions = [englishCaution, program.tradeoff, ...program.verify.map((item) => shortenCheckItem(item, program))].filter((value): value is string => Boolean(value))
+  const cautions = program.verify.map(shortenCheckItem).filter(Boolean)
   return cautions.length ? unique(cautions).slice(0, 3) : ["신청 전 최신 일정과 가격만 한 번 더 확인해 주세요."]
 }
 
@@ -89,7 +81,7 @@ function stayGoalLabel(state: CampfitV3ConversationState): string | null {
   return null
 }
 
-function shortenCheckItem(value: string, program?: CampfitV3ProgramCandidate): string {
+function shortenCheckItem(value: string): string {
   if (value.includes("이동시간")) return "숙소에서 프로그램까지 이동시간"
   if (value.includes("항공")) return "항공권 시기와 가족 기준 요금"
   if (value.includes("숙소") || value.includes("주거")) return "숙소 유형과 실제 단기 요금"
@@ -98,9 +90,6 @@ function shortenCheckItem(value: string, program?: CampfitV3ProgramCandidate): s
   if (value.includes("응급") || value.includes("병원")) return "응급 상황 대응 범위"
   if (value.includes("최신") || value.includes("운영")) return "최신 운영 일정"
   if (value.includes("핵심 경험 방향")) return "원하는 경험 방향과 실제 활동의 차이"
-  if (value.includes("초급자 전용 반 미확인")) return "영어 초급자 전용 반은 제공되지 않아요."
-  if (value.includes("초급자 반") || value.includes("초급자 지원")) return "영어 초급자 지원 여부는 확인이 필요해요."
-  if (value.includes("초기 적응 지원")) return "초기 적응 지원 여부는 확인이 필요해요."
   if (value.includes("구조화 근거")) return "프로그램의 실제 활동 구성"
   if (value.includes("부모가 같은 도시")) return "부모가 머물 숙소와 프로그램 위치"
   if (value.includes("세션")) return "희망 기간에 운영되는 세션"

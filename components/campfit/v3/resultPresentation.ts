@@ -117,8 +117,8 @@ export function programCatalogPresentation(
   if (source === "demo") {
     return {
       sectionTitle: "추천 프로그램 예시",
-      sectionSubtitle: "현재 조건에서 비교해볼 수 있도록 구성한 프로그램 후보입니다.",
-      notice: null,
+      sectionSubtitle: "현재 조건에서 비교해볼 수 있도록 구성한 Demo Catalog 후보입니다.",
+      notice: "Demo Catalog의 참고용 상품 데이터입니다. 실제 운영 일정·가격·모집 여부는 제공기관 확인이 필요합니다.",
       showProgramCards: true,
       unavailableTitle: null,
       unavailableGuidance: null,

@@ -437,7 +437,6 @@ function ProgramInlineCard({
   readonly result: CampfitV3RecommendationResult
   readonly resultId: string | null
 }) {
-  const isDemoProgram = program.catalogSource === "demo"
   const href = safeProgramDetailHref(program.detailUrl)
   const strengths = programStrengths(program)
   const cautions = programCautions(program)
@@ -448,26 +447,19 @@ function ProgramInlineCard({
           <p className="text-xs font-black uppercase tracking-[.08em] text-[var(--accent-primary)]">프로그램 {index + 1} · {rankLabel(index)}</p>
           <h5 className="mt-1 text-base font-black leading-6 [word-break:keep-all]">{program.name}</h5>
           <p className="mt-1 text-xs text-[var(--text-secondary)]">{program.ageLabel} · {program.durationLabel}</p>
-          {isDemoProgram ? <p className="mt-2 inline-flex rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-black text-[var(--accent-primary)]">예시 프로그램</p> : null}
         </div>
         {program.imageUrl ? (
           <img className="h-14 w-16 shrink-0 rounded-xl object-cover" src={program.imageUrl} alt="" />
         ) : (
-          <div className="grid h-14 w-16 shrink-0 place-items-center rounded-xl bg-[var(--accent-soft)] text-lg font-black text-[var(--accent-primary)]" aria-hidden>{program.cityName.slice(0, 1)}</div>
+          <img className="h-14 w-16 shrink-0 rounded-xl object-cover opacity-80 bg-[var(--accent-soft)]" src="/campfit/campfit-guide-illustration.png" alt="" />
         )}
       </div>
       <div className="mt-3">
-        {program.description ? (
-          <div className="mb-3 rounded-2xl bg-[var(--bg-secondary)] p-3 [word-break:keep-all]">
-            <p className="text-xs font-black text-[var(--text-primary)]">프로그램 소개</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{program.description}</p>
-          </div>
-        ) : null}
         <p className="text-xs font-black text-[var(--text-primary)]">추천 이유</p>
         <p className="mt-1 text-sm leading-6 [word-break:keep-all]">{strengths[0]}</p>
         {program.englishMatchLabel ? (
           <div data-campfit-english-match={program.englishMatchStatus ?? "unknown"} className="mt-3 rounded-2xl border border-[var(--border-default)] bg-[var(--accent-soft)]/40 p-3">
-            <p className="text-xs font-black text-[var(--accent-primary)]">영어 부담도{program.englishRequirementSource === "official" ? " · 공식 확인" : program.englishRequirementSource === "inferred" ? " · 설명 기반 추론" : ""}</p>
+            <p className="text-xs font-black text-[var(--accent-primary)]">영어 부담도 · {program.englishRequirementSource === "official" ? "공식 확인" : program.englishRequirementSource === "inferred" ? "설명 기반 추론" : program.englishRequirementSource === "demo_fixture" ? "데모 테스트 데이터" : "확인되지 않음"}</p>
             <p className="mt-1 text-sm font-bold leading-6 [word-break:keep-all]">{program.englishMatchLabel}</p>
           </div>
         ) : null}

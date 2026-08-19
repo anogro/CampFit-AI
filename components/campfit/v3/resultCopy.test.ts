@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest"
 import { cityWhyBullets, programCautions, programStrengths } from "@/components/campfit/v3/resultCopy"
-import { englishMatchLabels } from "@/lib/campfit/v3/englishRequirement"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationState,
@@ -84,16 +83,7 @@ describe("CampFit v3 result copy", () => {
     ]))
   })
 
-  it("puts an English burden in the caution list instead of labeling it as demo data", () => {
-    const candidate = {
-      ...program,
-      englishMatchStatus: "english_burden_possible" as const,
-      englishMatchLabel: englishMatchLabels.english_burden_possible,
-    }
-    expect(programCautions(candidate)[0]).toBe(englishMatchLabels.english_burden_possible)
-  })
-
-  it("renders stored personalized match evidence before eligibility fallbacks", () => {
+  it("uses the established fallback instead of repeating stored parent-goal copy", () => {
     const candidate = {
       ...program,
       reason: "외국 친구들과 어울리는 경험을 가장 중요하게 보셔서 프로그램의 또래 교류·협업 활동 정보와 잘 맞는 후보예요.",
@@ -101,9 +91,10 @@ describe("CampFit v3 result copy", () => {
       tradeoff: "영어 초급자 지원 여부는 확인이 필요해요.",
     }
     expect(programStrengths(candidate)).toEqual([
-      candidate.reason,
-      "아이가 좋아하는 몸을 움직이는 활동과 프로그램의 스포츠 구성이 연결돼요.",
+      "주제·프로젝트를 중심으로 아이의 조건을 살펴볼 수 있어요.",
+      "아이 연령에 맞는 범위를 확인했어요.",
+      "4주 옵션 선택지를 확인했어요.",
     ])
-    expect(programCautions(candidate)).toContain("영어 초급자 지원 여부는 확인이 필요해요.")
+    expect(programCautions(candidate)).toEqual(["원하는 경험 방향과 실제 활동의 차이"])
   })
 })
