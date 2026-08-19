@@ -68,13 +68,9 @@ export function buildDecisionAxes(
   basicInfo: CampfitV3BasicInfo,
 ): readonly DecisionAxis[] {
   const directions = new Map(result.experienceDirections.map((direction) => [direction.key, direction]))
-  const directionKeys = orderedDirectionKeys(state)
+  const directionKeys: readonly ExperienceDirectionKey[] = ["englishIntensive", "schoolSchooling", "subjectProject", "cultureActivity"]
   return [
-    ...directionKeys.map((key): DecisionAxis => ({
-      ...directionAxis[key],
-      summaryLabel: decisionAxisSummaryLabel(key, state),
-      level: directionLevel(directions.get(key)),
-    })),
+    ...directionKeys.map((key): DecisionAxis => ({ ...directionAxis[key], level: directionLevel(directions.get(key)) })),
     { key: "support", label: "지원 필요", summaryLabel: "필요한 지원 확인", level: supportLevel(state) },
     { key: "family", label: "가족 체류 현실성", summaryLabel: "가족 체류의 현실성", level: familyLevel(state, basicInfo) },
   ]
@@ -88,13 +84,7 @@ export function decisionAxisGeometry(level: DecisionAxisLevel): number {
   return level === "high" ? 88 : level === "medium" ? 62 : 34
 }
 
-export function decisionAxesSummary(axes: readonly DecisionAxis[], state?: CampfitV3ConversationState): string {
-  const primaryDirection = state ? primaryParentDirection(state) : null
-  if (primaryDirection !== null) {
-    const primaryKey = directionAxis[primaryDirection].key
-    const primaryAxis = axes.find((axis) => axis.key === primaryKey)
-    if (primaryAxis) return `이번 상담에서는 ${primaryAxis.summaryLabel}을 가장 중요하게 반영했어요. 나머지 확인된 가족 조건도 함께 살펴봤어요.`
-  }
+export function decisionAxesSummary(axes: readonly DecisionAxis[]): string {
   const emphasized = axes.filter((axis) => axis.level === "high")
   const selected = (emphasized.length ? emphasized : axes.filter((axis) => axis.level === "medium")).slice(0, 2)
   if (!selected.length) return "이번 상담에서는 입력한 조건을 균형 있게 반영했어요."
@@ -116,9 +106,9 @@ export function programCatalogPresentation(
   }
   if (source === "demo") {
     return {
-      sectionTitle: "추천 프로그램 예시",
-      sectionSubtitle: "현재 조건에서 비교해볼 수 있도록 구성한 Demo Catalog 후보입니다.",
-      notice: "Demo Catalog의 참고용 상품 데이터입니다. 실제 운영 일정·가격·모집 여부는 제공기관 확인이 필요합니다.",
+      sectionTitle: "현재 조건에서 살펴볼 프로그램",
+      sectionSubtitle: "현재 조건에서 비교할 수 있는 프로그램 후보를 살펴보세요.",
+      notice: null,
       showProgramCards: true,
       unavailableTitle: null,
       unavailableGuidance: null,
@@ -134,15 +124,14 @@ export function programCatalogPresentation(
   }
 }
 
-export function buildAnogroCityHref(cityName: string, baseUrl = anogroBaseUrl(), citySlug?: string | null): string | null {
+export function buildAnogroCityHref(cityName: string, baseUrl = anogroBaseUrl()): string | null {
   const normalizedName = cityName.trim()
-  const normalizedSlug = citySlug?.trim() ?? ""
   const normalizedBaseUrl = baseUrl?.trim().replace(/\/+$/, "") ?? ""
   if (!normalizedName || !normalizedBaseUrl) return null
   try {
     const parsedBaseUrl = new URL(normalizedBaseUrl)
     if (parsedBaseUrl.protocol !== "https:" && parsedBaseUrl.protocol !== "http:") return null
-    return `${normalizedBaseUrl}/city/${encodeURIComponent(normalizedSlug || normalizedName)}`
+    return `${normalizedBaseUrl}/city/${encodeURIComponent(normalizedName)}`
   } catch {
     return null
   }
@@ -204,77 +193,6 @@ function familyLevel(state: CampfitV3ConversationState, basicInfo: CampfitV3Basi
 
 function factString(state: CampfitV3ConversationState, key: keyof CampfitV3ConversationState["facts"]): string {
   return String(state.facts[key]?.value ?? "")
-}
-
-function primaryParentDirection(state: CampfitV3ConversationState): ExperienceDirectionKey | null {
-  const needs = state.facts.parentExperienceNeeds?.value
-  const record = typeof needs === "object" && needs !== null && !Array.isArray(needs) ? needs as Record<string, unknown> : null
-  const primaryAxis = record === null
-    ? null
-    : [
-      "school_learning_experience",
-      "english_growth",
-      "peer_interaction",
-      "global_experience",
-      "independence_confidence",
-    ].find((axis) => isPrimaryNeed(record[axis])) ?? null
-  return primaryAxis === "english_growth"
-    ? "englishIntensive"
-    : primaryAxis === "school_learning_experience"
-      ? "schoolSchooling"
-      : primaryAxis === null
-        ? null
-        : "cultureActivity"
-}
-
-function orderedDirectionKeys(state: CampfitV3ConversationState): readonly ExperienceDirectionKey[] {
-  const defaultKeys: readonly ExperienceDirectionKey[] = ["englishIntensive", "schoolSchooling", "subjectProject", "cultureActivity"]
-  const needs = state.facts.parentExperienceNeeds?.value
-  const record = typeof needs === "object" && needs !== null && !Array.isArray(needs) ? needs as Record<string, unknown> : null
-  const primaryAxis = record === null
-    ? null
-    : [
-      "school_learning_experience",
-      "english_growth",
-      "peer_interaction",
-      "global_experience",
-      "independence_confidence",
-    ].find((axis) => isPrimaryNeed(record[axis])) ?? null
-  const primaryDirection = primaryAxis === "english_growth"
-    ? "englishIntensive"
-    : primaryAxis === "school_learning_experience"
-      ? "schoolSchooling"
-      : primaryAxis === null
-        ? null
-        : "cultureActivity"
-  if (primaryDirection !== null) return [primaryDirection, ...defaultKeys.filter((key) => key !== primaryDirection)]
-
-  const goals = state.facts.experienceGoals?.value
-  if (typeof goals === "object" && goals !== null && !Array.isArray(goals)) {
-    const goalRecord = goals as Record<string, unknown>
-    const legacyPrimary = (["schoolSchooling", "englishIntensive", "subjectProject", "cultureActivity"] as const)
-      .find((key) => goalRecord[key] === "primary")
-    if (legacyPrimary !== undefined) return [legacyPrimary, ...defaultKeys.filter((key) => key !== legacyPrimary)]
-  }
-  return defaultKeys
-}
-
-function decisionAxisSummaryLabel(key: ExperienceDirectionKey, state: CampfitV3ConversationState): string {
-  if (key !== "cultureActivity") return directionAxis[key].summaryLabel
-  const needs = state.facts.parentExperienceNeeds?.value
-  if (typeof needs !== "object" || needs === null || Array.isArray(needs)) return directionAxis[key].summaryLabel
-  const peer = (needs as Record<string, unknown>)["peer_interaction"]
-  const global = (needs as Record<string, unknown>)["global_experience"]
-  const independence = (needs as Record<string, unknown>)["independence_confidence"]
-  if (isPrimaryNeed(peer)) return "또래 교류·친구 경험"
-  if (isPrimaryNeed(global)) return "새로운 문화·환경 경험"
-  if (isPrimaryNeed(independence)) return "자립·적응 경험"
-  return directionAxis[key].summaryLabel
-}
-
-function isPrimaryNeed(value: unknown): boolean {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    && (value as Record<string, unknown>)["importance"] === "primary"
 }
 
 function aggregateTripCosts(

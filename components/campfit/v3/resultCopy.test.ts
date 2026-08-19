@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { cityWhyBullets, programCautions, programStrengths } from "@/components/campfit/v3/resultCopy"
+import { cityWhyBullets, programCautions, programRecommendationReasons, programStrengths } from "@/components/campfit/v3/resultCopy"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationState,
@@ -58,7 +58,7 @@ const program: CampfitV3ProgramCandidate = {
   durationLabel: "4주 옵션",
   priceLabel: "1,000만원",
   primaryDirection: "주제·프로젝트 경험",
-  reason: "실제 DB 후보",
+  reason: "프로그램의 STEM 프로젝트 구성이 아이의 관심사와 연결돼요.",
   verify: ["핵심 경험 방향(주제·프로젝트 경험)의 구조화 근거 미확인"],
   detailUrl: null,
   group: "우선 살펴볼 프로그램",
@@ -77,24 +77,54 @@ describe("CampFit v3 result copy", () => {
   it("keeps confirmation copy short and separates program strengths from cautions", () => {
     expect(programCautions(program)).toEqual(["원하는 경험 방향과 실제 활동의 차이"])
     expect(programStrengths(program)).toEqual(expect.arrayContaining([
-      "주제·프로젝트를 중심으로 아이의 조건을 살펴볼 수 있어요.",
+      program.reason,
       "아이 연령에 맞는 범위를 확인했어요.",
       "4주 옵션 선택지를 확인했어요.",
     ]))
   })
 
-  it("uses the established fallback instead of repeating stored parent-goal copy", () => {
+  it("uses stored candidate reasons and grounded highlights instead of a repeated direction fallback", () => {
     const candidate = {
       ...program,
-      reason: "외국 친구들과 어울리는 경험을 가장 중요하게 보셔서 프로그램의 또래 교류·협업 활동 정보와 잘 맞는 후보예요.",
-      matchHighlights: ["아이가 좋아하는 몸을 움직이는 활동과 프로그램의 스포츠 구성이 연결돼요."],
-      tradeoff: "영어 초급자 지원 여부는 확인이 필요해요.",
+      reason: "프로그램의 또래 협업 프로젝트가 아이가 원하는 교류 경험과 연결돼요.",
+      matchHighlights: ["프로젝트 안에서 또래와 함께 결과물을 만들 수 있어요."],
+      tradeoff: "영어 수업 방식과 초반 지원 범위 확인",
     }
     expect(programStrengths(candidate)).toEqual([
-      "주제·프로젝트를 중심으로 아이의 조건을 살펴볼 수 있어요.",
-      "아이 연령에 맞는 범위를 확인했어요.",
-      "4주 옵션 선택지를 확인했어요.",
+      candidate.reason,
+      ...candidate.matchHighlights,
     ])
-    expect(programCautions(candidate)).toEqual(["원하는 경험 방향과 실제 활동의 차이"])
+    expect(programCautions(candidate)).toContain(candidate.tradeoff)
+    expect(programStrengths(candidate).join(" ")).not.toContain("주제·프로젝트를 중심으로 아이의 조건을 살펴볼 수 있어요.")
+  })
+
+  it("uses the next grounded highlight when candidate reasons are duplicated", () => {
+    const first = { ...program, reason: "같은 후보 설명" }
+    const second = { ...program, programId: "stem-program-2", reason: first.reason, matchHighlights: ["두 번째 후보의 STEM 활동 근거"] }
+    expect(programRecommendationReasons([first, second])).toEqual([first.reason, second.matchHighlights[0]])
+  })
+
+  it("shows English caution only when the state requires a user-facing check", () => {
+    const comfortable = programCautions({ ...program, englishMatchStatus: "comfortable" }).join(" ")
+    const manageable = programCautions({ ...program, englishMatchStatus: "manageable_with_support" }).join(" ")
+    const supported = programCautions({
+      ...program,
+      englishMatchStatus: "manageable_with_support",
+      verify: ["영어 수업 방식과 초반 지원 범위 확인"],
+    }).join(" ")
+    const burden = programCautions({ ...program, englishMatchStatus: "english_burden_possible" }).join(" ")
+    const unknown = programCautions({ ...program, englishMatchStatus: "unknown" }).join(" ")
+    const mismatch = programCautions({
+      ...program,
+      englishMatchStatus: "official_requirement_mismatch",
+      verify: ["공식 영어 자격조건과 아이의 현재 준비도 확인"],
+    }).join(" ")
+
+    expect(comfortable).not.toContain("영어")
+    expect(manageable).not.toContain("영어 수업 방식")
+    expect(supported).toContain("영어 수업 방식과 초반 지원 범위 확인")
+    expect(burden).toContain("영어 부담이 있을 수 있어요")
+    expect(unknown).toContain("프로그램 영어 요구 수준 확인 필요")
+    expect(mismatch).not.toContain("영어")
   })
 })

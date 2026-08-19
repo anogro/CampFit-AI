@@ -16,10 +16,10 @@ import {
 import {
   cityWhyBullets,
   programCautions,
+  programRecommendationReasons,
   programStrengths,
   rankLabel,
 } from "@/components/campfit/v3/resultCopy"
-import { assessEnglishReadiness, englishReadinessLabels } from "@/lib/campfit/v3/englishReadiness"
 import type {
   CampfitV3BasicInfo,
   CampfitV3ConversationState,
@@ -43,8 +43,6 @@ type CampFitV3ResultProps = {
 function getAxisDetail(axisKey: string, state: CampfitV3ConversationState): string {
   switch (axisKey) {
     case "english": {
-      const readinessAssessment = assessEnglishReadiness(state)
-      if (readinessAssessment.evidenceKeys.length > 0 && readinessAssessment.readiness !== "unknown") return englishReadinessLabels[readinessAssessment.readiness]
       const level = state.facts.childEnglishLevel?.value
       if (level === "beginner") return "영어 초급자 수준"
       if (level === "basic") return "단어·짧은 표현 수준"
@@ -95,8 +93,6 @@ function getAxisDetail(axisKey: string, state: CampfitV3ConversationState): stri
 }
 
 function englishLevelLabel(state: CampfitV3ConversationState): string {
-  const readinessAssessment = assessEnglishReadiness(state)
-  if (readinessAssessment.evidenceKeys.length > 0 && readinessAssessment.readiness !== "unknown") return englishReadinessLabels[readinessAssessment.readiness]
   const level = state.facts.childEnglishLevel?.value
   if (level === "beginner") return "영어 초급자 수준"
   if (level === "basic") return "단어·짧은 표현 수준"
@@ -193,7 +189,7 @@ export function CampFitV3Result({
     <CampFitV3Frame className="!h-auto !min-h-dvh !overflow-visible pb-10 sm:pb-16" contentClassName="!h-auto !min-h-full !overflow-visible">
       <V3Header />
       <div className="flex-1">
-          <div ref={reportRef} onClickCapture={handleResultClick} data-campfit-result-report data-campfit-export-root="true" className="mx-auto max-w-[1120px] px-0 py-7 sm:py-10">
+        <div ref={reportRef} onClickCapture={handleResultClick} data-campfit-result-report data-campfit-export-root="true" className="mx-auto max-w-[1120px] px-0 py-7 sm:py-10">
           <section data-campfit-report-section="title" className="rounded-[24px] border border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 sm:p-7">
             <div className="flex flex-wrap items-center gap-2 text-xs font-black tracking-[.12em] text-[var(--accent-primary)]">
               <img className="h-6 w-auto object-contain" src="/images/Small Logo.png" alt="" />
@@ -216,7 +212,7 @@ export function CampFitV3Result({
                       <span className="text-right font-bold text-[var(--text-primary)]">{getAxisDetail(axis.key, conversationState)}</span>
                     </div>
                   ))}
-                  <p className="mt-2 text-xs font-semibold leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{decisionAxesSummary(axes, conversationState)}</p>
+                  <p className="mt-2 text-xs font-semibold leading-6 text-[var(--text-secondary)] [word-break:keep-all]">{decisionAxesSummary(axes)}</p>
                 </div>
               </div>
               <div className="mt-6 grid gap-5 border-t border-[var(--border-default)] pt-5 lg:grid-cols-2">
@@ -240,7 +236,7 @@ export function CampFitV3Result({
             ) : null}
             {cityComparisons.length ? (
               <div className="grid gap-5 lg:grid-cols-3">
-                  {cityComparisons.map((comparison, index) => (
+                {cityComparisons.map((comparison, index) => (
                   <CityCard comparison={comparison} index={index} basicInfo={basicInfo} conversationState={conversationState} result={result} resultId={resultId ?? null} key={comparison.city.cityId} />
                 ))}
               </div>
@@ -252,9 +248,11 @@ export function CampFitV3Result({
           <ReportSection title="추천 프로그램 Top3" subtitle="도시 순위와 별개로, 가족 조건에 가장 잘 맞는 프로그램을 골랐습니다.">
             <div data-campfit-program-section="top3">
               {catalogPresentation.showProgramCards && result.programCandidates.length ? (
-                <div className="grid gap-5 lg:grid-cols-3">
-                  {result.programCandidates.slice(0, 3).map((program, index) => <ProgramInlineCard program={program} index={index} result={result} resultId={resultId ?? null} key={program.programId} />)}
-                </div>
+                (() => {
+                  const programs = result.programCandidates.slice(0, 3)
+                  const reasons = programRecommendationReasons(programs)
+                  return <div className="grid gap-5 lg:grid-cols-3">{programs.map((program, index) => <ProgramInlineCard program={program} index={index} reasonOverride={reasons[index]} key={program.programId} />)}</div>
+                })()
               ) : <Empty text="현재 조건에 맞는 프로그램 후보를 확인하지 못했습니다." />}
             </div>
           </ReportSection>
@@ -376,7 +374,7 @@ function CityCard({
   readonly resultId: string | null
 }) {
   const { city } = comparison
-  const href = buildAnogroCityHref(city.cityName, undefined, city.citySlug)
+  const href = buildAnogroCityHref(city.cityName)
   return (
     <article data-campfit-city-card data-city-name={city.cityName} className="apple-glass-soft flex flex-col overflow-hidden rounded-[22px]">
       <div className="flex items-start justify-between gap-3 p-5 pb-0 sm:p-6 sm:pb-0">
@@ -389,12 +387,9 @@ function CityCard({
       </div>
       <div className="flex flex-1 flex-col p-5 sm:p-6">
         {city.description ? (
-          <div className="mb-4 [word-break:keep-all]">
-            <p className="text-xs leading-5 text-[var(--text-secondary)]">{city.description}</p>
-          </div>
-        ) : null}
-        {city.comparisonNote ? (
-          <p className="mb-4 text-xs font-semibold leading-5 text-[var(--accent-primary)] [word-break:keep-all]">{city.comparisonNote}</p>
+          <p className="mb-4 rounded-2xl bg-[var(--bg-secondary)] p-3 text-xs leading-5 text-[var(--text-secondary)] [word-break:keep-all]">
+            “ {city.description} ”
+          </p>
         ) : null}
         <h4 className="text-sm font-black text-[var(--text-primary)]">추천 이유와 장점</h4>
         <ul className="mt-3 space-y-2.5">
@@ -426,19 +421,9 @@ function CityLivingCostSummary({ city }: { readonly city: CampfitV3DestinationRe
   )
 }
 
-function ProgramInlineCard({
-  program,
-  index,
-  result,
-  resultId,
-}: {
-  readonly program: CampfitV3ProgramCandidate
-  readonly index: number
-  readonly result: CampfitV3RecommendationResult
-  readonly resultId: string | null
-}) {
+function ProgramInlineCard({ program, index, reasonOverride }: { readonly program: CampfitV3ProgramCandidate; readonly index: number; readonly reasonOverride?: string | undefined }) {
   const href = safeProgramDetailHref(program.detailUrl)
-  const strengths = programStrengths(program)
+  const strengths = programStrengths(program, reasonOverride)
   const cautions = programCautions(program)
   return (
     <article data-campfit-program-card data-program-id={program.programId} data-city-name={program.cityName} className="rounded-2xl border border-[var(--border-default)] bg-white p-4">
@@ -455,14 +440,14 @@ function ProgramInlineCard({
         )}
       </div>
       <div className="mt-3">
-        <p className="text-xs font-black text-[var(--text-primary)]">추천 이유</p>
-        <p className="mt-1 text-sm leading-6 [word-break:keep-all]">{strengths[0]}</p>
-        {program.englishMatchLabel ? (
-          <div data-campfit-english-match={program.englishMatchStatus ?? "unknown"} className="mt-3 rounded-2xl border border-[var(--border-default)] bg-[var(--accent-soft)]/40 p-3">
-            <p className="text-xs font-black text-[var(--accent-primary)]">영어 부담도 · {program.englishRequirementSource === "official" ? "공식 확인" : program.englishRequirementSource === "inferred" ? "설명 기반 추론" : program.englishRequirementSource === "demo_fixture" ? "데모 테스트 데이터" : "확인되지 않음"}</p>
-            <p className="mt-1 text-sm font-bold leading-6 [word-break:keep-all]">{program.englishMatchLabel}</p>
+        {program.description ? (
+          <div className="mb-3 rounded-2xl bg-[var(--bg-secondary)] p-3 [word-break:keep-all]">
+            <p className="text-xs font-black text-[var(--text-primary)]">프로그램 소개</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{program.description}</p>
           </div>
         ) : null}
+        <p className="text-xs font-black text-[var(--text-primary)]">추천 이유</p>
+        <p className="mt-1 text-sm leading-6 [word-break:keep-all]">{strengths[0]}</p>
         {(() => {
           const tripCost = program.tripCost
           let estimatedTotalText = program.priceLabel

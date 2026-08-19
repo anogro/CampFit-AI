@@ -66,7 +66,7 @@ const result: CampfitV3RecommendationResult = {
   ],
   requiredSupportConditions: ["지원조건"],
   programCandidates: [
-    { programId: "prog-1", name: "싱가포르 STEM 캠프", cityName: "싱가포르", countryName: "싱가포르", group: "우선 살펴볼 프로그램", ageLabel: "만 8세", durationLabel: "3주", priceLabel: "300만원", reason: "이유", verify: [], detailUrl: null, imageUrl: null, primaryDirection: "subjectProject", score: 95, tripCost }
+    { programId: "prog-1", name: "싱가포르 STEM 캠프", cityName: "싱가포르", countryName: "싱가포르", group: "우선 살펴볼 프로그램", ageLabel: "만 8세", durationLabel: "3주", priceLabel: "300만원", description: "과학 실험과 만들기를 통해 결과물을 완성하는 프로젝트형 캠프예요.", reason: "프로그램의 STEM 프로젝트 구성이 아이의 관심사와 연결돼요.", matchHighlights: ["아이의 STEM 선호와 프로그램의 프로젝트 구성이 연결돼요."], tradeoff: "영어 수업 방식과 초반 지원 범위 확인", verify: [], detailUrl: null, imageUrl: null, primaryDirection: "subjectProject", score: 95, tripCost }
   ],
   verificationChecklist: ["확인사항"],
   alternatives: ["대안"],
@@ -108,12 +108,21 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).toContain("도시 평균 생활비")
     expect(markup).toContain("월 약 200만 원")
     expect(markup).toContain("총 예상 금액")
+    expect(markup).toContain("프로그램 소개")
+    expect(markup).toContain("프로그램의 STEM 프로젝트 구성이 아이의 관심사와 연결돼요.")
+    expect(markup).toContain("아이의 STEM 선호와 프로그램의 프로젝트 구성이 연결돼요.")
     expect(markup).toContain("lg:grid-cols-2")
     expect(markup).not.toContain("비교용")
     expect(markup).toContain("영어 경험")
     expect(markup).toContain("가족 체류 현실성")
     expect(markup).not.toContain("판단 근거와 세부 확인사항 보기")
     expect(markup).not.toContain("낮은 우선순위 설명")
+    expect(markup).not.toContain("영어 부담도")
+    expect(markup).not.toContain("공식 확인")
+    expect(markup).not.toContain("설명 기반 추론")
+    expect(markup).not.toContain("데모 테스트 데이터")
+    expect(markup).not.toContain("예시 프로그램")
+    expect(markup).not.toContain("Demo Catalog")
   })
 
   it("keeps report city and program cards tied to real result records", () => {
@@ -132,28 +141,38 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).toContain("싱가포르 STEM 캠프")
   })
 
-  it("marks demo programs while keeping each candidate detail link", () => {
-    const demoResult: CampfitV3RecommendationResult = {
+  it("keeps candidate reasons and production/demo detail links without provenance copy", () => {
+    const mixedResult: CampfitV3RecommendationResult = {
       ...result,
       programCandidates: [
         {
           ...result.programCandidates[0]!,
           catalogSource: "supabase",
-          detailUrl: "https://www.anogro.com/program/production-in-mixed-result",
+          reason: "프로덕션 STEM 프로그램의 프로젝트 구성이 아이의 관심사와 연결돼요.",
+          detailUrl: "https://www.anogro.com/program/production-stem",
         },
         {
           ...result.programCandidates[0]!,
           programId: "demo-1",
-          name: "Demo example program",
+          name: "Demo STEM 캠프",
           catalogSource: "demo",
-          description: "이 설명은 기준 카드에 표시되지 않아야 합니다.",
-          detailUrl: "https://www.anogro.com/program/demo-should-not-open",
+          reason: "데모 후보의 만들기 활동과 아이의 STEM 선호가 연결돼요.",
+          matchHighlights: ["데모 후보의 만들기 활동을 확인할 수 있어요."],
+          detailUrl: "https://www.anogro.com/program/demo-stem",
+        },
+        {
+          ...result.programCandidates[0]!,
+          programId: "prog-3",
+          name: "Peer Collaboration Camp",
+          catalogSource: "supabase",
+          reason: "프로그램의 또래 협업 활동이 가족이 원하는 교류 경험과 연결돼요.",
+          detailUrl: "https://www.anogro.com/program/peer-collaboration",
         },
       ],
     }
     const markup = renderToStaticMarkup(
       createElement(CampFitV3Result, {
-        result: demoResult,
+        result: mixedResult,
         basicInfo,
         conversationState,
         onBack: vi.fn(),
@@ -161,35 +180,14 @@ describe("CampFitV3Result UI component", () => {
       })
     )
 
+    expect(markup).toContain("프로덕션 STEM 프로그램의 프로젝트 구성이 아이의 관심사와 연결돼요.")
+    expect(markup).toContain("데모 후보의 만들기 활동과 아이의 STEM 선호가 연결돼요.")
+    expect(markup).toContain("프로그램의 또래 협업 활동이 가족이 원하는 교류 경험과 연결돼요.")
+    expect(markup).toContain('href="https://www.anogro.com/program/production-stem"')
+    expect(markup).toContain('href="https://www.anogro.com/program/demo-stem"')
     expect(markup).not.toContain("예시 프로그램")
-    expect(markup).toContain("href=\"https://www.anogro.com/program/production-in-mixed-result\"")
-    expect(markup).toContain("href=\"https://www.anogro.com/program/demo-should-not-open\"")
-    expect(markup).not.toContain("프로그램 소개")
-    expect(markup).not.toContain("이 설명은 기준 카드에 표시되지 않아야 합니다.")
     expect(markup).not.toContain("상세 정보 준비 중")
-  })
-
-  it("keeps the existing external link for production programs", () => {
-    const productionResult: CampfitV3RecommendationResult = {
-      ...result,
-      programCandidates: [{
-        ...result.programCandidates[0]!,
-        catalogSource: "supabase",
-        detailUrl: "https://www.anogro.com/program/production-program",
-      }],
-    }
-    const markup = renderToStaticMarkup(
-      createElement(CampFitV3Result, {
-        result: productionResult,
-        basicInfo,
-        conversationState,
-        onBack: vi.fn(),
-        onRestart: vi.fn(),
-      })
-    )
-
-    expect(markup).toContain("href=\"https://www.anogro.com/program/production-program\"")
-    expect(markup).not.toContain("예시 프로그램")
+    expect(markup).not.toContain("Demo Catalog")
   })
 
   it("presents basic English as words and short phrases without overstating fluency", () => {
@@ -207,7 +205,7 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).not.toContain("기본 회화 가능")
   })
 
-  it("shows city living cost and family total estimate when trip cost components are available", () => {
+  it("shows city living cost and program price without a family total trip cost", () => {
     const markup = renderToStaticMarkup(
       createElement(CampFitV3Result, {
         result,
@@ -223,6 +221,36 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).toContain("약 600만~750만 원")
     expect(markup).not.toContain("우리 가족 예상 총여행비")
     expect(markup).not.toContain("총여행비 구성")
+  })
+
+  it("falls back to the program price when total trip cost is unavailable", () => {
+    const incompleteTripCost: CampfitV3TripCost = {
+      ...tripCost,
+      totalLow: null,
+      totalHigh: null,
+      priceStatus: "inquiry",
+      breakdown: {
+        ...tripCost.breakdown,
+        flights: testLine("inquiry", null, null),
+      },
+    }
+    const incompleteResult: CampfitV3RecommendationResult = {
+      ...result,
+      programCandidates: [{ ...result.programCandidates[0]!, tripCost: incompleteTripCost }],
+    }
+    const markup = renderToStaticMarkup(
+      createElement(CampFitV3Result, {
+        result: incompleteResult,
+        basicInfo,
+        conversationState,
+        onBack: vi.fn(),
+        onRestart: vi.fn(),
+      })
+    )
+
+    expect(markup).toContain("프로그램 가격")
+    expect(markup).toContain("300만원")
+    expect(markup).not.toContain("총 예상 금액")
   })
 
   it("renders the email CTA button with corrected copy", () => {

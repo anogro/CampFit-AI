@@ -32,54 +32,8 @@ describe("CampFit v3 result presentation", () => {
     expect(decisionAxesSummary(axes)).not.toMatch(/\d+점/)
   })
 
-  it("uses the parent's primary peer goal in the result summary", () => {
-    const peerState: CampfitV3ConversationState = {
-      ...state,
-      facts: {
-        ...state.facts,
-        parentExperienceNeeds: fact("parentExperienceNeeds", {
-          english_growth: { importance: "nice_to_have", evidence: ["영어도 늘면 좋겠어요"] },
-          peer_interaction: { importance: "primary", evidence: ["외국 친구들과 어울리는 게 가장 중요해요"] },
-          global_experience: { importance: "unspecified", evidence: [] },
-          independence_confidence: { importance: "unspecified", evidence: [] },
-          school_learning_experience: { importance: "unspecified", evidence: [] },
-        }),
-      },
-    }
-    const axes = buildDecisionAxes(result, peerState, basicInfo)
-    expect(decisionAxesSummary(axes)).toContain("또래 교류·친구 경험")
-    expect(decisionAxesSummary(axes)).not.toContain("문화·활동 경험을 중요")
-  })
-
-  it("puts the parent's primary school goal before a strong English axis", () => {
-    const schoolState: CampfitV3ConversationState = {
-      ...state,
-      facts: {
-        ...state.facts,
-        parentExperienceNeeds: fact("parentExperienceNeeds", {
-          english_growth: { importance: "nice_to_have", evidence: ["영어도 늘면 좋겠어요"] },
-          peer_interaction: { importance: "unspecified", evidence: [] },
-          global_experience: { importance: "unspecified", evidence: [] },
-          independence_confidence: { importance: "unspecified", evidence: [] },
-          school_learning_experience: { importance: "primary", evidence: ["해외 학교생활을 경험하는 게 가장 중요해요"] },
-        }),
-      },
-    }
-    const schoolResult = {
-      ...result,
-      experienceDirections: result.experienceDirections.map((direction) => direction.key === "schoolSchooling"
-        ? { ...direction, fitLabel: "가장 잘 맞는 방향" as const, score: 98 }
-        : direction.key === "englishIntensive"
-          ? { ...direction, fitLabel: "가장 잘 맞는 방향" as const, score: 97 }
-          : direction),
-    }
-    const axes = buildDecisionAxes(schoolResult, schoolState, basicInfo)
-    expect(decisionAxesSummary(axes).startsWith("이번 상담에서는 학교·학습")).toBe(true)
-  })
-
   it("uses the verified ANOGRO city route and rejects unsafe program URLs", () => {
     expect(buildAnogroCityHref("Cebu", "https://www.anogro.com")).toBe("https://www.anogro.com/city/Cebu")
-    expect(buildAnogroCityHref("Gold Coast", "https://www.anogro.com", "gold-coast")).toBe("https://www.anogro.com/city/gold-coast")
     expect(buildAnogroCityHref("Chiang Mai", "https://www.anogro.com")).toBe("https://www.anogro.com/city/Chiang%20Mai")
     expect(buildAnogroCityHref(" Cebu ", " https://www.anogro.com/ ")).toBe("https://www.anogro.com/city/Cebu")
     expect(buildAnogroCityHref("", "https://www.anogro.com")).toBeNull()
@@ -101,8 +55,9 @@ describe("CampFit v3 result presentation", () => {
     expect(verified.notice).toBeNull()
     expect(verified.sectionSubtitle).toContain("실제 프로그램 DB")
     expect(demo.showProgramCards).toBe(true)
-    expect(demo.sectionSubtitle).toContain("Demo Catalog")
-    expect(demo.notice).toContain("Demo Catalog")
+    expect(demo.sectionTitle).toBe("현재 조건에서 살펴볼 프로그램")
+    expect(demo.sectionSubtitle).not.toContain("Demo Catalog")
+    expect(demo.notice).toBeNull()
     expect(unavailable.showProgramCards).toBe(false)
     expect(unavailable.unavailableTitle).toBe("프로그램 정보를 불러오지 못했습니다")
     expect(unavailable.unavailableGuidance).toContain("다시")
