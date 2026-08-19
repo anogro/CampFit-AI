@@ -132,6 +132,63 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).toContain("싱가포르 STEM 캠프")
   })
 
+  it("marks demo programs and never renders an external demo detail link", () => {
+    const demoResult: CampfitV3RecommendationResult = {
+      ...result,
+      programCandidates: [
+        {
+          ...result.programCandidates[0]!,
+          catalogSource: "supabase",
+          detailUrl: "https://www.anogro.com/program/production-in-mixed-result",
+        },
+        {
+          ...result.programCandidates[0]!,
+          programId: "demo-1",
+          name: "Demo example program",
+          catalogSource: "demo",
+          detailUrl: "https://www.anogro.com/program/demo-should-not-open",
+        },
+      ],
+    }
+    const markup = renderToStaticMarkup(
+      createElement(CampFitV3Result, {
+        result: demoResult,
+        basicInfo,
+        conversationState,
+        onBack: vi.fn(),
+        onRestart: vi.fn(),
+      })
+    )
+
+    expect(markup).toContain("예시 프로그램")
+    expect(markup).toContain("상세 정보 준비 중")
+    expect(markup).toContain("href=\"https://www.anogro.com/program/production-in-mixed-result\"")
+    expect(markup).not.toContain("href=\"https://www.anogro.com/program/demo-should-not-open\"")
+  })
+
+  it("keeps the existing external link for production programs", () => {
+    const productionResult: CampfitV3RecommendationResult = {
+      ...result,
+      programCandidates: [{
+        ...result.programCandidates[0]!,
+        catalogSource: "supabase",
+        detailUrl: "https://www.anogro.com/program/production-program",
+      }],
+    }
+    const markup = renderToStaticMarkup(
+      createElement(CampFitV3Result, {
+        result: productionResult,
+        basicInfo,
+        conversationState,
+        onBack: vi.fn(),
+        onRestart: vi.fn(),
+      })
+    )
+
+    expect(markup).toContain("href=\"https://www.anogro.com/program/production-program\"")
+    expect(markup).not.toContain("예시 프로그램")
+  })
+
   it("presents basic English as words and short phrases without overstating fluency", () => {
     const markup = renderToStaticMarkup(
       createElement(CampFitV3Result, {

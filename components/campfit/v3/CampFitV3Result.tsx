@@ -437,7 +437,8 @@ function ProgramInlineCard({
   readonly result: CampfitV3RecommendationResult
   readonly resultId: string | null
 }) {
-  const href = safeProgramDetailHref(program.detailUrl)
+  const isDemoProgram = program.catalogSource === "demo"
+  const href = isDemoProgram ? null : safeProgramDetailHref(program.detailUrl)
   const strengths = programStrengths(program)
   const cautions = programCautions(program)
   return (
@@ -447,6 +448,7 @@ function ProgramInlineCard({
           <p className="text-xs font-black uppercase tracking-[.08em] text-[var(--accent-primary)]">프로그램 {index + 1} · {rankLabel(index)}</p>
           <h5 className="mt-1 text-base font-black leading-6 [word-break:keep-all]">{program.name}</h5>
           <p className="mt-1 text-xs text-[var(--text-secondary)]">{program.ageLabel} · {program.durationLabel}</p>
+          {isDemoProgram ? <p className="mt-2 inline-flex rounded-full bg-[var(--accent-soft)] px-2 py-1 text-[11px] font-black text-[var(--accent-primary)]">예시 프로그램</p> : null}
         </div>
         {program.imageUrl ? (
           <img className="h-14 w-16 shrink-0 rounded-xl object-cover" src={program.imageUrl} alt="" />
@@ -524,7 +526,7 @@ function ProgramInlineCard({
             {program.verify.length ? <p className="mt-3 text-[var(--text-secondary)]">추가 확인: {program.verify.join(" · ")}</p> : null}
           </div>
         </details>
-        {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" aria-label={`${program.name} 프로그램 살펴보기 (새 창 열림)`}>프로그램 살펴보기<span className="ml-1.5" aria-hidden>↗</span></a> : null}
+        {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" aria-label={`${program.name} 프로그램 살펴보기 (새 창 열림)`}>프로그램 살펴보기<span className="ml-1.5" aria-hidden>↗</span></a> : isDemoProgram ? <span className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-bold text-[var(--text-secondary)]">상세 정보 준비 중</span> : null}
       </div>
     </article>
   )
