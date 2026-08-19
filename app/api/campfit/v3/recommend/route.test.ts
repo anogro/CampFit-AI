@@ -100,6 +100,19 @@ describe("CampFit v3 recommendation route", () => {
     expect(payload["catalogSource"]).toBe("demo")
   })
 
+  it("falls back to the local demo catalog without loading production programs", async () => {
+    loadDemoCatalogFromSupabase.mockResolvedValue({ programs: [], cities: [], source: "unavailable", warnings: ["demo read failed"] })
+    buildRecommendation.mockReturnValue({ ...result, catalogSource: "demo" })
+
+    const response = await POST(request(true))
+
+    expect(response.status).toBe(200)
+    expect(loadDemoCatalogFromSupabase).toHaveBeenCalledTimes(1)
+    expect(loadDemoCatalog).toHaveBeenCalledTimes(1)
+    expect(loadV3Catalog).not.toHaveBeenCalled()
+    expect(buildRecommendation).toHaveBeenCalledWith(expect.objectContaining({ catalog: expect.objectContaining({ source: "demo" }) }))
+  })
+
   it("returns an explicit service error when the production catalog is unavailable", async () => {
     loadV3Catalog.mockResolvedValue({ programs: [], cities: [], source: "unavailable", warnings: ["read failed"] })
 

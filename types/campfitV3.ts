@@ -1,3 +1,5 @@
+import type { V3CatalogSource } from "@/lib/campfit/v3/catalogPolicy"
+
 export const CAMPFIT_V3_MIN_DURATION_WEEKS = 1
 export const CAMPFIT_V3_MAX_DURATION_WEEKS = 12
 
@@ -387,6 +389,7 @@ export type CampfitV3ProgramCandidate = {
   readonly englishMatchStatus?: "comfortable" | "manageable_with_support" | "english_burden_possible" | "official_requirement_mismatch" | "unknown" | undefined
   readonly englishMatchLabel?: string | undefined
   readonly englishMatchExplanation?: string | undefined
+  readonly catalogSource?: Exclude<V3CatalogSource, "unavailable"> | undefined
   readonly detailUrl: string | null
   readonly group: "우선 살펴볼 프로그램" | "조건 확인 후 살펴볼 프로그램" | "함께 비교할 대안"
   readonly score: number

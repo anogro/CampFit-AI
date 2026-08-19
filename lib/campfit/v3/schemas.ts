@@ -214,6 +214,7 @@ export const CampfitV3RecommendationResultSchema = z.object({
     englishRequirementSource: z.enum(["official", "inferred", "demo_fixture", "unknown"]).optional(),
     englishMatchStatus: z.enum(["comfortable", "manageable_with_support", "english_burden_possible", "official_requirement_mismatch", "unknown"]).optional(),
     englishMatchLabel: z.string().optional(), englishMatchExplanation: z.string().optional(),
+    catalogSource: z.enum(["supabase", "demo"]).optional(),
     detailUrl: z.string().nullable(),
     group: z.enum(["우선 살펴볼 프로그램", "조건 확인 후 살펴볼 프로그램", "함께 비교할 대안"]), score: z.number().min(0).max(100), tripCost: CampfitV3TripCostSchema.optional(),
   })).max(9),
