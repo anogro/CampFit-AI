@@ -189,7 +189,7 @@ describe("CampFit v3 family trip cost calculation", () => {
     expect(attached.destinationRecommendations[0]?.tripCost?.breakdown.program.status).toBe("exact")
   })
 
-  it("preserves per-program provenance and suppresses demo detail links", () => {
+  it("preserves per-program provenance and existing detail links", () => {
     const demoResult: CampfitV3RecommendationResult = {
       consultingConclusion: "테스트 결과",
       experienceDirections: [],
@@ -203,7 +203,7 @@ describe("CampFit v3 family trip cost calculation", () => {
     }
     const demoAttached = attachTripCosts({ result: demoResult, catalog, basicInfo: info(), calculatedAt })
     expect(demoAttached.programCandidates[0]?.catalogSource).toBe("demo")
-    expect(demoAttached.programCandidates[0]?.detailUrl).toBeNull()
+    expect(demoAttached.programCandidates[0]?.detailUrl).toBe("https://www.anogro.com/program/demo")
 
     const productionCatalog = {
       ...catalog,

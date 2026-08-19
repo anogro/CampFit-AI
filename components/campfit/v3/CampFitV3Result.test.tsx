@@ -132,7 +132,7 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).toContain("싱가포르 STEM 캠프")
   })
 
-  it("marks demo programs and never renders an external demo detail link", () => {
+  it("marks demo programs while keeping each candidate detail link", () => {
     const demoResult: CampfitV3RecommendationResult = {
       ...result,
       programCandidates: [
@@ -161,9 +161,9 @@ describe("CampFitV3Result UI component", () => {
     )
 
     expect(markup).toContain("예시 프로그램")
-    expect(markup).toContain("상세 정보 준비 중")
     expect(markup).toContain("href=\"https://www.anogro.com/program/production-in-mixed-result\"")
-    expect(markup).not.toContain("href=\"https://www.anogro.com/program/demo-should-not-open\"")
+    expect(markup).toContain("href=\"https://www.anogro.com/program/demo-should-not-open\"")
+    expect(markup).not.toContain("상세 정보 준비 중")
   })
 
   it("keeps the existing external link for production programs", () => {

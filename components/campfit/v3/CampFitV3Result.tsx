@@ -438,7 +438,7 @@ function ProgramInlineCard({
   readonly resultId: string | null
 }) {
   const isDemoProgram = program.catalogSource === "demo"
-  const href = isDemoProgram ? null : safeProgramDetailHref(program.detailUrl)
+  const href = safeProgramDetailHref(program.detailUrl)
   const strengths = programStrengths(program)
   const cautions = programCautions(program)
   return (
@@ -526,7 +526,7 @@ function ProgramInlineCard({
             {program.verify.length ? <p className="mt-3 text-[var(--text-secondary)]">추가 확인: {program.verify.join(" · ")}</p> : null}
           </div>
         </details>
-        {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" aria-label={`${program.name} 프로그램 살펴보기 (새 창 열림)`}>프로그램 살펴보기<span className="ml-1.5" aria-hidden>↗</span></a> : isDemoProgram ? <span className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-bold text-[var(--text-secondary)]">상세 정보 준비 중</span> : null}
+        {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" aria-label={`${program.name} 프로그램 살펴보기 (새 창 열림)`}>프로그램 살펴보기<span className="ml-1.5" aria-hidden>↗</span></a> : null}
       </div>
     </article>
   )

@@ -20,7 +20,6 @@ export function attachTripCosts(input: {
       return {
         ...candidate,
         catalogSource: program.catalogSource,
-        detailUrl: program.catalogSource === "demo" ? null : candidate.detailUrl,
       }
     }
     const tripCost = calculateTotalTripCost({
@@ -34,7 +33,6 @@ export function attachTripCosts(input: {
     return {
       ...candidate,
       catalogSource: program.catalogSource,
-      detailUrl: program.catalogSource === "demo" ? null : candidate.detailUrl,
       tripCost,
     }
   })
