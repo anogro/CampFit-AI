@@ -50,6 +50,45 @@ describe("CampFit v3 Demo Catalog recommendation coverage", () => {
     expect(result.programCandidates.every((program) => program.imageUrl === cityImages.get(program.cityName))).toBe(true)
   })
 
+  it("uses direct program evidence for a peer-primary STEM family scenario", () => {
+    const { childEnglishLevel: _childEnglishLevel, ...demoFactsWithoutLegacyLevel } = demoState.facts
+    const result = buildRecommendation({
+      basicInfo: {
+        ...demoBasicInfo,
+        durationWeeks: 3,
+        departureWindow: "2026년 8월",
+      },
+      state: {
+        ...demoState,
+        facts: {
+          ...demoFactsWithoutLegacyLevel,
+          childEnglishListening: fact("childEnglishListening", "understands_simple_instructions", "child"),
+          childEnglishSpeaking: fact("childEnglishSpeaking", "answers_simple_questions", "child"),
+          parentExperienceNeeds: fact("parentExperienceNeeds", {
+            english_growth: { importance: "nice_to_have", evidence: ["영어도 늘면 좋겠어요"] },
+            peer_interaction: { importance: "primary", evidence: ["외국 친구들과 어울리는 경험이 가장 중요해요"] },
+            global_experience: { importance: "unspecified", evidence: [] },
+            independence_confidence: { importance: "unspecified", evidence: [] },
+            school_learning_experience: { importance: "unspecified", evidence: [] },
+          }, "preference"),
+          activityPreferences: fact("activityPreferences", {
+            preferences: [{ category: "stem_maker", strength: "strong", rank: 1, mentionedActivities: ["과학실험", "만들기"], evidence: ["과학실험과 만들기를 좋아해요"] }],
+            varietyPreference: "unspecified",
+            evidence: ["과학실험과 만들기를 좋아해요"],
+          }, "preference"),
+        },
+      },
+      catalog: loadDemoCatalog(2026),
+      now: new Date("2026-07-19T00:00:00.000Z"),
+    })
+
+    const reasons = result.programCandidates.map((candidate) => candidate.reason)
+    expect(result.programCandidates).toHaveLength(3)
+    expect(new Set(reasons).size).toBeGreaterThan(1)
+    expect(result.programCandidates.some((candidate) => /또래|친구|교류|국제학생|다국적/iu.test([candidate.reason, ...(candidate.matchHighlights ?? [])].join(" ")))).toBe(true)
+    expect(result.programCandidates.flatMap((candidate) => candidate.matchHighlights).join(" ")).not.toMatch(/연령에 맞는|옵션 선택지/iu)
+  })
+
   it.each([
     ["A beginner + immersion", personaState("support_required", { englishIntensive: "primary", cultureActivity: "secondary" }), ["english_burden_possible", "manageable_with_support"]],
     ["B beginner + activity", personaState("support_required", { cultureActivity: "primary", englishIntensive: "secondary" }), ["comfortable", "manageable_with_support", "unknown"]],

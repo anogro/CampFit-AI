@@ -440,12 +440,6 @@ function ProgramInlineCard({ program, index, reasonOverride }: { readonly progra
         )}
       </div>
       <div className="mt-3">
-        {program.description ? (
-          <div className="mb-3 rounded-2xl bg-[var(--bg-secondary)] p-3 [word-break:keep-all]">
-            <p className="text-xs font-black text-[var(--text-primary)]">프로그램 소개</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{program.description}</p>
-          </div>
-        ) : null}
         <p className="text-xs font-black text-[var(--text-primary)]">추천 이유</p>
         <p className="mt-1 text-sm leading-6 [word-break:keep-all]">{strengths[0]}</p>
         {(() => {
@@ -491,7 +485,7 @@ function ProgramInlineCard({ program, index, reasonOverride }: { readonly progra
           )
         })()}
         <div className="mt-3 grid gap-2 text-xs leading-5 text-[var(--text-secondary)]">
-          <p><span className="font-black text-[var(--status-success)]">좋은 점</span> · {strengths.slice(1).join(" · ") || "조건에 맞는 기본 정보를 확인했어요."}</p>
+          {strengths.length > 1 ? <p><span className="font-black text-[var(--status-success)]">좋은 점</span> · {strengths.slice(1).join(" · ")}</p> : null}
           <p><span className="font-black text-[var(--status-warning)]">아쉬운 점</span> · {cautions.join(" · ")}</p>
         </div>
         <details className="group mt-5 border-t border-[var(--border-default)] pt-4">

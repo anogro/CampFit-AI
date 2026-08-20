@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { processConversationMessage, startConversation, cleanAcknowledgement } from "@/lib/campfit/v3/conversationService"
 import { selectNextQuestion } from "@/lib/campfit/v3/questionBank"
 import { calculateProgress } from "@/lib/campfit/v3/progress"
+import { assessEnglishReadiness } from "@/lib/campfit/v3/englishReadiness"
 import { createFact, createInitialConversationState, extractDeterministicFacts, mergeFacts } from "@/lib/campfit/v3/stateEngine"
 import type { CampfitV3BasicInfo } from "@/types/campfitV3"
 import type { CampfitV3LLMProvider } from "@/lib/campfit/v3/provider"
@@ -555,6 +556,68 @@ describe("CampFit v3 conversational counselor flow", () => {
     expect(second.assistantMessage).not.toContain("선생님의 설명은 대체로 이해하고 따라갈 수 있나요?")
   })
 
+  it.each([
+    [
+      "영어노출은 꾸준히 했지만 빠른 말은 이해하기 어려워요. 간단한 일상대화는 가능해요.",
+      "struggles_with_class_explanation",
+      "can_converse",
+      true,
+    ],
+    [
+      "천천히 말하면 이해하는데 빠르게 말하면 놓쳐요. 짧은 대화는 할 수 있어요.",
+      "struggles_with_class_explanation",
+      "can_converse",
+      true,
+    ],
+    [
+      "수업 설명은 대체로 알아듣지만 원어민이 빨리 말하면 어려워해요. 자기소개나 일상적인 대답은 가능해요.",
+      "struggles_with_class_explanation",
+      "answers_simple_questions",
+      true,
+    ],
+    [
+      "듣기는 괜찮은데 말을 먼저 시작하는 건 어려워해요.",
+      "understands_simple_instructions",
+      "difficulty_initiating",
+      true,
+    ],
+    [
+      "간단한 대화도 아직 어렵고 질문에는 단어로만 답해요.",
+      undefined,
+      "answers_simple_questions",
+      false,
+    ],
+  ] as const)("extracts both English dimensions from the current question context: %s", async (userMessage, listening, speaking, sufficient) => {
+    const start = startConversation(basicInfo)
+    const englishState = {
+      ...start.updatedState,
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: [...start.updatedState.askedQuestionKeys, "child_english_level"],
+    }
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: englishState,
+      basicInfo,
+      userMessage,
+      quickReplyKey: null,
+      provider: fallbackProvider,
+    })
+
+    if (listening === undefined) expect(response.updatedState.facts.childEnglishListening).toBeUndefined()
+    else {
+      expect(response.updatedState.facts.childEnglishListening?.value).toBe(listening)
+      expect(response.updatedState.facts.childEnglishListening?.evidence).toContain(userMessage)
+    }
+    expect(response.updatedState.facts.childEnglishSpeaking?.value).toBe(speaking)
+    expect(response.updatedState.facts.childEnglishSpeaking?.evidence).toContain(userMessage)
+    expect(response.updatedState.facts.englishReadiness?.value).toBe("beginner_friendly")
+    expect(assessEnglishReadiness(response.updatedState).sufficientForRecommendation).toBe(sufficient)
+    if (sufficient) {
+      expect(response.questionKey).not.toBe("child_english_level")
+      expect(response.assistantMessage).not.toContain("아직 답변을 충분히 파악하지 못했어요")
+    }
+  })
+
   it("accepts a provider's valid evidence variant for both English dimensions", async () => {
     const start = startConversation(basicInfo)
     const englishState = {
@@ -603,6 +666,60 @@ describe("CampFit v3 conversational counselor flow", () => {
 
     expect(response.updatedState.facts.childEnglishListening?.value).toBe("struggles_with_class_explanation")
     expect(response.updatedState.facts.childEnglishSpeaking?.value).toBe("answers_simple_questions")
+    expect(response.updatedState.facts.englishReadiness?.value).toBe("beginner_friendly")
+    expect(response.questionKey).not.toBe("child_english_level")
+    expect(response.assistantMessage).not.toContain("아직 답변을 충분히 파악하지 못했어요")
+  })
+
+  it("keeps fast-listening and simple-conversation meaning on the normal provider path", async () => {
+    const start = startConversation(basicInfo)
+    const englishState = {
+      ...start.updatedState,
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: [...start.updatedState.askedQuestionKeys, "child_english_level"],
+    }
+    const userMessage = "영어노출은 꾸준히 했지만 빠른 말은 이해하기 어려워요. 간단한 일상대화는 가능해요."
+    const provider: CampfitV3LLMProvider = {
+      ...fallbackProvider,
+      analyzeConversation: async () => ({
+        assistantMessage: "빠른 영어 듣기는 어렵지만 간단한 일상대화는 가능하군요.",
+        facts: [
+          {
+            key: "childEnglishListening",
+            subject: "child",
+            value: "struggles_with_class_explanation",
+            source: "explicit_user_statement",
+            confidence: 1,
+            evidence: "빠른 말은 이해하기 어려워요",
+          },
+          {
+            key: "childEnglishSpeaking",
+            subject: "child",
+            value: "can_converse",
+            source: "explicit_user_statement",
+            confidence: 1,
+            evidence: "간단한 일상대화는 가능해요",
+          },
+        ],
+        unresolved: [],
+        conflicts: [],
+        suggestedNextQuestionKey: "child_english_level",
+        nextAction: "ask",
+        readyForRecommendation: false,
+      }),
+    }
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: englishState,
+      basicInfo,
+      userMessage,
+      quickReplyKey: null,
+      provider,
+    })
+
+    expect(response.aiUsed).toBe(true)
+    expect(response.updatedState.facts.childEnglishListening?.evidence).toContain("빠른 말은 이해하기 어려워요")
+    expect(response.updatedState.facts.childEnglishSpeaking?.evidence).toContain("간단한 일상대화는 가능해요")
     expect(response.updatedState.facts.englishReadiness?.value).toBe("beginner_friendly")
     expect(response.questionKey).not.toBe("child_english_level")
     expect(response.assistantMessage).not.toContain("아직 답변을 충분히 파악하지 못했어요")
@@ -693,6 +810,44 @@ describe("CampFit v3 conversational counselor flow", () => {
     expect(response.updatedState.facts.childEnglishListening?.value).toBe("struggles_with_class_explanation")
     expect(response.updatedState.facts.childEnglishSpeaking?.value).toBe("answers_simple_questions")
     expect(response.questionKey).not.toBe("child_english_level")
+  })
+
+  it.each(["schema_validation_failed", "timeout"] as const)("keeps fast-listening and simple-conversation meaning after provider %s", async (diagnosticCode) => {
+    const start = startConversation(basicInfo)
+    const englishState = {
+      ...start.updatedState,
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: [...start.updatedState.askedQuestionKeys, "child_english_level"],
+    }
+    const userMessage = "영어노출은 꾸준히 했지만 빠른 말은 이해하기 어려워요. 간단한 일상대화는 가능해요."
+    const provider: CampfitV3LLMProvider = {
+      ...fallbackProvider,
+      getLastDiagnostic: () => ({
+        code: diagnosticCode,
+        providerResponseReceived: diagnosticCode === "schema_validation_failed",
+        httpStatus: diagnosticCode === "schema_validation_failed" ? 200 : null,
+        errorStatus: null,
+        repaired: false,
+        requestCount: 1,
+        elapsedMs: diagnosticCode === "timeout" ? 7_000 : 12,
+      }),
+    }
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: englishState,
+      basicInfo,
+      userMessage,
+      quickReplyKey: null,
+      provider,
+    })
+
+    expect(response.aiUsed).toBe(false)
+    expect(response.diagnostics?.fallbackReason).toBe(diagnosticCode)
+    expect(response.updatedState.facts.childEnglishListening?.value).toBe("struggles_with_class_explanation")
+    expect(response.updatedState.facts.childEnglishSpeaking?.value).toBe("can_converse")
+    expect(response.updatedState.facts.englishReadiness?.value).toBe("beginner_friendly")
+    expect(response.questionKey).not.toBe("child_english_level")
+    expect(response.assistantMessage).not.toContain("아직 답변을 충분히 파악하지 못했어요")
   })
 
   it("does not infer current English level from English-kindergarten experience alone", async () => {

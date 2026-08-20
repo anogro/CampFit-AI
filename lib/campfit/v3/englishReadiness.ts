@@ -181,7 +181,8 @@ function scoreListening(value: string | null, evidence: string | null): number {
   // understood. This avoids turning mixed evidence into either all-positive
   // or all-unknown listening.
   if (value === "struggles_with_class_explanation"
-    && /(?:간단한|짧은)\s*(?:수업\s*)?(?:지시|안내|설명).{0,16}(?:알아듣|이해|따라)/iu.test(evidence ?? "")) return 1
+    && (/(?:간단한|짧은)\s*(?:수업\s*)?(?:지시|안내|설명).{0,16}(?:알아듣|이해|따라)/iu.test(evidence ?? "")
+      || /(?:천천히|간단한|짧은|대체로|괜찮).{0,20}(?:알아듣|이해|따라|듣)/iu.test(evidence ?? ""))) return 1
   return 0
 }
 

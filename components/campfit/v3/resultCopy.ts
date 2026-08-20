@@ -70,10 +70,7 @@ export function programRecommendationReasons(programs: readonly CampfitV3Program
 export function programStrengths(program: CampfitV3ProgramCandidate, reasonOverride?: string): readonly string[] {
   const primary = reasonOverride?.trim() || programReason(program)
   const matchHighlights = program.matchHighlights ?? []
-  const strengths: string[] = [primary, ...matchHighlights]
-  if (matchHighlights.length === 0 && program.ageLabel !== "연령 확인 필요") strengths.push("아이 연령에 맞는 범위를 확인했어요.")
-  if (matchHighlights.length === 0 && program.durationLabel !== "기간 확인 필요") strengths.push(`${program.durationLabel} 선택지를 확인했어요.`)
-  return unique(strengths).slice(0, 3)
+  return unique([primary, ...matchHighlights]).slice(0, 3)
 }
 
 export function programCautions(program: CampfitV3ProgramCandidate): readonly string[] {

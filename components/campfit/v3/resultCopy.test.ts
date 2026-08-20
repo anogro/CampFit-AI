@@ -76,11 +76,9 @@ describe("CampFit v3 result copy", () => {
 
   it("keeps confirmation copy short and separates program strengths from cautions", () => {
     expect(programCautions(program)).toEqual(["원하는 경험 방향과 실제 활동의 차이"])
-    expect(programStrengths(program)).toEqual(expect.arrayContaining([
-      program.reason,
-      "아이 연령에 맞는 범위를 확인했어요.",
-      "4주 옵션 선택지를 확인했어요.",
-    ]))
+    expect(programStrengths(program)).toEqual([program.reason])
+    expect(programStrengths(program).join(" ")).not.toContain("연령에 맞는 범위")
+    expect(programStrengths(program).join(" ")).not.toContain("옵션 선택지")
   })
 
   it("uses stored candidate reasons and grounded highlights instead of a repeated direction fallback", () => {

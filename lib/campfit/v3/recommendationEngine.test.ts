@@ -236,6 +236,32 @@ describe("CampFit v3 recommendation engine", () => {
     expect(schoolResult.consultingConclusion).toContain("학교·스쿨링 경험")
   })
 
+  it("prioritizes direct primary-goal catalog evidence over a generic direction proxy", () => {
+    const state = stateFor("englishIntensive", {
+      parentExperienceNeeds: {
+        english_growth: { importance: "nice_to_have", evidence: ["영어도 늘면 좋겠어요"] },
+        peer_interaction: { importance: "primary", evidence: ["외국 친구들과 어울리는 게 가장 중요해요"] },
+        global_experience: { importance: "unspecified", evidence: [] },
+        independence_confidence: { importance: "unspecified", evidence: [] },
+        school_learning_experience: { importance: "unspecified", evidence: [] },
+      },
+    })
+    const result = buildRecommendation({
+      basicInfo,
+      state,
+      catalog: productionCatalog([
+        program({ id: "generic-english", city: "Cebu", country: "Philippines", direction: "englishIntensive", traits: ["영어 수업"] }),
+        program({ id: "peer-direct", city: "Auckland", country: "New Zealand", direction: "cultureActivity", traits: ["국제학생과 함께하는 또래 교류"] }),
+      ]),
+      now,
+    })
+
+    expect(result.programCandidates.map((item) => item.programId)).toEqual(["peer-direct", "generic-english"])
+    expect(result.programCandidates[0]?.reason).toContain("국제학생과 함께하는 또래 교류")
+    expect(result.programCandidates[0]?.matchHighlights?.join(" ") ?? "").toContain("국제학생과 함께하는 또래 교류")
+    expect(result.programCandidates[1]?.reason).toContain("목표와 직접 연결되는 프로그램 특성은 추가 확인이 필요해요")
+  })
+
   it("scenario B selects the structured schooling program instead of a generic ESL program", () => {
     const result = recommend("schoolSchooling", productionCatalog([
       program({ id: "school-singapore", city: "Singapore", country: "Singapore", direction: "schoolSchooling", price: 7_000_000 }),

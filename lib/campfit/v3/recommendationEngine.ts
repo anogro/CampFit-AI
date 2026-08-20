@@ -59,6 +59,7 @@ type ScoredProgram = {
   readonly program: V3CatalogProgram
   readonly city: V3CatalogCity | null
   readonly score: number
+  readonly primaryGoalMatch: boolean
   readonly direction: ExperienceDirectionKey
   readonly classification: ProgramClassification
   readonly verify: readonly string[]
@@ -286,6 +287,8 @@ function evaluateProgram(input: {
   }
 
   const direction = bestProgramDirection(input.program, input.directions)
+  const primaryNeed = primaryParentNeed(input.state)
+  const primaryGoalEvidence = primaryNeed === null ? null : programGoalEvidence(input.program, primaryNeed.axis, direction)
   const primaryDirection = input.directions[0]?.key
   const primarySignal = primaryDirection ? programExperienceScore(input.program, primaryDirection) : 50
   const primaryStatus = primaryDirection ? programExperienceStatus(input.program, primaryDirection) : undefined
@@ -305,7 +308,15 @@ function evaluateProgram(input: {
     : 75
   const supportFit = supportScore(koreanNeed, input.program)
   const budgetFit = referenceMinimumKrw === null ? 58 : referenceMinimumKrw <= input.basicInfo.budgetMaxKrw ? 90 : 25
-  const score = clamp(goalFit * 0.46 + beginnerFit * 0.14 + supportFit * 0.14 + budgetFit * 0.14 + 60 * 0.07 + metadataScore(input.program) * 0.05 + englishMatch.scoreAdjustment + activityFitAdjustment + commuteFitAdjustment)
+  // A primary parent need must be supported by the program's own catalog
+  // evidence before it receives the same ranking credit as a direct match.
+  // This only affects program ordering; city scoring and hard filters remain
+  // unchanged.
+  const primaryGoalMatch = primaryNeed?.importance === "primary" && primaryGoalEvidence !== null
+  const primaryGoalFitAdjustment = primaryNeed?.importance === "primary"
+    ? primaryGoalMatch ? 12 : -12
+    : 0
+  const score = clamp(goalFit * 0.46 + beginnerFit * 0.14 + supportFit * 0.14 + budgetFit * 0.14 + 60 * 0.07 + metadataScore(input.program) * 0.05 + englishMatch.scoreAdjustment + activityFitAdjustment + commuteFitAdjustment + primaryGoalFitAdjustment)
   const classification: ProgramClassification = excluded.length
     ? "excluded"
     : softMismatch.length > 0 || score < 62
@@ -318,6 +329,7 @@ function evaluateProgram(input: {
     program: input.program,
     city: input.city,
     score,
+    primaryGoalMatch,
     direction,
     classification,
     verify: Array.from(new Set([...verify, ...softMismatch])),
@@ -1193,13 +1205,14 @@ function buildProgramReason(item: ScoredProgram, basicInfo: CampfitV3BasicInfo, 
   const highlights: string[] = []
   const lead = need
     ? goalEvidence
-      ? `${parentNeedSubject(need)} ${needImportancePhrase(need.importance)} 프로그램의 ${goalEvidence} 정보와 잘 맞는 후보예요.`
+      ? `${parentNeedSubject(need)} ${needImportancePhrase(need.importance)} 이 후보에서 ${goalEvidence} 근거가 확인돼 목표와 잘 맞는 후보예요.`
       : activityMatch
         ? `${activityMatch.preference}과 프로그램의 ${activityMatch.programFeature} 구성이 잘 맞아 추천했어요. ${need.label}은 프로그램 정보에서 추가 확인이 필요해요.`
         : `${parentNeedSubject(need)} ${needImportancePhrase(need.importance, true)} 이 후보에서 목표와 직접 연결되는 프로그램 특성은 추가 확인이 필요해요.`
     : `${directionLabels[item.direction]}을 중심으로 아이의 연령·${basicInfo.durationWeeks}주 기간·가족 체류 조건을 함께 확인한 후보예요.`
 
   const activityInLead = need !== null && goalEvidence === null && activityMatch !== null
+  if (goalEvidence) highlights.push(`프로그램에서 확인된 근거: ${goalEvidence}`)
   if (activityMatch && !activityInLead) {
     highlights.push(`아이가 좋아하는 ${activityMatch.preference}과 프로그램의 ${activityMatch.programFeature} 구성이 연결돼요.`)
   }
@@ -1283,13 +1296,33 @@ function parentNeedSubject(need: ParentNeedProjection): string {
 function programGoalEvidence(program: V3CatalogProgram, axis: ParentNeedProjection["axis"], direction: ExperienceDirectionKey): string | null {
   const text = catalogProgramEvidenceText(program)
   const directionScore = programExperienceScore(program, direction)
-  if (axis === "peer_interaction" && /또래|친구|교류|국제학생|다국적|다문화|international|multicultural|collaboration|community/i.test(text)) return "또래 교류·협업 활동"
+  if (axis === "peer_interaction") {
+    const evidence = firstCatalogEvidence(program, /또래|친구|교류|국제학생|협업|collaboration|(?:다국적|다문화).{0,10}(?:학생|또래|친구)|(?:학생|또래|친구).{0,10}(?:다국적|다문화)|international\s+(?:student|peer|youth|children)|multicultural\s+(?:student|peer|community)/iu)
+    if (evidence !== null) return evidence
+  }
   const englishLevel = program.englishRequirement?.level
-  if (axis === "english_growth" && ((englishLevel !== undefined && englishLevel !== "unknown" && englishLevel !== "no_requirement") || directionScore >= 60 || /영어|english|esl|immersion|language/i.test(text))) return "영어 사용 활동"
-  if (axis === "global_experience" && /문화|현지|도시|다문화|국제|culture|local|international|community/i.test(text)) return "현지 문화·다문화 활동"
+  if (axis === "english_growth" && ((englishLevel !== undefined && englishLevel !== "unknown" && englishLevel !== "no_requirement") || directionScore >= 60 || /영어|english|esl|immersion|language/i.test(text))) {
+    return firstCatalogEvidence(program, /영어|english|esl|immersion|language/iu) ?? "영어 사용 활동"
+  }
+  if (axis === "global_experience") {
+    const evidence = firstCatalogEvidence(program, /문화|현지|도시|다문화|국제|culture|local|international|community/iu)
+    if (evidence !== null) return evidence
+  }
   if (axis === "independence_confidence" && (program.parentScope.stayMode === "child_residential" || program.parentScope.stayMode === "homestay" || program.earlyAdaptationSupport === true)) return "아이 독립 참여·초기 적응 지원"
-  if (axis === "school_learning_experience" && (direction === "schoolSchooling" || /학교|수업|school|class|schooling/i.test(text))) return "학교형 수업 환경"
+  if (axis === "school_learning_experience" && (direction === "schoolSchooling" || /학교|수업|school|class|schooling/i.test(text))) {
+    return firstCatalogEvidence(program, /학교|수업|school|class|schooling/iu) ?? "학교형 수업 환경"
+  }
   return null
+}
+
+function firstCatalogEvidence(program: V3CatalogProgram, matcher: RegExp): string | null {
+  const entries = [
+    ...program.traits,
+    ...(program.demoProfile?.strengths ?? []),
+    ...(program.experienceAssessment?.evidence.map((item) => item.value) ?? []),
+    ...(program.description ? [program.description] : []),
+  ]
+  return entries.find((entry) => matcher.test(entry))?.replace(/[.!?。！？]+$/u, "").trim() ?? null
 }
 
 function programActivityMatch(program: V3CatalogProgram, state: CampfitV3ConversationState): { readonly preference: string; readonly programFeature: string } | null {
@@ -1385,7 +1418,10 @@ function metadataScore(program: V3CatalogProgram): number {
 
 function comparePrograms(left: ScoredProgram, right: ScoredProgram): number {
   const rank: Readonly<Record<ProgramClassification, number>> = { main: 0, conditional: 1, alternative: 2, excluded: 3 }
-  return rank[left.classification] - rank[right.classification] || right.score - left.score || left.program.id.localeCompare(right.program.id)
+  return Number(right.primaryGoalMatch) - Number(left.primaryGoalMatch)
+    || rank[left.classification] - rank[right.classification]
+    || right.score - left.score
+    || left.program.id.localeCompare(right.program.id)
 }
 
 function buildAlternatives(

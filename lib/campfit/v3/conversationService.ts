@@ -537,6 +537,25 @@ function englishAcknowledgement(
   }
   if (listening !== undefined && speaking !== undefined
     && isValue(listening, "struggles_with_class_explanation")
+    && (isValue(speaking, "can_converse") || isValue(speaking, "answers_simple_questions"))
+    && hasFastListeningDifficulty(listening)) {
+    return compact(
+      isValue(speaking, "can_converse")
+        ? "꾸준히 영어에 노출되어 간단한 일상대화는 가능하지만, 빠른 영어를 들을 때는 아직 부담이 있는 편이군요."
+        : "짧은 대화나 질문에는 답할 수 있지만, 빠른 영어를 들을 때는 아직 부담이 있는 편이군요.",
+      [listening, speaking],
+    )
+  }
+  if (listening !== undefined && speaking !== undefined
+    && isValue(listening, "struggles_with_class_explanation")
+    && isValue(speaking, "can_converse")) {
+    return compact(
+      "영어로 간단한 대화는 가능하지만 긴 설명을 들을 때는 어려움을 느끼는 편이군요.",
+      [listening, speaking],
+    )
+  }
+  if (listening !== undefined && speaking !== undefined
+    && isValue(listening, "struggles_with_class_explanation")
     && isValue(speaking, "answers_simple_questions")) {
     return compact(
       "간단한 수업 지시는 이해하지만 긴 설명은 어려워하고, 질문에는 단어나 짧은 문장으로 답할 수 있는 편이군요.",
@@ -580,6 +599,10 @@ function englishAcknowledgement(
 
 function isValue(fact: CampfitV3Fact | undefined, value: string): boolean {
   return fact?.value === value
+}
+
+function hasFastListeningDifficulty(fact: CampfitV3Fact): boolean {
+  return /빠른|빠르게|원어민이\s*빨리|놓쳐|속도가?\s*빠른/iu.test(fact.evidence)
 }
 
 function isPositiveListening(fact: CampfitV3Fact | undefined): boolean {
