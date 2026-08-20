@@ -9,7 +9,7 @@ import type {
 } from "@/types/campfitV3"
 
 const axisMatchers: Readonly<Record<CampfitV3ParentExperienceNeedAxis, RegExp>> = {
-  english_growth: /(?:영어|회화|말하기).{0,48}(?:늘|성장|자신감|자연스럽|접|배우|사용|쓰|경험|노출|좋|싶|했으면|원|유지|확대)/iu,
+  english_growth: /(?:영어|회화|말하기).{0,48}(?:늘|성장|향상|자신감|자연스럽|접|배우|사용|쓰|경험|노출|좋|싶|했으면|원|유지|확대)/iu,
   peer_interaction: /외국\s*친구|친구|또래|어울리|교류|사귀|함께\s*지내|같이\s*놀/iu,
   global_experience: /새로운\s*(?:경험|문화|환경)|다양한\s*문화|해외\s*(?:생활|경험)|시야|세상을?\s*(?:넓|보)/iu,
   independence_confidence: /혼자서|혼자\s*해|자신감|독립|스스로|낯선\s*(?:환경|곳)|해낼\s*수/iu,
@@ -63,7 +63,7 @@ function hasEnglishGoalCue(text: string, matchIndex: number, matchLength: number
   const start = Math.max(0, matchIndex - 8)
   const end = Math.min(text.length, matchIndex + Math.max(matchLength, 1) + 20)
   const nearby = text.slice(start, end)
-  return /(?:영어|회화|말하기).{0,20}(?:늘|성장|자신감|자연스럽|접|배우|사용|쓰|경험|노출|좋|싶|했으면|원|유지|확대)/iu.test(nearby)
+  return /(?:영어|회화|말하기).{0,20}(?:늘|성장|향상|자신감|자연스럽|접|배우|사용|쓰|경험|노출|좋|싶|했으면|원|유지|확대)/iu.test(nearby)
 }
 
 export function hasParentExperienceNeeds(value: unknown): value is CampfitV3ParentExperienceNeeds {
@@ -160,7 +160,7 @@ function inferFallbackImportance(
 ): CampfitV3ParentNeedImportance {
   const local = text.slice(Math.max(0, matchIndex - 34), Math.min(text.length, matchIndex + matchLength + 64))
   const contrast = axis === "english_growth"
-    && /(?:영어|회화|말하기).{0,20}(?:늘|성장|자신감|자연스럽|접|배우|사용|쓰|경험|노출|좋|싶|했으면|원|유지|확대).{0,8}(?:지만|는데|보다)/iu.test(text)
+    && /(?:영어|회화|말하기).{0,20}(?:늘|성장|향상|자신감|자연스럽|접|배우|사용|쓰|경험|노출|좋|싶|했으면|원|유지|확대).{0,8}(?:지만|는데|보다)/iu.test(text)
     || axis === "peer_interaction"
     && /(?:친구|또래|어울리|교류).{0,20}(?:좋|했으면|원|싶|어울려|사귀어).{0,8}(?:지만|는데|보다)/iu.test(text)
   if (isAvoid(local, axis, text)) return "avoid"
@@ -168,7 +168,7 @@ function inferFallbackImportance(
   // append English as a secondary wish with "...가장 중요하고 영어는...".
   // Do not let the primary cue leak forward to the later English phrase.
   if (axis === "english_growth" && primaryPeerGoalAppearsBefore(text, matchIndex)) return "nice_to_have"
-  if (axis === "peer_interaction" && /영어.{0,40}(?:지만|는데).{0,40}(?:외국\s*친구|친구|또래|어울리|교류)/iu.test(text)) return "primary"
+  if (axis === "peer_interaction" && /영어.{0,40}(?:지만|는데|보다|보다는).{0,40}(?:외국\s*친구|친구|또래|어울리|교류)/iu.test(text)) return "primary"
   // A contrast cue belongs to the axis named after the contrast, even when
   // a later "가장 중요" phrase is close enough to fool the generic priority
   // matcher. For example, "영어도 좋겠지만 ... 친구들과 어울리는 경험이

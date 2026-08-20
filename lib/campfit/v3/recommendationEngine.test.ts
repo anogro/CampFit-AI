@@ -171,7 +171,9 @@ describe("CampFit v3 recommendation engine", () => {
     expect(result.experienceDirections[0]?.key).toBe("cultureActivity")
     expect(result.destinationRecommendations[0]?.cityName).toBe("Cebu")
     expect(result.programCandidates[0]).toMatchObject({ programId: "culture-cebu", primaryDirection: "문화·활동 경험" })
-    expect(result.programCandidates[0]?.reason).toContain("후보예요")
+    expect(result.programCandidates[0]?.reason).toContain("추가 확인이 필요해요")
+    expect(result.programCandidates[0]?.reason).not.toContain("연령")
+    expect(result.programCandidates[0]?.reason).not.toContain("가족 체류")
   })
 
   it("uses parent need priority over a conflicting legacy direction hint", () => {
@@ -218,7 +220,7 @@ describe("CampFit v3 recommendation engine", () => {
     })
     expect(result.experienceDirections[0]?.key).toBe("cultureActivity")
     expect(result.consultingConclusion).toContain("또래 교류")
-    expect(result.programCandidates[0]?.reason).toContain("프로그램 정보에서 추가 확인이 필요해요")
+    expect(result.programCandidates[0]?.reason).toContain("직접 연결은 추가 확인이 필요해요")
     expect(result.programCandidates[0]?.reason).not.toContain("또래 교류·협업 활동 정보와 잘 맞는 후보")
     expect(result.programCandidates[0]?.reason).toContain("STEM")
 
@@ -259,7 +261,46 @@ describe("CampFit v3 recommendation engine", () => {
     expect(result.programCandidates.map((item) => item.programId)).toEqual(["peer-direct", "generic-english"])
     expect(result.programCandidates[0]?.reason).toContain("국제학생과 함께하는 또래 교류")
     expect(result.programCandidates[0]?.matchHighlights?.join(" ") ?? "").toContain("국제학생과 함께하는 또래 교류")
-    expect(result.programCandidates[1]?.reason).toContain("목표와 직접 연결되는 프로그램 특성은 추가 확인이 필요해요")
+    expect(result.programCandidates[1]?.reason).toContain("영어를 실제로 사용하며 자연스럽게 늘리는 경험")
+  })
+
+  it("uses grounded activity evidence when parent experience needs are absent", () => {
+    const state = stateFor("subjectProject", {
+      activityPreferences: {
+        preferences: [{ category: "stem_maker", strength: "strong", rank: 1, mentionedActivities: ["과학실험", "만들기"], evidence: ["과학실험과 만들기를 좋아해요"] }],
+        varietyPreference: "unspecified",
+        evidence: ["과학실험과 만들기를 좋아해요"],
+      },
+    })
+    const result = buildRecommendation({
+      basicInfo: { ...basicInfo, durationWeeks: 3 },
+      state,
+      catalog: productionCatalog([program({
+        id: "demo-strength-stem",
+        city: "Auckland",
+        country: "New Zealand",
+        direction: "subjectProject",
+        durationWeeks: [3],
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 3, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-07-20", "2026-08-09", 3)],
+        traits: [],
+        demoProfile: {
+          productCategory: "stem",
+          accommodationOptions: [],
+          priceQuality: "reference",
+          priceNote: "참고",
+          packageInclusions: demoPackage,
+          strengths: ["자연 속 STEM 탐구와 결과물"],
+          tradeoffs: [],
+        },
+      })]),
+      now,
+    })
+
+    expect(result.programCandidates[0]?.reason).toContain("과학실험과 만들기를 좋아하는 아이")
+    expect(result.programCandidates[0]?.reason).toContain("자연 속 STEM 탐구와 결과물")
+    expect(result.programCandidates[0]?.reason).not.toContain("연령")
+    expect(result.programCandidates[0]?.reason).not.toContain("가족 체류")
   })
 
   it("scenario B selects the structured schooling program instead of a generic ESL program", () => {
@@ -921,6 +962,7 @@ function program(input: {
   readonly commuteTransferCount?: number | null
   readonly shuttleAvailable?: boolean | null
   readonly packageInclusions?: V3CatalogProgram["packageInclusions"]
+  readonly demoProfile?: V3CatalogProgram["demoProfile"]
 }): V3CatalogProgram {
   const price = input.price ?? 3_000_000
   const signal = (key: ExperienceDirectionKey) => key === input.direction ? 95 : key === "englishIntensive" ? 45 : 15
@@ -971,6 +1013,7 @@ function program(input: {
     catalogSource: input.catalogSource ?? "supabase",
     updatedAt: "2026-07-01T00:00:00.000Z",
     ...(input.packageInclusions === undefined ? {} : { packageInclusions: input.packageInclusions }),
+    ...(input.demoProfile === undefined ? {} : { demoProfile: input.demoProfile }),
   }
 }
 

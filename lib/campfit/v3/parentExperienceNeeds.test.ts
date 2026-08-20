@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { processConversationMessage, startConversation } from "@/lib/campfit/v3/conversationService"
+import { CampfitV3RecommendRequestSchema } from "@/lib/campfit/v3/schemas"
 import { extractDeterministicFacts } from "@/lib/campfit/v3/stateEngine"
 import { parseStructuredProviderText } from "@/lib/campfit/v3/providerNormalization"
 import type { CampfitV3BasicInfo } from "@/types/campfitV3"
@@ -81,6 +82,45 @@ describe("parent experience needs", () => {
     const value = facts.find((fact) => fact.key === "parentExperienceNeeds")?.value as Record<string, { importance: string }> | undefined
     expect(value?.["peer_interaction"]?.importance).toBe("primary")
     expect(value?.["english_growth"]?.importance).toBe("nice_to_have")
+  })
+
+  it("keeps English improvement secondary when the parent says 영어실력 향상보다는", () => {
+    const message = "영어실력 향상보다는 다양한 친구들과 어울리는 경험을 했으면 좋겠어요."
+    const facts = extractDeterministicFacts(message)
+    const value = facts.find((fact) => fact.key === "parentExperienceNeeds")?.value as Record<string, { importance: string; evidence: readonly string[] }> | undefined
+
+    expect(value?.["peer_interaction"]?.importance).toBe("primary")
+    expect(value?.["english_growth"]?.importance).toBe("nice_to_have")
+    expect(value?.["peer_interaction"]?.evidence).toContain(message.replace(/\.$/u, ""))
+    expect(value?.["english_growth"]?.evidence).toContain(message.replace(/\.$/u, ""))
+  })
+
+  it("preserves the grounded parent goal through the recommendation request contract", async () => {
+    const start = startConversation(basicInfo)
+    const message = "영어실력 향상보다는 다양한 친구들과 어울리는 경험을 했으면 좋겠어요."
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: start.updatedState,
+      basicInfo,
+      userMessage: message,
+      quickReplyKey: null,
+      provider: noProvider,
+    })
+    const request = CampfitV3RecommendRequestSchema.safeParse({
+      transcript: [{ role: "user", content: message }],
+      finalState: response.updatedState,
+      basicInfo,
+    })
+    const value = response.updatedState.facts.parentExperienceNeeds?.value as Record<string, { importance: string; evidence: readonly string[] }> | undefined
+
+    expect(request.success).toBe(true)
+    expect(value?.["peer_interaction"]).toMatchObject({ importance: "primary" })
+    expect(value?.["english_growth"]).toMatchObject({ importance: "nice_to_have" })
+    if (request.success) {
+      const requestValue = request.data.finalState.facts["parentExperienceNeeds"]?.value as Record<string, { importance: string; evidence: readonly string[] }> | undefined
+      expect(requestValue?.["peer_interaction"]).toEqual(value?.["peer_interaction"])
+      expect(requestValue?.["english_growth"]).toEqual(value?.["english_growth"])
+    }
   })
 
   it.each([

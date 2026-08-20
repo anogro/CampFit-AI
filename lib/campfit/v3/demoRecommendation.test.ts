@@ -89,6 +89,56 @@ describe("CampFit v3 Demo Catalog recommendation coverage", () => {
     expect(result.programCandidates.flatMap((candidate) => candidate.matchHighlights).join(" ")).not.toMatch(/연령에 맞는|옵션 선택지/iu)
   })
 
+  it("does not repeat the same semantic reason across the top three candidates", () => {
+    const catalog = loadDemoCatalog(2026)
+    const { childEnglishLevel: _childEnglishLevel, ...demoFactsWithoutLegacyLevel } = demoState.facts
+    const result = buildRecommendation({
+      basicInfo: {
+        ...demoBasicInfo,
+        durationWeeks: 3,
+        departureWindow: "2026년 8월",
+      },
+      state: {
+        ...demoState,
+        facts: {
+          ...demoFactsWithoutLegacyLevel,
+          childEnglishListening: fact("childEnglishListening", "understands_simple_instructions", "child"),
+          childEnglishSpeaking: fact("childEnglishSpeaking", "answers_simple_questions", "child"),
+          parentExperienceNeeds: fact("parentExperienceNeeds", {
+            english_growth: { importance: "nice_to_have", evidence: ["영어도 늘면 좋겠어요"] },
+            peer_interaction: { importance: "primary", evidence: ["외국 친구들과 어울리는 경험이 가장 중요해요"] },
+            global_experience: { importance: "unspecified", evidence: [] },
+            independence_confidence: { importance: "unspecified", evidence: [] },
+            school_learning_experience: { importance: "unspecified", evidence: [] },
+          }, "preference"),
+          activityPreferences: fact("activityPreferences", {
+            preferences: [{ category: "stem_maker", strength: "strong", rank: 1, mentionedActivities: ["과학실험", "만들기"], evidence: ["과학실험과 만들기를 좋아해요"] }],
+            varietyPreference: "unspecified",
+            evidence: ["과학실험과 만들기를 좋아해요"],
+          }, "preference"),
+        },
+      },
+      catalog,
+      now: new Date("2026-07-19T00:00:00.000Z"),
+    })
+
+    const groundedProgramEvidence = result.programCandidates.map((candidate) => {
+      const program = catalog.programs.find((item) => item.id === candidate.programId)
+      if (program === undefined) return null
+      const evidence = [
+        ...program.traits,
+        ...(program.demoProfile?.strengths ?? []),
+        ...(typeof program.description === "string" ? [program.description] : []),
+      ].map((value) => value.replace(/[.!?。！？]+$/u, "").trim()).filter(Boolean)
+      return evidence.find((value) => candidate.reason.includes(value)) ?? null
+    })
+
+    expect(result.programCandidates).toHaveLength(3)
+    const nonNullEvidence = groundedProgramEvidence.filter((value): value is string => value !== null)
+    expect(nonNullEvidence).toHaveLength(groundedProgramEvidence.length)
+    expect(new Set(nonNullEvidence).size).toBe(nonNullEvidence.length)
+  })
+
   it.each([
     ["A beginner + immersion", personaState("support_required", { englishIntensive: "primary", cultureActivity: "secondary" }), ["english_burden_possible", "manageable_with_support"]],
     ["B beginner + activity", personaState("support_required", { cultureActivity: "primary", englishIntensive: "secondary" }), ["comfortable", "manageable_with_support", "unknown"]],

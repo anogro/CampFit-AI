@@ -18,6 +18,7 @@ import type {
 } from "@/lib/campfit/v3/catalogRepository"
 import type {
   CampfitV3BasicInfo,
+  CampfitV3ActivityPreferenceCategory,
   CampfitV3ConversationState,
   CampfitV3CostEstimate,
   CampfitV3DestinationRecommendation,
@@ -110,8 +111,9 @@ export function buildRecommendation(input: {
   const sortedEligiblePrograms = eligiblePrograms.sort(comparePrograms)
   // City and program recommendations are independent lists. A strong program
   // in a city outside the city Top3 must still be eligible for the program Top3.
+  const usedReasonSignatures = new Set<string>()
   let programCandidates = selectDiverseProgramCandidates(sortedEligiblePrograms, 3)
-    .map((item) => toProgramCandidate(item, input.basicInfo, input.state))
+    .map((item) => toProgramCandidate(item, input.basicInfo, input.state, usedReasonSignatures))
 
   if (destinations.length > 0 && destinations[0]) {
     const firstCityName = destinations[0].cityName.trim().toLowerCase()
@@ -119,7 +121,7 @@ export function buildRecommendation(input: {
     if (!hasFirstCityProgram) {
       const fallbackProgram = eligiblePrograms.find((item) => item.program.city.trim().toLowerCase() === firstCityName)
       if (fallbackProgram) {
-        const fallbackCandidate = toProgramCandidate(fallbackProgram, input.basicInfo, input.state)
+        const fallbackCandidate = toProgramCandidate(fallbackProgram, input.basicInfo, input.state, usedReasonSignatures)
         programCandidates = [
           programCandidates[0] ?? null,
           programCandidates[1] ?? null,
@@ -773,7 +775,12 @@ function cityStayMonthlyCost(city: V3CatalogCity, basicInfo: CampfitV3BasicInfo)
   return parts.every((value): value is number => value !== null) ? parts.reduce((sum, value) => sum + value, 0) : null
 }
 
-function toProgramCandidate(item: ScoredProgram, basicInfo: CampfitV3BasicInfo, state: CampfitV3ConversationState): CampfitV3ProgramCandidate {
+function toProgramCandidate(
+  item: ScoredProgram,
+  basicInfo: CampfitV3BasicInfo,
+  state: CampfitV3ConversationState,
+  usedReasonSignatures?: Set<string>,
+): CampfitV3ProgramCandidate {
   const priceLabel = item.exactPrice?.priceValue !== null && item.exactPrice?.priceValue !== undefined && item.exactPrice.priceValue > 0
     ? `${formatNumber(item.exactPrice.priceValue)} ${item.exactPrice.currency ?? "통화 미확인"}${item.exactPrice.adultCount === 0 ? ` · 아이 ${basicInfo.childAges.length}명 프로그램비` : ""}`
     : item.program.budgetMinKrw !== null && item.program.budgetMinKrw > 0
@@ -785,7 +792,8 @@ function toProgramCandidate(item: ScoredProgram, basicInfo: CampfitV3BasicInfo, 
       ? "조건 확인 후 살펴볼 프로그램"
       : "함께 비교할 대안"
   const baseUrl = process.env["NEXT_PUBLIC_ANOGRO_SITE_URL"] ?? "https://www.anogro.com"
-  const reasonProjection = buildProgramReason(item, basicInfo, state)
+  const reasonProjection = buildProgramReason(item, state, usedReasonSignatures ?? new Set())
+  if (reasonProjection.selectedSignature !== null) usedReasonSignatures?.add(reasonProjection.selectedSignature)
   return {
     programId: item.program.id,
     name: item.program.name,
@@ -1182,12 +1190,46 @@ type ProgramReasonProjection = {
   readonly reason: string
   readonly highlights: readonly string[]
   readonly tradeoff: string | null
+  readonly selectedSignature: string | null
+}
+
+type ProgramReasonKind =
+  | "parent_primary_goal"
+  | "activity_preference"
+  | "english_match"
+  | "participation_support"
+  | "parent_secondary_goal"
+  | "regional_or_cost_difference"
+
+type ProgramReasonCandidate = {
+  readonly reasonKind: ProgramReasonKind
+  readonly userFactKey: string
+  readonly userEvidence: string
+  readonly programEvidenceKey: string
+  readonly programEvidence: string
+  readonly renderedText: string
+  readonly priority: number
+  readonly signature: string
+}
+
+type ProgramCatalogEvidence = {
+  readonly key: string
+  readonly text: string
 }
 
 type ParentNeedProjection = {
   readonly axis: "english_growth" | "peer_interaction" | "global_experience" | "independence_confidence" | "school_learning_experience"
   readonly label: string
   readonly importance: "primary" | "important" | "nice_to_have"
+  readonly evidence: readonly string[]
+}
+
+type ProgramActivityMatch = {
+  readonly category: string
+  readonly preference: string
+  readonly userEvidence: string
+  readonly programEvidenceKey: string
+  readonly programEvidence: string
 }
 
 const parentNeedLabels: Readonly<Record<ParentNeedProjection["axis"], string>> = {
@@ -1198,54 +1240,94 @@ const parentNeedLabels: Readonly<Record<ParentNeedProjection["axis"], string>> =
   school_learning_experience: "해외 학교생활과 수업 방식을 경험하는 것",
 }
 
-function buildProgramReason(item: ScoredProgram, basicInfo: CampfitV3BasicInfo, state: CampfitV3ConversationState): ProgramReasonProjection {
-  const need = primaryParentNeed(state)
-  const goalEvidence = need ? programGoalEvidence(item.program, need.axis, item.direction) : null
+function buildProgramReason(
+  item: ScoredProgram,
+  state: CampfitV3ConversationState,
+  usedReasonSignatures: ReadonlySet<string>,
+): ProgramReasonProjection {
+  const needs = parentNeeds(state)
+  const primaryNeed = needs[0] ?? null
+  const primaryGoalEvidence = primaryNeed === null ? null : programGoalEvidence(item.program, primaryNeed.axis, item.direction)
   const activityMatch = programActivityMatch(item.program, state)
-  const highlights: string[] = []
-  const lead = need
-    ? goalEvidence
-      ? `${parentNeedSubject(need)} ${needImportancePhrase(need.importance)} 이 후보에서 ${goalEvidence} 근거가 확인돼 목표와 잘 맞는 후보예요.`
-      : activityMatch
-        ? `${activityMatch.preference}과 프로그램의 ${activityMatch.programFeature} 구성이 잘 맞아 추천했어요. ${need.label}은 프로그램 정보에서 추가 확인이 필요해요.`
-        : `${parentNeedSubject(need)} ${needImportancePhrase(need.importance, true)} 이 후보에서 목표와 직접 연결되는 프로그램 특성은 추가 확인이 필요해요.`
-    : `${directionLabels[item.direction]}을 중심으로 아이의 연령·${basicInfo.durationWeeks}주 기간·가족 체류 조건을 함께 확인한 후보예요.`
+  const candidates: ProgramReasonCandidate[] = []
 
-  const activityInLead = need !== null && goalEvidence === null && activityMatch !== null
-  if (goalEvidence) highlights.push(`프로그램에서 확인된 근거: ${goalEvidence}`)
-  if (activityMatch && !activityInLead) {
-    highlights.push(`아이가 좋아하는 ${activityMatch.preference}과 프로그램의 ${activityMatch.programFeature} 구성이 연결돼요.`)
+  for (const need of needs) {
+    const evidence = programGoalEvidence(item.program, need.axis, item.direction)
+    if (evidence === null) continue
+    const isPrimary = need.importance === "primary"
+    candidates.push(makeReasonCandidate({
+      reasonKind: isPrimary ? "parent_primary_goal" : "parent_secondary_goal",
+      userFactKey: "parentExperienceNeeds",
+      userEvidence: need.evidence[0] ?? "부모가 기대하는 경험",
+      programEvidenceKey: `parent:${need.axis}:${evidence.key}:${normalizeReasonPart(evidence.text)}`,
+      programEvidence: evidence.text,
+      renderedText: `${parentNeedSubject(need)} ${needImportancePhrase(need.importance)} 이 후보의 ${evidence.text} 근거와 연결돼 추천했어요.`,
+      priority: isPrimary ? 10 : need.importance === "important" ? 50 : 80,
+    }))
   }
 
-  const participationHighlight = programParticipationHighlight(item.program, state)
-  if (participationHighlight) highlights.push(participationHighlight)
+  if (activityMatch !== null) {
+    candidates.push(makeReasonCandidate({
+      reasonKind: "activity_preference",
+      userFactKey: "activityPreferences",
+      userEvidence: activityMatch.userEvidence,
+      programEvidenceKey: activityMatch.programEvidenceKey,
+      programEvidence: activityMatch.programEvidence,
+      renderedText: `${activityMatch.preference}${koreanObjectParticle(activityMatch.preference)} 좋아하는 아이와 프로그램의 ${activityMatch.programEvidence} 구성이 연결돼 추천했어요.${primaryNeed && primaryGoalEvidence === null ? ` ${primaryNeed.label}과의 직접 연결은 추가 확인이 필요해요.` : ""}`,
+      priority: 20,
+    }))
+  }
 
-  if (preferredRegionMatches(item.city, state)) highlights.push("말씀하신 선호 지역 조건과도 맞아요.")
+  const englishCandidate = programEnglishReasonCandidate(item, state)
+  if (englishCandidate !== null) candidates.push(englishCandidate)
+
+  const sortedCandidates = candidates.sort((left, right) => left.priority - right.priority)
+  const selected = sortedCandidates.find((candidate) => !usedReasonSignatures.has(candidate.signature)) ?? sortedCandidates[0] ?? null
+  const highlights = sortedCandidates
+    .map((candidate) => `프로그램에서 확인된 근거: ${candidate.programEvidence}`)
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .slice(0, 3)
+
+  const reason = selected?.renderedText
+    ?? (primaryNeed
+      ? `${parentNeedSubject(primaryNeed)} ${needImportancePhrase(primaryNeed.importance, true)} 이 후보에서 목표와 직접 연결되는 프로그램 근거는 추가 확인이 필요해요.`
+      : "사용자 선호와 직접 연결되는 프로그램 근거는 추가 확인이 필요해요.")
+
+  const participationHighlight = programParticipationHighlight(item.program, state)
+  if (participationHighlight && highlights.length < 3) highlights.push(participationHighlight)
+  if (preferredRegionMatches(item.city, state) && highlights.length < 3) highlights.push("말씀하신 선호 지역 조건과도 맞아요.")
 
   let tradeoff: string | null = null
-  if (item.classification === "alternative" && need === null) {
+  if (primaryNeed !== null && primaryGoalEvidence === null) {
+    tradeoff = `${primaryNeed.label}과의 직접 연결 근거는 신청 전 프로그램 구성에서 확인해 주세요.`
+  } else if (item.classification === "alternative" && primaryNeed === null) {
     tradeoff = "가족의 핵심 목표와 일부 조건이 달라, 확인할 점이 있는 대안으로 표시했어요."
   }
 
-  return { reason: lead, highlights: highlights.slice(0, 3), tradeoff }
+  return { reason, highlights, tradeoff, selectedSignature: selected?.signature ?? null }
 }
 
 function primaryParentNeed(state: CampfitV3ConversationState): ParentNeedProjection | null {
+  return parentNeeds(state)[0] ?? null
+}
+
+function parentNeeds(state: CampfitV3ConversationState): readonly ParentNeedProjection[] {
   const value = state.facts.parentExperienceNeeds?.value
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return []
   const record = value as Record<string, unknown>
   const axes: readonly ParentNeedProjection["axis"][] = ["school_learning_experience", "english_growth", "peer_interaction", "global_experience", "independence_confidence"]
   const importanceOrder: readonly ParentNeedProjection["importance"][] = ["primary", "important", "nice_to_have"]
-  for (const importance of importanceOrder) {
-    const axis = axes.find((key) => {
-      const need = record[key]
-      return typeof need === "object" && need !== null && (need as Record<string, unknown>)["importance"] === importance
-        && Array.isArray((need as Record<string, unknown>)["evidence"])
-        && ((need as Record<string, unknown>)["evidence"] as unknown[]).length > 0
-    })
-    if (axis) return { axis, label: parentNeedLabels[axis], importance }
-  }
-  return null
+  return importanceOrder.flatMap((importance) => axes.flatMap((axis): readonly ParentNeedProjection[] => {
+    const need = record[axis]
+    if (typeof need !== "object" || need === null) return []
+    const needRecord = need as Record<string, unknown>
+    const evidence = Array.isArray(needRecord["evidence"])
+      ? needRecord["evidence"].filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      : []
+    return needRecord["importance"] === importance && evidence.length > 0
+      ? [{ axis, label: parentNeedLabels[axis], importance, evidence }]
+      : []
+  }))
 }
 
 function experienceDirectionSummary(
@@ -1293,7 +1375,7 @@ function parentNeedSubject(need: ParentNeedProjection): string {
   return need.importance === "nice_to_have" ? `${need.label}도` : `${need.label}을`
 }
 
-function programGoalEvidence(program: V3CatalogProgram, axis: ParentNeedProjection["axis"], direction: ExperienceDirectionKey): string | null {
+function programGoalEvidence(program: V3CatalogProgram, axis: ParentNeedProjection["axis"], direction: ExperienceDirectionKey): ProgramCatalogEvidence | null {
   const text = catalogProgramEvidenceText(program)
   const directionScore = programExperienceScore(program, direction)
   if (axis === "peer_interaction") {
@@ -1302,35 +1384,66 @@ function programGoalEvidence(program: V3CatalogProgram, axis: ParentNeedProjecti
   }
   const englishLevel = program.englishRequirement?.level
   if (axis === "english_growth" && ((englishLevel !== undefined && englishLevel !== "unknown" && englishLevel !== "no_requirement") || directionScore >= 60 || /영어|english|esl|immersion|language/i.test(text))) {
-    return firstCatalogEvidence(program, /영어|english|esl|immersion|language/iu) ?? "영어 사용 활동"
+    return firstCatalogEvidence(program, /영어|english|esl|immersion|language/iu)
   }
   if (axis === "global_experience") {
     const evidence = firstCatalogEvidence(program, /문화|현지|도시|다문화|국제|culture|local|international|community/iu)
     if (evidence !== null) return evidence
   }
-  if (axis === "independence_confidence" && (program.parentScope.stayMode === "child_residential" || program.parentScope.stayMode === "homestay" || program.earlyAdaptationSupport === true)) return "아이 독립 참여·초기 적응 지원"
+  if (axis === "independence_confidence" && (program.parentScope.stayMode === "child_residential" || program.parentScope.stayMode === "homestay" || program.earlyAdaptationSupport === true)) {
+    return { key: "program.parentScope/earlyAdaptationSupport", text: "아이 독립 참여·초기 적응 지원" }
+  }
   if (axis === "school_learning_experience" && (direction === "schoolSchooling" || /학교|수업|school|class|schooling/i.test(text))) {
-    return firstCatalogEvidence(program, /학교|수업|school|class|schooling/iu) ?? "학교형 수업 환경"
+    return firstCatalogEvidence(program, /학교|수업|school|class|schooling/iu)
   }
   return null
 }
 
-function firstCatalogEvidence(program: V3CatalogProgram, matcher: RegExp): string | null {
+function firstCatalogEvidence(program: V3CatalogProgram, matcher: RegExp): ProgramCatalogEvidence | null {
   const entries = [
-    ...program.traits,
-    ...(program.demoProfile?.strengths ?? []),
-    ...(program.experienceAssessment?.evidence.map((item) => item.value) ?? []),
-    ...(program.description ? [program.description] : []),
+    ...program.traits.map((text) => ({ key: "program.traits", text })),
+    ...(program.demoProfile?.strengths ?? []).map((text) => ({ key: "program.demoProfile.strengths", text })),
+    ...(program.experienceAssessment?.evidence.map((item) => ({ key: item.source, text: item.value })) ?? []),
+    ...(program.description ? [{ key: "program.description", text: program.description }] : []),
   ]
-  return entries.find((entry) => matcher.test(entry))?.replace(/[.!?。！？]+$/u, "").trim() ?? null
+  const match = entries.find((entry) => matcher.test(entry.text))
+  return match === undefined ? null : { ...match, text: match.text.replace(/[.!?。！？]+$/u, "").trim() }
 }
 
-function programActivityMatch(program: V3CatalogProgram, state: CampfitV3ConversationState): { readonly preference: string; readonly programFeature: string } | null {
+function makeReasonCandidate(input: Omit<ProgramReasonCandidate, "signature">): ProgramReasonCandidate {
+  return {
+    ...input,
+    signature: [input.reasonKind, input.userFactKey, input.programEvidenceKey].join("|"),
+  }
+}
+
+function normalizeReasonPart(value: string): string {
+  return value.normalize("NFKC").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, "").slice(0, 120)
+}
+
+function programEnglishReasonCandidate(item: ScoredProgram, state: CampfitV3ConversationState): ProgramReasonCandidate | null {
+  if (["official_requirement_mismatch", "unknown"].includes(item.englishMatch.status)) return null
+  const userFact = ["childEnglishListening", "childEnglishSpeaking", "childEnglishUsage", "childEnglishReading", "childEnglishWriting"]
+    .map((key) => state.facts[key as keyof CampfitV3ConversationState["facts"]])
+    .find((fact) => fact?.evidence.trim())
+  if (userFact === undefined) return null
+  const programEvidence = firstCatalogEvidence(item.program, /영어|english|esl|immersion|language/iu)
+  if (programEvidence === null) return null
+  return makeReasonCandidate({
+    reasonKind: "english_match",
+    userFactKey: userFact.key,
+    userEvidence: userFact.evidence,
+    programEvidenceKey: `english:${programEvidence.key}:${normalizeReasonPart(programEvidence.text)}`,
+    programEvidence: programEvidence.text,
+    renderedText: `아이의 영어 참여 근거와 프로그램의 ${programEvidence.text} 구성이 연결돼 추천했어요.`,
+    priority: 30,
+  })
+}
+
+function programActivityMatch(program: V3CatalogProgram, state: CampfitV3ConversationState): ProgramActivityMatch | null {
   const value = state.facts.activityPreferences?.value
   if (!isActivityPreferenceProfileValue(value)) return null
-  // Activity claims should come from the program's own normalized traits or
-  // tag evidence. Broad marketing strengths may mention several directions
-  // and are not precise enough to claim a child-preference match on their own.
+
   const evidenceText = programActivityEvidenceText(program)
   const signals = new Map(program.experienceAssessment?.tags.map((item) => [item.tag, item.score]) ?? [])
   const ordered = [...value.preferences].filter((preference) => preference.strength !== "dislike").sort((left, right) => (left.rank ?? 99) - (right.rank ?? 99))
@@ -1338,13 +1451,30 @@ function programActivityMatch(program: V3CatalogProgram, state: CampfitV3Convers
     const tags = activityCategoryTags[preference.category] ?? []
     const signal = Math.max(...tags.map((tag) => signals.get(tag) ?? 0), 0)
     const textMatches = activityTextMatches(preference.category, evidenceText)
-    if (signal < 65 && !textMatches) continue
+    const programEvidence = programTraitForActivity(program, preference.category)
+    if (programEvidence === null || signal < 65 && !textMatches) continue
     return {
-      preference: activityCategoryPhrase(preference.category),
-      programFeature: programTraitForActivity(program, preference.category) ?? activityCategoryPhrase(preference.category),
+      category: preference.category,
+      preference: activityPreferenceLabel(preference),
+      userEvidence: preference.evidence[0] ?? `${activityCategoryPhrase(preference.category)} 선호`,
+      programEvidenceKey: `activity:${preference.category}`,
+      programEvidence: programEvidence.text,
     }
   }
   return null
+}
+
+function activityPreferenceLabel(preference: { readonly category: CampfitV3ActivityPreferenceCategory; readonly mentionedActivities: readonly string[] }): string {
+  const mentioned = preference.mentionedActivities.map((value) => value.trim()).filter(Boolean).slice(0, 3)
+  if (mentioned.length === 1) return mentioned[0]!
+  if (mentioned.length > 1) return mentioned.join("과 ")
+  return activityCategoryPhrase(preference.category)
+}
+
+function koreanObjectParticle(value: string): "을" | "를" {
+  const last = value.codePointAt(value.length - 1) ?? 0
+  if (last < 0xac00 || last > 0xd7a3) return "를"
+  return (last - 0xac00) % 28 === 0 ? "를" : "을"
 }
 
 function programParticipationHighlight(program: V3CatalogProgram, state: CampfitV3ConversationState): string | null {
@@ -1370,34 +1500,28 @@ function programActivityEvidenceText(program: V3CatalogProgram): string {
   return [
     program.description ?? "",
     ...program.traits,
+    ...(program.demoProfile?.strengths ?? []),
     ...(program.experienceAssessment?.tags.map((item) => item.tag) ?? []),
   ].join(" ")
 }
 
-function activityTextMatches(category: string, text: string): boolean {
-  const patterns: Readonly<Record<string, RegExp>> = {
-    stem_maker: /stem|science|coding|robot|maker|과학|실험|코딩|로봇|메이커|만들기/i,
-    sports_physical: /sport|축구|농구|수영|운동|체육/i,
-    nature_outdoor: /nature|outdoor|environment|자연|야외|숲|해양|바다|환경/i,
-    animals_ecology: /animal|ecology|wildlife|동물|생태|해양생물/i,
-    art_creative: /art|drawing|painting|craft|design|미술|그림|공예|디자인/i,
-    performance_music: /music|performance|dance|concert|음악|공연|춤|댄스/i,
-    culture_lifestyle: /culture|local|city|문화|현지|도시/i,
-  }
-  return patterns[category]?.test(text) ?? false
+const activityEvidencePatterns: Readonly<Record<string, RegExp>> = {
+  stem_maker: /stem|science|coding|robot|maker|과학|실험|코딩|로봇|메이커|만들기/i,
+  sports_physical: /sport|축구|농구|수영|운동|체육/i,
+  nature_outdoor: /nature|outdoor|environment|자연|야외|숲|해양|바다|환경/i,
+  animals_ecology: /animal|ecology|wildlife|동물|생태|해양생물/i,
+  art_creative: /art|drawing|painting|craft|design|미술|그림|공예|디자인/i,
+  performance_music: /music|performance|dance|concert|음악|공연|춤|댄스/i,
+  culture_lifestyle: /culture|local|city|문화|현지|도시/i,
 }
 
-function programTraitForActivity(program: V3CatalogProgram, category: string): string | null {
-  const patterns: Readonly<Record<string, RegExp>> = {
-    stem_maker: /STEM|science|coding|robot|maker|과학|실험|코딩|로봇|메이커|만들기/i,
-    sports_physical: /sport|축구|농구|수영|운동|체육/i,
-    nature_outdoor: /nature|outdoor|environment|자연|야외|숲|해양|바다|환경/i,
-    animals_ecology: /animal|ecology|wildlife|동물|생태|해양생물/i,
-    art_creative: /art|drawing|painting|craft|design|미술|그림|공예|디자인/i,
-    performance_music: /music|performance|dance|concert|음악|공연|춤|댄스/i,
-    culture_lifestyle: /culture|local|city|문화|현지|도시/i,
-  }
-  return program.traits.find((trait) => patterns[category]?.test(trait)) ?? null
+function activityTextMatches(category: string, text: string): boolean {
+  return activityEvidencePatterns[category]?.test(text) ?? false
+}
+
+function programTraitForActivity(program: V3CatalogProgram, category: string): ProgramCatalogEvidence | null {
+  const pattern = activityEvidencePatterns[category]
+  return pattern === undefined ? null : firstCatalogEvidence(program, pattern)
 }
 
 function supportScore(need: string, program: V3CatalogProgram): number {
