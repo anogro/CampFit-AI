@@ -33,7 +33,7 @@ export function calculateTotalTripCost(input: TotalTripCostInput): CampfitV3Trip
   const lines = [program, accommodation, flights, living, localTransport, other]
   const summed = sumRanges(lines)
   const hasKnownAmount = lines.some((line) => !["inquiry", "not_available"].includes(line.status) && (line.low !== null || line.high !== null))
-  const unresolvedItems = collectUnresolvedItems(lines)
+  const unresolvedItems = collectUnresolvedItems(lines, other.items)
   const assumptions = [
     `성인 ${input.basicInfo.adultCount}명·아동 ${input.basicInfo.childCount}명 전체 여행비 기준`,
     "프로그램 추천과 참가비는 첫 번째 아이 기준",
@@ -67,6 +67,9 @@ function otherCosts(): TripCostLine & { readonly items: readonly string[] } {
   }
 }
 
-function collectUnresolvedItems(lines: readonly TripCostLine[]): readonly string[] {
-  return uniqueStrings(lines.flatMap((line) => line.notes.filter((note) => /확인 필요|문의 필요|확인된 데이터가 없어|환율 설정이 없어|추가요금이 있을 수/.test(note))))
+function collectUnresolvedItems(lines: readonly TripCostLine[], otherItems: readonly string[]): readonly string[] {
+  return uniqueStrings([
+    ...lines.flatMap((line) => line.notes.filter((note) => /확인 필요|문의 필요|확인된 데이터가 없어|환율 설정이 없어|추가요금이 있을 수/.test(note))),
+    ...otherItems.map((item) => `확인 필요: ${item}`),
+  ])
 }

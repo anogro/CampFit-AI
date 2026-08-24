@@ -44,7 +44,6 @@ export function CampFitV3ResultActions({
   async function saveReport(format: CampFitResultExportFormat): Promise<void> {
     const report = reportRef.current
     if (!report || !exportLock.current.acquire()) return
-    trackCampfitV3AnalyticsEvent({ eventName: "campfit_report_action", stage: "result", resultId, action: "email_requested" })
     setExportBusy(format)
     setNotice("")
     try {
@@ -68,6 +67,7 @@ export function CampFitV3ResultActions({
     }
     const report = reportRef.current
     if (!report || !exportLock.current.acquire()) return
+    trackCampfitV3AnalyticsEvent({ eventName: "campfit_report_action", stage: "result", resultId, action: "email_requested" })
     setEmailError("")
     setNotice("")
     setEmailBusy(true)

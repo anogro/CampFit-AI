@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS, campfitV3FactKeys, campfitV3FactSources, campfitV3FactStatuses, campfitV3FactSubjects } from "@/types/campfitV3"
+import { CAMPFIT_V3_MAX_DURATION_WEEKS, CAMPFIT_V3_MIN_DURATION_WEEKS, campfitV3EnglishAssessmentTypes, campfitV3EnglishEnvironmentTypes, campfitV3EnglishExperienceTypes, campfitV3EnglishReadinessValues, campfitV3FactKeys, campfitV3FactSources, campfitV3FactStatuses, campfitV3FactSubjects, campfitV3ParentDistanceComfortLevels, campfitV3ParentExperienceNeedAxes, campfitV3ParentNeedImportanceValues, campfitV3ParticipationAdaptationLevels, campfitV3ParticipationEvidenceSubjects, campfitV3PeerInteractionStyleLevels, campfitV3ParticipationStyleLevels } from "@/types/campfitV3"
 
 export const CampfitV3BasicInfoSchema = z
   .object({
@@ -85,6 +85,11 @@ export const CampfitV3ConversationMessageRequestSchema = z.object({
 
 export const CampfitV3ConversationResponseSchema = z.object({
   assistantMessage: z.string().min(1).max(1000),
+  acknowledgementEvidence: z.array(z.object({
+    factKey: z.enum(campfitV3FactKeys),
+    source: z.enum(["ai_inference", "explicit_user_statement", "quick_reply", "structured_input", "user_correction"]),
+    evidence: z.string().min(1).max(240),
+  })).max(20).optional(),
   updatedState: CampfitV3ConversationStateSchema,
   updatedBasicInfo: CampfitV3BasicInfoSchema,
   quickReplies: z.array(z.object({ key: z.string().min(1).max(80), label: z.string().min(1).max(200) })).max(12),
@@ -193,18 +198,24 @@ export const CampfitV3RecommendationResultSchema = z.object({
     explanation: z.string().max(500),
   })).max(4),
   destinationRecommendations: z.array(z.object({
-    cityId: z.string().min(1), cityName: z.string().min(1), countryName: z.string().min(1),
+    cityId: z.string().min(1), cityName: z.string().min(1), citySlug: z.string().nullable().optional(), countryName: z.string().min(1),
     role: z.enum(["가장 균형 잡힌 선택", "원래 희망을 가장 잘 살리는 선택", "비용·부모 체류 관점의 대안"]),
     imageUrl: z.string().nullable(), reason: z.string(), verify: z.array(z.string()), costEstimate: CampfitV3CostEstimateSchema,
     cityStayFlightCostKrw: z.number().nonnegative().nullable().optional(), cityStayMonthlyCostKrw: z.number().nonnegative().nullable().optional(),
     singleFlightCostKrw: z.number().nonnegative().nullable().optional(), livingCostMonthlyKrw: z.number().nonnegative().nullable().optional(), housingCostMonthlyKrw: z.number().nonnegative().nullable().optional(),
-    description: z.string().nullable().optional(), bullets: z.array(z.string()).optional(), tripCost: CampfitV3TripCostSchema.optional(),
+    description: z.string().nullable().optional(), comparisonNote: z.string().nullable().optional(), bullets: z.array(z.string()).optional(), tripCost: CampfitV3TripCostSchema.optional(),
   })).max(3),
   requiredSupportConditions: z.array(z.string()).max(30),
   programCandidates: z.array(z.object({
     programId: z.string().min(1), name: z.string().min(1), cityName: z.string().min(1), countryName: z.string().min(1),
     imageUrl: z.string().nullable(), ageLabel: z.string(), durationLabel: z.string(), priceLabel: z.string(), primaryDirection: z.string(),
-    reason: z.string(), verify: z.array(z.string()), detailUrl: z.string().nullable(),
+    reason: z.string(), description: z.string().nullable().optional(), matchHighlights: z.array(z.string()).max(3).optional(), tradeoff: z.string().optional(), verify: z.array(z.string()),
+    englishRequirementLevel: z.enum(["no_requirement", "beginner_friendly", "general_english", "academic_english", "unknown"]).optional(),
+    englishRequirementSource: z.enum(["official", "inferred", "demo_fixture", "unknown"]).optional(),
+    englishMatchStatus: z.enum(["comfortable", "manageable_with_support", "english_burden_possible", "official_requirement_mismatch", "unknown"]).optional(),
+    englishMatchLabel: z.string().optional(), englishMatchExplanation: z.string().optional(),
+    catalogSource: z.enum(["supabase", "demo"]).optional(),
+    detailUrl: z.string().nullable(),
     group: z.enum(["우선 살펴볼 프로그램", "조건 확인 후 살펴볼 프로그램", "함께 비교할 대안"]), score: z.number().min(0).max(100), tripCost: CampfitV3TripCostSchema.optional(),
   })).max(9),
   verificationChecklist: z.array(z.string()).max(50),
@@ -222,14 +233,26 @@ export const CampfitV3RecommendRequestSchema = z.object({
 
 const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], readonly string[]>> = {
   childEnglishLevel: ["child"],
+  childEnglishExperience: ["child"],
+  childEnglishEnvironment: ["child"],
+  childEnglishAssessment: ["child"],
+  childEnglishListening: ["child"],
+  childEnglishSpeaking: ["child"],
+  childEnglishReading: ["child"],
+  childEnglishWriting: ["child"],
+  childEnglishUsage: ["child"],
+  englishReadiness: ["child"],
   parentEnglishCommunication: ["parent"],
   isFirstOverseasEducationExperience: ["child"],
   dayProgramSeparationReadiness: ["child"],
   preferredActivities: ["preference"],
+  activityPreferences: ["preference"],
+  participationProfile: ["child"],
   destinationPreference: ["preference"],
   socialPreference: ["child", "preference"],
   desiredOutcomes: ["preference"],
   worries: ["parent", "family"],
+  parentExperienceNeeds: ["preference"],
   experienceGoals: ["preference"],
   preferredRegions: ["preference"],
   excludedRegions: ["preference"],
@@ -250,16 +273,72 @@ const expectedSubjects: Readonly<Record<(typeof campfitV3FactKeys)[number], read
 }
 
 const goalStrengthSchema = z.enum(["primary", "secondary", "mentioned", "none"])
+const parentExperienceNeedSchema = z.object({
+  importance: z.enum(campfitV3ParentNeedImportanceValues),
+  evidence: z.array(z.string().trim().min(1).max(240)).max(3),
+})
+const parentExperienceNeedsSchema = z.object(
+  Object.fromEntries(campfitV3ParentExperienceNeedAxes.map((axis) => [axis, parentExperienceNeedSchema])) as Record<(typeof campfitV3ParentExperienceNeedAxes)[number], typeof parentExperienceNeedSchema>,
+)
+const englishExperienceSchema = z.array(z.object({
+  type: z.enum(campfitV3EnglishExperienceTypes),
+  durationYears: z.number().min(0).max(20).nullable(),
+  ongoing: z.boolean().nullable(),
+})).max(8)
+const englishAssessmentSchema = z.array(z.object({
+  type: z.enum(campfitV3EnglishAssessmentTypes),
+  value: z.union([z.number().finite(), z.string().trim().min(1).max(80)]),
+})).max(8)
+const activityPreferenceSchema = z.object({
+  category: z.enum(["stem_maker", "sports_physical", "nature_outdoor", "animals_ecology", "art_creative", "performance_music", "culture_lifestyle"]),
+  strength: z.enum(["strong", "positive", "neutral", "dislike"]),
+  rank: z.number().int().positive().nullable(),
+  mentionedActivities: z.array(z.string().trim().min(1).max(80)).max(8),
+  evidence: z.array(z.string().trim().min(1).max(240)).max(3),
+})
+const activityPreferenceProfileSchema = z.object({
+  preferences: z.array(activityPreferenceSchema).max(7),
+  varietyPreference: z.enum(["strong", "positive", "unspecified"]),
+  evidence: z.array(z.string().trim().min(1).max(240)).max(6),
+})
+const participationAxisSchema = (levels: readonly [string, ...string[]]) => z.object({
+  level: z.enum(levels),
+  evidence: z.array(z.string().trim().min(1).max(240)).max(3),
+  confidence: z.number().min(0).max(1),
+  subject: z.enum(campfitV3ParticipationEvidenceSubjects),
+})
+const participationProfileSchema = z.object({
+  adaptation_to_new_environment: participationAxisSchema(campfitV3ParticipationAdaptationLevels),
+  peer_interaction_style: participationAxisSchema(campfitV3PeerInteractionStyleLevels),
+  parent_distance_comfort: participationAxisSchema(campfitV3ParentDistanceComfortLevels),
+  participation_style: participationAxisSchema(campfitV3ParticipationStyleLevels),
+  independent_class_participation: z.enum(["ready", "needs_support", "unknown"]),
+  parent_preference_evidence: z.array(z.string().trim().min(1).max(240)).max(3),
+  ambiguous_evidence: z.array(z.string().trim().min(1).max(240)).max(3),
+  raw_evidence: z.array(z.string().trim().min(1).max(240)).max(6),
+})
 const valueSchemas: Readonly<Record<(typeof campfitV3FactKeys)[number], z.ZodTypeAny>> = {
   childEnglishLevel: z.enum(["beginner", "basic", "intermediate", "advanced"]),
+  childEnglishExperience: englishExperienceSchema,
+  childEnglishEnvironment: z.array(z.enum(campfitV3EnglishEnvironmentTypes)).max(8),
+  childEnglishAssessment: englishAssessmentSchema,
+  childEnglishListening: z.enum(["understands_simple_instructions", "understands_class_explanation", "struggles_with_class_explanation", "unknown"]),
+  childEnglishSpeaking: z.enum(["answers_simple_questions", "can_converse", "initiates_speech", "can_present_in_english", "difficulty_initiating", "rarely_speaks", "unknown"]),
+  childEnglishReading: z.enum(["phonics_only", "reads_simple_text", "reads_english_books", "understands_english_books", "unknown"]),
+  childEnglishWriting: z.enum(["simple_words", "simple_sentences", "can_explain_in_english", "unknown"]),
+  childEnglishUsage: z.array(z.enum(["speaks_with_foreigners", "answers_in_english", "initiates_in_english", "difficulty_initiating", "rarely_uses_english"])).max(8),
+  englishReadiness: z.enum(campfitV3EnglishReadinessValues),
   parentEnglishCommunication: z.enum(["possible", "limited", "not_possible"]),
   isFirstOverseasEducationExperience: z.boolean(),
   dayProgramSeparationReadiness: z.enum(["needs_close_support", "with_initial_support", "ready"]),
   preferredActivities: z.array(z.string().trim().min(1).max(80)).max(12),
+  activityPreferences: activityPreferenceProfileSchema,
+  participationProfile: participationProfileSchema,
   destinationPreference: z.array(z.string().trim().min(1).max(80)).max(8),
   socialPreference: z.array(z.string().trim().min(1).max(80)).max(8),
   desiredOutcomes: z.array(z.string().trim().min(1).max(120)).max(8),
   worries: z.array(z.string().trim().min(1).max(120)).max(8),
+  parentExperienceNeeds: parentExperienceNeedsSchema,
   experienceGoals: z.object({
     schoolSchooling: goalStrengthSchema,
     englishIntensive: goalStrengthSchema,

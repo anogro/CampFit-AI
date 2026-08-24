@@ -18,6 +18,104 @@ const basicInfo: CampfitV3BasicInfo = {
 }
 
 describe("CampFit v3 recommendation engine", () => {
+  it("keeps constrained December candidates stable without unrelated hard filters", () => {
+    const inferredAcademicRequirement: NonNullable<V3CatalogProgram["englishRequirement"]> = {
+      level: "academic_english",
+      source: "inferred",
+      confidence: 0.8,
+      version: "fixture-v1",
+      officialVerified: false,
+      officialText: null,
+      officialQualification: null,
+      instructionLanguageMode: null,
+      beginnerParticipation: null,
+      officialMinimumReadiness: null,
+    }
+    const matchingPrograms = [
+      program({
+        id: "december-cebu-four-week",
+        city: "Cebu",
+        country: "Philippines",
+        direction: "englishIntensive",
+        durationWeeks: [4],
+        price: 3_000_000,
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 4, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-12-01", "2026-12-28", 4)],
+        englishRequirement: inferredAcademicRequirement,
+      }),
+      program({
+        id: "december-auckland-four-week",
+        city: "Auckland",
+        country: "New Zealand",
+        direction: "englishIntensive",
+        durationWeeks: [4],
+        price: 3_000_000,
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 4, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-12-01", "2026-12-28", 4)],
+      }),
+    ] as const
+    const excludedPrograms = [
+      program({
+        id: "august-cebu-four-week",
+        city: "Singapore",
+        country: "Singapore",
+        direction: "englishIntensive",
+        durationWeeks: [4],
+        price: 3_000_000,
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 4, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-08-01", "2026-08-28", 4)],
+      }),
+      program({
+        id: "december-cebu-three-week",
+        city: "Osaka",
+        country: "Japan",
+        direction: "englishIntensive",
+        durationWeeks: [3],
+        price: 3_000_000,
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 3, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-12-01", "2026-12-21", 3)],
+      }),
+    ] as const
+    const state = stateFor("englishIntensive", {
+      childEnglishLevel: "advanced",
+      activityPreferences: {
+        preferences: [{ category: "culture_lifestyle", strength: "positive", rank: 1, mentionedActivities: ["문화"], evidence: ["문화를 좋아해요"] }],
+        varietyPreference: "unspecified",
+        evidence: ["문화를 좋아해요"],
+      },
+    })
+    const catalog = productionCatalog([...matchingPrograms, ...excludedPrograms])
+    const base = { ...basicInfo, childAges: [8], departureWindow: "2026년 12월", durationWeeks: 4, budgetMinKrw: 8_000_000, budgetMaxKrw: 12_000_000 }
+    const narrowerBudget = buildRecommendation({ basicInfo: base, state, catalog, now })
+    const widerBudget = buildRecommendation({ basicInfo: { ...base, budgetMinKrw: 12_000_000, budgetMaxKrw: 20_000_000 }, state, catalog, now })
+    const narrowerIds = narrowerBudget.programCandidates.map((item) => item.programId)
+
+    expect(narrowerBudget.programCandidates).toHaveLength(2)
+    expect(narrowerBudget.limitedResult).toBe(true)
+    expect(narrowerIds).toContain("december-cebu-four-week")
+    expect(narrowerIds).toContain("december-auckland-four-week")
+    expect(narrowerIds).not.toContain("august-cebu-four-week")
+    expect(narrowerIds).not.toContain("december-cebu-three-week")
+    expect(narrowerIds).toEqual(widerBudget.programCandidates.map((item) => item.programId))
+
+    const threeEligible = buildRecommendation({
+      basicInfo: base,
+      state,
+      catalog: productionCatalog([...matchingPrograms, program({
+        id: "december-singapore-four-week",
+        city: "Singapore",
+        country: "Singapore",
+        direction: "englishIntensive",
+        durationWeeks: [4],
+        price: 3_000_000,
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 4, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-12-01", "2026-12-28", 4)],
+      })]),
+      now,
+    })
+    expect(threeEligible.programCandidates).toHaveLength(3)
+  })
+
   it("keeps three city recommendations when the independent program list is empty", () => {
     const catalog = productionCatalog([])
     const cities = [
@@ -31,7 +129,7 @@ describe("CampFit v3 recommendation engine", () => {
     expect(result.programCandidates).toEqual([])
   })
 
-  it("removes cities whose one-month family living baseline exceeds the budget", () => {
+  it("keeps a modestly over-budget city as an alternative with an explicit burden", () => {
     const catalog = productionCatalog([
       program({ id: "london-program", city: "London", country: "United Kingdom", direction: "cultureActivity" }),
       program({ id: "cebu-program", city: "Cebu", country: "Philippines", direction: "cultureActivity" }),
@@ -44,7 +142,24 @@ describe("CampFit v3 recommendation engine", () => {
         : item)
     const result = buildRecommendation({ basicInfo, state: stateFor("cultureActivity"), catalog: { ...catalog, cities }, now })
 
-    expect(result.destinationRecommendations.map((item) => item.cityName)).not.toContain("London")
+    const london = result.destinationRecommendations.find((item) => item.cityName === "London")
+    expect(london).toBeDefined()
+    expect(london?.verify).toContain("예산 상한 대비 체류 비용 부담 가능성")
+  })
+
+  it("hard-excludes a city when its minimum reference total is more than 50% over budget", () => {
+    const catalog = productionCatalog([
+      program({ id: "tokyo-program", city: "Tokyo", country: "Japan", direction: "cultureActivity" }),
+      program({ id: "cebu-program", city: "Cebu", country: "Philippines", direction: "cultureActivity" }),
+      program({ id: "osaka-program", city: "Osaka", country: "Japan", direction: "cultureActivity" }),
+      program({ id: "auckland-program", city: "Auckland", country: "New Zealand", direction: "cultureActivity" }),
+    ])
+    const cities = catalog.cities.map((item) => item.name === "Tokyo"
+      ? { ...item, flightCostKrw: 2_500_000, livingCostMonthlyKrw: 5_000_000, housingCostMonthlyKrw: 5_000_000 }
+      : item)
+    const result = buildRecommendation({ basicInfo, state: stateFor("cultureActivity"), catalog: { ...catalog, cities }, now })
+
+    expect(result.destinationRecommendations.map((item) => item.cityName)).not.toContain("Tokyo")
   })
 
   it("scenario A selects a production-shaped Cebu culture program with DB provenance", () => {
@@ -56,7 +171,136 @@ describe("CampFit v3 recommendation engine", () => {
     expect(result.experienceDirections[0]?.key).toBe("cultureActivity")
     expect(result.destinationRecommendations[0]?.cityName).toBe("Cebu")
     expect(result.programCandidates[0]).toMatchObject({ programId: "culture-cebu", primaryDirection: "문화·활동 경험" })
-    expect(result.programCandidates[0]?.reason).toContain("실제 DB 후보")
+    expect(result.programCandidates[0]?.reason).toContain("추가 확인이 필요해요")
+    expect(result.programCandidates[0]?.reason).not.toContain("연령")
+    expect(result.programCandidates[0]?.reason).not.toContain("가족 체류")
+  })
+
+  it("uses parent need priority over a conflicting legacy direction hint", () => {
+    const state = stateFor("englishIntensive", {
+      parentExperienceNeeds: {
+        english_growth: { importance: "nice_to_have", evidence: ["영어는 늘면 좋겠어요"] },
+        peer_interaction: { importance: "primary", evidence: ["외국 친구들과 어울리는 게 가장 중요"] },
+        global_experience: { importance: "unspecified", evidence: [] },
+        independence_confidence: { importance: "unspecified", evidence: [] },
+        school_learning_experience: { importance: "unspecified", evidence: [] },
+      },
+    })
+    const directions = scoreExperienceDirections(state)
+    expect(directions[0]?.key).toBe("cultureActivity")
+    expect(directions.find((item) => item.key === "englishIntensive")?.score).toBeLessThan(directions[0]?.score ?? 0)
+  })
+
+  it("summarizes a peer primary goal without attributing unrelated activity evidence to it", () => {
+    const state = stateFor("englishIntensive", {
+      parentExperienceNeeds: {
+        english_growth: { importance: "nice_to_have", evidence: ["영어도 늘면 좋겠어요"] },
+        peer_interaction: { importance: "primary", evidence: ["외국 친구들과 어울리는 게 가장 중요해요"] },
+        global_experience: { importance: "unspecified", evidence: [] },
+        independence_confidence: { importance: "unspecified", evidence: [] },
+        school_learning_experience: { importance: "unspecified", evidence: [] },
+      },
+      activityPreferences: {
+        preferences: [{
+          category: "stem_maker",
+          strength: "strong",
+          rank: 1,
+          mentionedActivities: ["과학실험"],
+          evidence: ["과학실험을 좋아해요"],
+        }],
+        varietyPreference: "unspecified",
+        evidence: ["과학실험을 좋아해요"],
+      },
+    })
+    const result = buildRecommendation({
+      basicInfo,
+      state,
+      catalog: productionCatalog([program({ id: "stem-only", direction: "subjectProject", traits: ["STEM", "science"] })]),
+      now,
+    })
+    expect(result.experienceDirections[0]?.key).toBe("cultureActivity")
+    expect(result.consultingConclusion).toContain("또래 교류")
+    expect(result.programCandidates[0]?.reason).toContain("직접 연결은 추가 확인이 필요해요")
+    expect(result.programCandidates[0]?.reason).not.toContain("또래 교류·협업 활동 정보와 잘 맞는 후보")
+    expect(result.programCandidates[0]?.reason).toContain("STEM")
+
+    const schoolState = stateFor("englishIntensive", {
+      parentExperienceNeeds: {
+        english_growth: { importance: "nice_to_have", evidence: ["영어도 늘면 좋겠어요"] },
+        peer_interaction: { importance: "unspecified", evidence: [] },
+        global_experience: { importance: "unspecified", evidence: [] },
+        independence_confidence: { importance: "unspecified", evidence: [] },
+        school_learning_experience: { importance: "primary", evidence: ["해외 학교생활이 가장 중요해요"] },
+      },
+    })
+    const schoolResult = buildRecommendation({ basicInfo, state: schoolState, catalog: productionCatalog([program({ id: "school-only", direction: "schoolSchooling" })]), now })
+    expect(schoolResult.experienceDirections[0]?.key).toBe("schoolSchooling")
+    expect(schoolResult.consultingConclusion).toContain("학교·스쿨링 경험")
+  })
+
+  it("prioritizes direct primary-goal catalog evidence over a generic direction proxy", () => {
+    const state = stateFor("englishIntensive", {
+      parentExperienceNeeds: {
+        english_growth: { importance: "nice_to_have", evidence: ["영어도 늘면 좋겠어요"] },
+        peer_interaction: { importance: "primary", evidence: ["외국 친구들과 어울리는 게 가장 중요해요"] },
+        global_experience: { importance: "unspecified", evidence: [] },
+        independence_confidence: { importance: "unspecified", evidence: [] },
+        school_learning_experience: { importance: "unspecified", evidence: [] },
+      },
+    })
+    const result = buildRecommendation({
+      basicInfo,
+      state,
+      catalog: productionCatalog([
+        program({ id: "generic-english", city: "Cebu", country: "Philippines", direction: "englishIntensive", traits: ["영어 수업"] }),
+        program({ id: "peer-direct", city: "Auckland", country: "New Zealand", direction: "cultureActivity", traits: ["국제학생과 함께하는 또래 교류"] }),
+      ]),
+      now,
+    })
+
+    expect(result.programCandidates.map((item) => item.programId)).toEqual(["peer-direct", "generic-english"])
+    expect(result.programCandidates[0]?.reason).toContain("국제학생과 함께하는 또래 교류")
+    expect(result.programCandidates[0]?.matchHighlights?.join(" ") ?? "").toContain("국제학생과 함께하는 또래 교류")
+    expect(result.programCandidates[1]?.reason).toContain("영어를 실제로 사용하며 자연스럽게 늘리는 경험")
+  })
+
+  it("uses grounded activity evidence when parent experience needs are absent", () => {
+    const state = stateFor("subjectProject", {
+      activityPreferences: {
+        preferences: [{ category: "stem_maker", strength: "strong", rank: 1, mentionedActivities: ["과학실험", "만들기"], evidence: ["과학실험과 만들기를 좋아해요"] }],
+        varietyPreference: "unspecified",
+        evidence: ["과학실험과 만들기를 좋아해요"],
+      },
+    })
+    const result = buildRecommendation({
+      basicInfo: { ...basicInfo, durationWeeks: 3 },
+      state,
+      catalog: productionCatalog([program({
+        id: "demo-strength-stem",
+        city: "Auckland",
+        country: "New Zealand",
+        direction: "subjectProject",
+        durationWeeks: [3],
+        priceOptions: [{ adultCount: 1, childCount: 1, durationWeeks: 3, currency: "KRW", priceValue: 3_000_000, status: "active" }],
+        sessionWindows: [session("2026-07-20", "2026-08-09", 3)],
+        traits: [],
+        demoProfile: {
+          productCategory: "stem",
+          accommodationOptions: [],
+          priceQuality: "reference",
+          priceNote: "참고",
+          packageInclusions: demoPackage,
+          strengths: ["자연 속 STEM 탐구와 결과물"],
+          tradeoffs: [],
+        },
+      })]),
+      now,
+    })
+
+    expect(result.programCandidates[0]?.reason).toContain("과학실험과 만들기를 좋아하는 아이")
+    expect(result.programCandidates[0]?.reason).toContain("자연 속 STEM 탐구와 결과물")
+    expect(result.programCandidates[0]?.reason).not.toContain("연령")
+    expect(result.programCandidates[0]?.reason).not.toContain("가족 체류")
   })
 
   it("scenario B selects the structured schooling program instead of a generic ESL program", () => {
@@ -710,6 +954,7 @@ function program(input: {
   readonly traits?: readonly string[]
   readonly directionSignals?: V3CatalogProgram["directionSignals"]
   readonly experienceAssessment?: V3CatalogProgram["experienceAssessment"]
+  readonly englishRequirement?: V3CatalogProgram["englishRequirement"]
   readonly hasSessionRows?: boolean
   readonly hasScheduledSessionRows?: boolean
   readonly catalogSource?: V3CatalogProgram["catalogSource"]
@@ -717,6 +962,7 @@ function program(input: {
   readonly commuteTransferCount?: number | null
   readonly shuttleAvailable?: boolean | null
   readonly packageInclusions?: V3CatalogProgram["packageInclusions"]
+  readonly demoProfile?: V3CatalogProgram["demoProfile"]
 }): V3CatalogProgram {
   const price = input.price ?? 3_000_000
   const signal = (key: ExperienceDirectionKey) => key === input.direction ? 95 : key === "englishIntensive" ? 45 : 15
@@ -734,6 +980,7 @@ function program(input: {
       cultureActivity: signal("cultureActivity"),
     },
     ...(input.experienceAssessment === undefined ? {} : { experienceAssessment: input.experienceAssessment }),
+    ...(input.englishRequirement === undefined ? {} : { englishRequirement: input.englishRequirement }),
     ageMin: input.ageMin === undefined ? 5 : input.ageMin,
     ageMax: input.ageMax === undefined ? 12 : input.ageMax,
     ageSource: input.ageSource ?? "program",
@@ -766,6 +1013,7 @@ function program(input: {
     catalogSource: input.catalogSource ?? "supabase",
     updatedAt: "2026-07-01T00:00:00.000Z",
     ...(input.packageInclusions === undefined ? {} : { packageInclusions: input.packageInclusions }),
+    ...(input.demoProfile === undefined ? {} : { demoProfile: input.demoProfile }),
   }
 }
 

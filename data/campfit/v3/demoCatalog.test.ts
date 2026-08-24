@@ -30,10 +30,27 @@ describe("CampFit v3 Demo Catalog", () => {
     expect(catalog.cities).toHaveLength(37)
     expect(catalog.programs).toHaveLength(148)
     expect(catalog.programs.every((program) => program.sessionWindows.length > 0)).toBe(true)
+    expect(catalog.programs.every((program) => program.slug?.startsWith("campfit-demo-") === true)).toBe(true)
+    expect(catalog.programs.every((program) => program.imageUrl !== null)).toBe(true)
     expect(catalog.cities.every((city) => city.imageUrl !== null)).toBe(true)
     expect(catalog.programs.every((program) => program.priceOptions.some((option) => option.adultCount === 1 && option.childCount === 1 && option.durationWeeks === 4))).toBe(true)
     expect(catalog.programs.some((program) => program.priceOptions.some((option) => option.accommodationType === "Studio"))).toBe(true)
     const familyPriceVariants = catalog.programs[0]?.priceOptions.filter((option) => option.adultCount === 1 && option.childCount === 1 && option.durationWeeks === 4 && option.priceValue !== null)
     expect(new Set(familyPriceVariants?.map((option) => option.priceValue)).size).toBeGreaterThan(1)
+  })
+
+  it("includes an explicit, non-official English requirement fixture distribution", () => {
+    expect(new Set(demoProgramDefinitions.map((program) => program.englishRequirementLevel))).toEqual(new Set([
+      "no_requirement",
+      "beginner_friendly",
+      "general_english",
+      "academic_english",
+    ]))
+    expect(demoProgramDefinitions.every((program) => program.englishRequirementLevel !== "unknown")).toBe(true)
+    expect(demoProgramDefinitions.some((program) => program.englishRequirementLevel === "beginner_friendly" && program.englishExposure >= 0.8)).toBe(true)
+    expect(demoProgramDefinitions.some((program) => program.englishRequirementLevel === "academic_english" && program.englishExposure <= 0.6)).toBe(true)
+    expect(demoProgramDefinitions.every((program) => program.englishRequirementSource === "demo_fixture")).toBe(true)
+    expect(demoProgramDefinitions.every((program) => program.englishRequirementConfidence >= 0.6 && program.englishRequirementConfidence <= 0.9)).toBe(true)
+    expect(demoProgramDefinitions.every((program) => program.englishRequirementVersion === "campfit-v3-demo-english-requirement-v0.2")).toBe(true)
   })
 })

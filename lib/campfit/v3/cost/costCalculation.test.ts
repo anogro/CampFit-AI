@@ -138,7 +138,8 @@ describe("CampFit v3 family trip cost calculation", () => {
     const { packageInclusions: _packageInclusions, demoProfile: _demoProfile, ...program } = source
     const city = findCity(program.city)
     const cost = calculateTotalTripCost({ basicInfo: info({ adultCount: 1, childCount: 1, durationWeeks: 4 }), program, city, estimateProfile: null, calculatedAt })
-    expect(cost.breakdown.accommodation.status).toBe("inquiry")
+    expect(cost.breakdown.accommodation.status).toBe("partial")
+    expect(cost.breakdown.accommodation.notes.join(" ")).toContain("Cities의 1BR 월 주거비")
     expect(cost.breakdown.living.status).toBe("partial")
     expect(cost.breakdown.localTransport.status).toBe("inquiry")
   })
@@ -186,6 +187,65 @@ describe("CampFit v3 family trip cost calculation", () => {
     const attached = attachTripCosts({ result, catalog, basicInfo: info({ adultCount: 1, childCount: 1, durationWeeks: 4 }), calculatedAt })
     expect(attached.programCandidates[0]?.tripCost?.currency).toBe("KRW")
     expect(attached.destinationRecommendations[0]?.tripCost?.breakdown.program.status).toBe("exact")
+  })
+
+  it("preserves per-program provenance and existing detail links", () => {
+    const demoResult: CampfitV3RecommendationResult = {
+      consultingConclusion: "테스트 결과",
+      experienceDirections: [],
+      destinationRecommendations: [],
+      requiredSupportConditions: [],
+      programCandidates: [{ ...candidate("demo-cebu-family-esl", "Cebu"), catalogSource: "demo", detailUrl: "https://www.anogro.com/program/demo" }],
+      verificationChecklist: [],
+      alternatives: [],
+      limitedResult: false,
+      catalogSource: "supabase",
+    }
+    const demoAttached = attachTripCosts({ result: demoResult, catalog, basicInfo: info(), calculatedAt })
+    expect(demoAttached.programCandidates[0]?.catalogSource).toBe("demo")
+    expect(demoAttached.programCandidates[0]?.detailUrl).toBe("https://www.anogro.com/program/demo")
+
+    const productionCatalog = {
+      ...catalog,
+      source: "supabase" as const,
+      programs: catalog.programs.map((program) => program.id === "demo-cebu-family-esl" ? { ...program, catalogSource: "supabase" as const } : program),
+    }
+    const productionResult: CampfitV3RecommendationResult = {
+      ...demoResult,
+      programCandidates: [{ ...candidate("demo-cebu-family-esl", "Cebu"), catalogSource: "supabase", detailUrl: "https://www.anogro.com/program/production" }],
+    }
+    const productionAttached = attachTripCosts({ result: productionResult, catalog: productionCatalog, basicInfo: info(), calculatedAt })
+    expect(productionAttached.programCandidates[0]?.catalogSource).toBe("supabase")
+    expect(productionAttached.programCandidates[0]?.detailUrl).toBe("https://www.anogro.com/program/production")
+    const expectedProductionCost = calculateTotalTripCost({
+      basicInfo: info(),
+      program: productionCatalog.programs.find((program) => program.id === "demo-cebu-family-esl")!,
+      city: findCity("Cebu"),
+      estimateProfile: null,
+      calculatedAt,
+    })
+    expect(productionAttached.programCandidates[0]?.tripCost).toEqual(expectedProductionCost)
+  })
+
+  it("keeps a demo reference price estimated when no requested-duration price exists", () => {
+    const source = findProgram("demo-cebu-family-esl")
+    const referenceProgram = {
+      ...source,
+      priceOptions: [],
+      budgetMinKrw: 3_900_000,
+      budgetMaxKrw: null,
+      demoProfile: { ...source.demoProfile!, priceQuality: "reference" as const },
+    }
+    const cost = calculateTotalTripCost({
+      basicInfo: info({ durationWeeks: 3 }),
+      program: referenceProgram,
+      city: findCity("Cebu"),
+      estimateProfile: null,
+      calculatedAt,
+    })
+
+    expect(cost.breakdown.program.status).toBe("estimated")
+    expect(cost.breakdown.program.notes.join(" ")).toContain("참고값")
   })
 
   it("keeps total price status honest when any required component needs inquiry", () => {

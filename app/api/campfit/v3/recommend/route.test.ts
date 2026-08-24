@@ -4,13 +4,15 @@ const loadV3Catalog = vi.hoisted(() => vi.fn())
 const loadDemoCatalog = vi.hoisted(() => vi.fn())
 const loadDemoCatalogFromSupabase = vi.hoisted(() => vi.fn())
 const isReadyForRecommendation = vi.hoisted(() => vi.fn())
+const isParentExperienceNeedsSufficient = vi.hoisted(() => vi.fn(() => true))
+const isPreferredRegionResolved = vi.hoisted(() => vi.fn(() => true))
 const buildRecommendation = vi.hoisted(() => vi.fn())
 const explainRecommendation = vi.hoisted(() => vi.fn())
 const createConversationProvider = vi.hoisted(() => vi.fn(() => ({ explainRecommendation })))
 
 vi.mock("@/lib/campfit/v3/catalogRepository", () => ({ loadV3Catalog, loadDemoCatalogFromSupabase }))
 vi.mock("@/lib/campfit/v3/demoCatalog", () => ({ loadDemoCatalog }))
-vi.mock("@/lib/campfit/v3/progress", () => ({ isReadyForRecommendation }))
+vi.mock("@/lib/campfit/v3/progress", () => ({ isReadyForRecommendation, isParentExperienceNeedsSufficient, isPreferredRegionResolved }))
 vi.mock("@/lib/campfit/v3/recommendationEngine", () => ({ buildRecommendation }))
 vi.mock("@/lib/campfit/v3/server/providerFactory", () => ({ createConversationProvider }))
 
@@ -96,6 +98,19 @@ describe("CampFit v3 recommendation route", () => {
     expect(loadV3Catalog).not.toHaveBeenCalled()
     expect(buildRecommendation).toHaveBeenCalledWith(expect.objectContaining({ catalog: expect.objectContaining({ source: "demo" }) }))
     expect(payload["catalogSource"]).toBe("demo")
+  })
+
+  it("falls back to the local demo catalog without loading production programs", async () => {
+    loadDemoCatalogFromSupabase.mockResolvedValue({ programs: [], cities: [], source: "unavailable", warnings: ["demo read failed"] })
+    buildRecommendation.mockReturnValue({ ...result, catalogSource: "demo" })
+
+    const response = await POST(request(true))
+
+    expect(response.status).toBe(200)
+    expect(loadDemoCatalogFromSupabase).toHaveBeenCalledTimes(1)
+    expect(loadDemoCatalog).toHaveBeenCalledTimes(1)
+    expect(loadV3Catalog).not.toHaveBeenCalled()
+    expect(buildRecommendation).toHaveBeenCalledWith(expect.objectContaining({ catalog: expect.objectContaining({ source: "demo" }) }))
   })
 
   it("returns an explicit service error when the production catalog is unavailable", async () => {

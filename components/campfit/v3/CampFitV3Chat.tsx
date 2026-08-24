@@ -1,8 +1,9 @@
 "use client"
 
+import * as React from "react"
 import { useEffect, useRef, useState } from "react"
 import { CampFitV3Frame, V3Header } from "@/components/campfit/v3/CampFitV3Frame"
-import { isChatNearBottom, shouldSendChatMessage } from "@/components/campfit/v3/chatUi"
+import { getCampfitV3ChatStatus, isChatNearBottom, shouldSendChatMessage } from "@/components/campfit/v3/chatUi"
 import { TypingIndicator } from "@/components/campfit/v3/TypingIndicator"
 import { AiAvatar } from "@/components/campfit/v3/AiAvatar"
 import type { CampfitV3BasicInfo, CampfitV3ConversationResponse, CampfitV3TranscriptMessage } from "@/types/campfitV3"
@@ -74,8 +75,9 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
   const sendLockRef = useRef(false)
   const specialCare = conversation.questionKey === "special_care_follow_up"
   const refinementQuestion = cityRefinementQuestions[refinementIndex]
-  const progressLabel = conversation.progress >= 100 ? "추천 가능 조건 100%" : `${conversation.progress}%`
-  const progressCopy = continuing ? "추천 정교화 진행 중 · 추가 답변은 결과를 더 정확하게 만드는 데 반영돼요." : conversation.progressMessage
+  const chatStatus = getCampfitV3ChatStatus(conversation.readyForRecommendation, conversation.progress)
+  const progressWidth = conversation.readyForRecommendation ? 100 : conversation.progress
+  const progressCopy = continuing ? "추천 정교화 진행 중 · 추가 답변은 결과를 더 정확하게 만드는 데 반영돼요." : chatStatus.description
   const refinementOpening = "추가로 고려하고 계신 사항이 있으시면 편하게 알려주세요."
   const visibleTranscript = continuing
     ? [...transcript, { role: "assistant" as const, content: refinementIndex === 0
@@ -141,16 +143,16 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
                   }}
                   className="w-full min-h-9 py-1 px-3 text-xs font-black rounded-full bg-[var(--accent-primary)] text-white hover:opacity-90 active:scale-[0.98] transition-all"
                 >
-                  지금 결과 보기 →
+                  {chatStatus.statusLabel} · {chatStatus.valueLabel} · 결과 보기 →
                 </button>
               </div>
             ) : (
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3 text-xs font-bold">
-                  <span className="truncate">CampFit AI · 추천 조건 정리 중</span>
-                  <span className="tabular-nums text-[var(--accent-primary)]">{progressLabel}</span>
+                  <span className="truncate">CampFit AI · {chatStatus.statusLabel}</span>
+                  <span className="tabular-nums text-[var(--accent-primary)]">{chatStatus.valueLabel}</span>
                 </div>
-                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${conversation.progress}%` }} /></div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${progressWidth}%` }} /></div>
               </div>
             )}
             <span className="text-sm text-[var(--text-tertiary)] transition-transform group-open:rotate-180" aria-hidden>⌄</span>
@@ -165,11 +167,11 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
         <aside className="apple-glass-soft hidden h-full min-h-0 flex-col rounded-[24px] p-5 lg:flex">
           <div className="flex items-center gap-3 border-b border-[var(--border-default)] pb-4">
             <AiAvatar className="h-10 w-10" />
-            <div><p className="font-extrabold">CampFit AI 컨설턴트</p><p className="mt-1 text-xs font-bold text-[var(--status-success)]">현재 상담 중</p></div>
+            <div><p className="font-extrabold">CampFit AI 컨설턴트</p><p className="mt-1 text-xs font-bold text-[var(--status-success)]">{chatStatus.statusLabel}</p></div>
           </div>
           <div className="mt-4">
-            <div className="flex items-center justify-between gap-2 text-xs font-bold"><span>추천 조건 정리 중</span><span className="shrink-0 tabular-nums text-[var(--accent-primary)]">{progressLabel}</span></div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${conversation.progress}%` }} /></div>
+            <div className="flex items-center justify-between gap-2 text-xs font-bold"><span>{chatStatus.title}</span><span className="shrink-0 tabular-nums text-[var(--accent-primary)]">{chatStatus.valueLabel}</span></div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-default)]"><div className="h-full rounded-full bg-[var(--accent-primary)] transition-[width] duration-300" style={{ width: `${progressWidth}%` }} /></div>
             <p className="mt-3 text-xs leading-5 text-[var(--text-secondary)]">{progressCopy}</p>
           </div>
           <div className="mt-5 flex min-h-0 flex-1 flex-col border-t border-[var(--border-default)] pt-4">
@@ -213,8 +215,8 @@ export function CampFitV3Chat({ basicInfo, conversation, transcript, onAnswer, o
           <div className="shrink-0 border-t border-[var(--border-default)] bg-white/80 px-4 py-3 sm:px-7 sm:py-4">
             {conversation.readyForRecommendation && !continuing ? (
               <div className="mb-4 rounded-2xl border border-[var(--accent-primary)]/25 bg-[var(--accent-soft)] px-4 py-3" role="status">
-                <p className="text-sm font-extrabold">추천을 시작할 핵심 조건이 모였어요.</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">지금 결과를 보거나, 아이 성향·선호 활동·부모 조건을 더 알려주고 추천을 정교하게 만들 수 있어요.</p>
+                <p className="text-sm font-extrabold">맞춤 결과를 확인할 준비가 됐어요.</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">지금 결과를 확인하거나, 더 알려주고 싶은 가족 조건을 이어서 말씀해 주세요.</p>
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                   <button className="glass-cta min-h-11 flex-1 rounded-full px-5 text-sm font-extrabold" type="button" onClick={onResult}>지금 결과 보기 →</button>
                   <button className="min-h-11 flex-1 rounded-full border border-[var(--border-default)] bg-white px-5 text-sm font-bold" type="button" onClick={() => setContinuing(true)}>상담 더 이어가기</button>

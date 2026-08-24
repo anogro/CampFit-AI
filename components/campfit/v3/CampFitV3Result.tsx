@@ -16,6 +16,7 @@ import {
 import {
   cityWhyBullets,
   programCautions,
+  programRecommendationReasons,
   programStrengths,
   rankLabel,
 } from "@/components/campfit/v3/resultCopy"
@@ -164,23 +165,24 @@ export function CampFitV3Result({
     }
 
     const cityCard = anchor.closest<HTMLElement>("[data-campfit-city-card]")
-    if (!cityCard?.dataset["cityName"]) return
-    const city = result.destinationRecommendations.find((candidate) => candidate.cityName === cityCard.dataset["cityName"])
-    const rank = result.destinationRecommendations.findIndex((candidate) => candidate.cityName === cityCard.dataset["cityName"])
-    trackCampfitV3AnalyticsEvent({
-      eventName: "campfit_city_clicked",
-      stage: "result",
-      resultId: resultId ?? null,
-      itemType: "city",
-      itemId: city?.cityId ?? cityCard.dataset["cityName"],
-      itemNameSnapshot: cityCard.dataset["cityName"],
-      cityId: city?.cityId ?? null,
-      cityNameSnapshot: cityCard.dataset["cityName"],
-      countryNameSnapshot: city?.countryName ?? null,
-      itemRank: rank >= 0 ? rank + 1 : null,
-      linkTarget: "anogro_city",
-      catalogSource: result.catalogSource,
-    })
+    if (cityCard?.dataset["cityName"]) {
+      const city = result.destinationRecommendations.find((candidate) => candidate.cityName === cityCard.dataset["cityName"])
+      const rank = result.destinationRecommendations.findIndex((candidate) => candidate.cityName === cityCard.dataset["cityName"])
+      trackCampfitV3AnalyticsEvent({
+        eventName: "campfit_city_clicked",
+        stage: "result",
+        resultId: resultId ?? null,
+        itemType: "city",
+        itemId: city?.cityId ?? cityCard.dataset["cityName"],
+        itemNameSnapshot: cityCard.dataset["cityName"],
+        cityId: city?.cityId ?? null,
+        cityNameSnapshot: cityCard.dataset["cityName"],
+        countryNameSnapshot: city?.countryName ?? null,
+        itemRank: rank >= 0 ? rank + 1 : null,
+        linkTarget: "anogro_city",
+        catalogSource: result.catalogSource,
+      })
+    }
   }
 
   return (
@@ -235,7 +237,7 @@ export function CampFitV3Result({
             {cityComparisons.length ? (
               <div className="grid gap-5 lg:grid-cols-3">
                 {cityComparisons.map((comparison, index) => (
-                  <CityCard comparison={comparison} index={index} basicInfo={basicInfo} conversationState={conversationState} result={result} key={comparison.city.cityId} />
+                  <CityCard comparison={comparison} index={index} basicInfo={basicInfo} conversationState={conversationState} result={result} resultId={resultId ?? null} key={comparison.city.cityId} />
                 ))}
               </div>
             ) : (
@@ -246,9 +248,11 @@ export function CampFitV3Result({
           <ReportSection title="추천 프로그램 Top3" subtitle="도시 순위와 별개로, 가족 조건에 가장 잘 맞는 프로그램을 골랐습니다.">
             <div data-campfit-program-section="top3">
               {catalogPresentation.showProgramCards && result.programCandidates.length ? (
-                <div className="grid gap-5 lg:grid-cols-3">
-                  {result.programCandidates.slice(0, 3).map((program, index) => <ProgramInlineCard program={program} index={index} key={program.programId} />)}
-                </div>
+                (() => {
+                  const programs = result.programCandidates.slice(0, 3)
+                  const reasons = programRecommendationReasons(programs)
+                  return <div className="grid gap-5 lg:grid-cols-3">{programs.map((program, index) => <ProgramInlineCard program={program} index={index} reasonOverride={reasons[index]} key={program.programId} />)}</div>
+                })()
               ) : <Empty text="현재 조건에 맞는 프로그램 후보를 확인하지 못했습니다." />}
             </div>
           </ReportSection>
@@ -360,12 +364,14 @@ function CityCard({
   basicInfo,
   conversationState,
   result,
+  resultId,
 }: {
   readonly comparison: CampfitV3CityComparison
   readonly index: number
   readonly basicInfo: CampfitV3BasicInfo
   readonly conversationState: CampfitV3ConversationState
   readonly result: CampfitV3RecommendationResult
+  readonly resultId: string | null
 }) {
   const { city } = comparison
   const href = buildAnogroCityHref(city.cityName)
@@ -395,7 +401,7 @@ function CityCard({
           ))}
         </ul>
         <CityLivingCostSummary city={city} />
-        {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" aria-label={`${city.cityName} 도시 자세히 보기 (새 창 열림)`}>도시 자세히 보기<span className="ml-1.5" aria-hidden>↗</span></a> : null}
+        {href ? <a href={href} target="_blank" rel="noopener noreferrer" onClick={() => trackCampfitV3AnalyticsEvent({ eventName: "campfit_city_clicked", stage: "result", resultId, itemType: "city", itemId: city.cityId, itemNameSnapshot: city.cityName, cityId: city.cityId, cityNameSnapshot: city.cityName, countryNameSnapshot: city.countryName, itemRank: index + 1, linkTarget: "anogro_city", catalogSource: result.catalogSource })} className="mt-5 inline-flex min-h-11 items-center self-start text-sm font-extrabold text-[var(--accent-primary)] hover:underline focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--focus-ring)]" aria-label={`${city.cityName} 도시 자세히 보기 (새 창 열림)`}>도시 자세히 보기<span className="ml-1.5" aria-hidden>↗</span></a> : null}
       </div>
     </article>
   )
@@ -415,9 +421,9 @@ function CityLivingCostSummary({ city }: { readonly city: CampfitV3DestinationRe
   )
 }
 
-function ProgramInlineCard({ program, index }: { readonly program: CampfitV3ProgramCandidate; readonly index: number }) {
+function ProgramInlineCard({ program, index, reasonOverride }: { readonly program: CampfitV3ProgramCandidate; readonly index: number; readonly reasonOverride?: string | undefined }) {
   const href = safeProgramDetailHref(program.detailUrl)
-  const strengths = programStrengths(program)
+  const strengths = programStrengths(program, reasonOverride)
   const cautions = programCautions(program)
   return (
     <article data-campfit-program-card data-program-id={program.programId} data-city-name={program.cityName} className="rounded-2xl border border-[var(--border-default)] bg-white p-4">
@@ -479,7 +485,7 @@ function ProgramInlineCard({ program, index }: { readonly program: CampfitV3Prog
           )
         })()}
         <div className="mt-3 grid gap-2 text-xs leading-5 text-[var(--text-secondary)]">
-          <p><span className="font-black text-[var(--status-success)]">좋은 점</span> · {strengths.slice(1).join(" · ") || "조건에 맞는 기본 정보를 확인했어요."}</p>
+          {strengths.length > 1 ? <p><span className="font-black text-[var(--status-success)]">좋은 점</span> · {strengths.slice(1).join(" · ")}</p> : null}
           <p><span className="font-black text-[var(--status-warning)]">아쉬운 점</span> · {cautions.join(" · ")}</p>
         </div>
         <details className="group mt-5 border-t border-[var(--border-default)] pt-4">

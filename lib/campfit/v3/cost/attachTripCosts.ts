@@ -15,7 +15,13 @@ export function attachTripCosts(input: {
   const programCandidates = input.result.programCandidates.map((candidate) => {
     const program = programById.get(candidate.programId)
     const city = program ? cityByKey.get(cityKey(program.city, program.country)) : undefined
-    if (!program || !city) return candidate
+    if (!program) return candidate
+    if (!city) {
+      return {
+        ...candidate,
+        catalogSource: program.catalogSource,
+      }
+    }
     const tripCost = calculateTotalTripCost({
       basicInfo: input.basicInfo,
       program,
@@ -24,7 +30,11 @@ export function attachTripCosts(input: {
       calculatedAt: input.calculatedAt,
     })
     costsByProgramId.set(candidate.programId, tripCost)
-    return { ...candidate, tripCost }
+    return {
+      ...candidate,
+      catalogSource: program.catalogSource,
+      tripCost,
+    }
   })
   const destinationRecommendations = input.result.destinationRecommendations.map((destination) => {
     let tripCost = programCandidates.find((candidate) => candidate.cityName === destination.cityName)?.tripCost

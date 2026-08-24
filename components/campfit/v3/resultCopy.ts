@@ -5,6 +5,7 @@ import type {
   CampfitV3ProgramCandidate,
   CampfitV3RecommendationResult,
 } from "@/types/campfitV3"
+import { englishMatchLabels } from "@/lib/campfit/v3/englishRequirement"
 
 export function cityWhyBullets(
   city: CampfitV3DestinationRecommendation,
@@ -44,24 +45,57 @@ export function cityCostDetails(city: CampfitV3DestinationRecommendation): {
 }
 
 export function programReason(program: CampfitV3ProgramCandidate): string {
-  if (program.reason.includes("대안으로만") || program.group === "함께 비교할 대안") return "원하는 방향과는 조금 다르지만, 이런 점이 괜찮다면 충분히 고려할 수 있는 선택지예요."
-  return `${directionObjectPhrase(friendlyDirectionLabel(program.primaryDirection))} 중심으로 아이의 조건을 살펴볼 수 있어요.`
+  return program.reason.trim()
 }
 
-export function programStrengths(program: CampfitV3ProgramCandidate): readonly string[] {
-  const strengths: string[] = [programReason(program)]
-  if (program.ageLabel !== "연령 확인 필요") strengths.push("아이 연령에 맞는 범위를 확인했어요.")
-  if (program.durationLabel !== "기간 확인 필요") strengths.push(`${program.durationLabel} 선택지를 확인했어요.`)
-  return unique(strengths).slice(0, 3)
+export function programRecommendationReasons(programs: readonly CampfitV3ProgramCandidate[]): readonly string[] {
+  const used = new Set<string>()
+  return programs.map((program) => {
+    const primary = programReason(program)
+    if (!used.has(primary)) {
+      used.add(primary)
+      return primary
+    }
+    const alternative = (program.matchHighlights ?? []).find((highlight) => highlight.trim().length > 0 && !used.has(highlight.trim()))
+    if (alternative) {
+      const normalized = alternative.trim()
+      used.add(normalized)
+      return normalized
+    }
+    used.add(primary)
+    return primary
+  })
+}
+
+export function programStrengths(program: CampfitV3ProgramCandidate, reasonOverride?: string): readonly string[] {
+  const primary = reasonOverride?.trim() || programReason(program)
+  const matchHighlights = program.matchHighlights ?? []
+  return unique([primary, ...matchHighlights]).slice(0, 3)
 }
 
 export function programCautions(program: CampfitV3ProgramCandidate): readonly string[] {
-  const cautions = program.verify.map(shortenCheckItem).filter(Boolean)
+  const englishCaution = englishCautionFor(program)
+  const verification = program.englishMatchStatus === "official_requirement_mismatch"
+    ? program.verify.filter((item) => !/공식 영어|영어 자격조건/i.test(item))
+    : program.verify
+  const cautions = [englishCaution, program.tradeoff, ...verification.map(shortenCheckItem)].filter((value): value is string => Boolean(value?.trim()))
   return cautions.length ? unique(cautions).slice(0, 3) : ["신청 전 최신 일정과 가격만 한 번 더 확인해 주세요."]
 }
 
 export function rankLabel(index: number): string {
   return index === 0 ? "Best Match" : "Alternative Recommendation"
+}
+
+function englishCautionFor(program: CampfitV3ProgramCandidate): string | null {
+  if (program.englishMatchStatus === "comfortable" || program.englishMatchStatus === "official_requirement_mismatch") return null
+  if (program.englishMatchStatus === "english_burden_possible") return englishMatchLabels.english_burden_possible
+  if (program.englishMatchStatus === "unknown") return "프로그램 영어 요구 수준 확인 필요"
+  if (program.englishMatchStatus === "manageable_with_support") {
+    const hasSupportEvidence = program.verify.some((item) => /영어|초급자|지원|적응|수업 방식/i.test(item))
+      || Boolean(program.tradeoff?.trim())
+    return hasSupportEvidence ? "영어 수업 방식과 초반 지원 범위 확인" : null
+  }
+  return null
 }
 
 function cityCostFit(city: CampfitV3DestinationRecommendation): string {
@@ -104,19 +138,6 @@ function shortenCostItem(value: string): string {
   if (value.includes("교통")) return "현지 교통비"
   if (value.includes("보험") || value.includes("비자")) return "보험·비자"
   return value
-}
-
-function friendlyDirectionLabel(value: string): string {
-  if (value === "schoolSchooling") return "학교·스쿨링"
-  if (value === "englishIntensive") return "영어 집중"
-  if (value === "subjectProject") return "주제·프로젝트"
-  if (value === "cultureActivity") return "문화·활동"
-  return value.replace(/ 경험$/, "")
-}
-
-function directionObjectPhrase(value: string): string {
-  if (value === "주제·프로젝트") return `${value}를`
-  return `${value}을`
 }
 
 function unique(values: readonly string[]): readonly string[] {

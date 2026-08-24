@@ -1,5 +1,6 @@
 import type { ExperienceDirectionKey } from "@/types/campfitV3"
 import type { Camp } from "@/types/campfit"
+import type { EnglishRequirementLevel } from "@/lib/campfit/v3/englishRequirement"
 
 export const CAMPFIT_V3_DEMO_CATALOG_VERSION = "campfit-v3-demo-3"
 
@@ -43,7 +44,7 @@ export type DemoCityDefinition = {
 
 export type DemoProgramDefinition = {
   readonly id: string
-  /** Optional real ANOGRO program slug. Leave null for synthetic demo-only programs. */
+  /** Optional real ANOGRO program slug. Omitted entries use the seed-compatible demo slug. */
   readonly anogroSlug?: string | null
   readonly name: string
   readonly city: string
@@ -69,6 +70,13 @@ export type DemoProgramDefinition = {
   readonly traits: readonly string[]
   readonly strengths: readonly string[]
   readonly tradeoffs: readonly string[]
+  /** Synthetic-only English requirement projection. Never treated as provider evidence. */
+  readonly englishRequirementLevel: EnglishRequirementLevel
+  readonly englishExposure: number
+  readonly englishRequirementConfidence: number
+  readonly englishRequirementVersion: string
+  readonly englishRequirementSource: "demo_fixture"
+  readonly englishRequirementText?: string | undefined
 }
 
 const coreDemoCityDefinitions: readonly DemoCityDefinition[] = [
@@ -297,8 +305,47 @@ export const demoCityDefinitions: readonly DemoCityDefinition[] = [...coreDemoCi
 
 const cityCountry: Readonly<Record<string, string>> = Object.fromEntries(demoCityDefinitions.map((city) => [city.name, city.country]))
 
-function demoProgram(input: Omit<DemoProgramDefinition, "country">): DemoProgramDefinition {
-  return { ...input, country: cityCountry[input.city] ?? "" }
+const demoEnglishRequirementOverrides: Readonly<Record<string, {
+  readonly level: EnglishRequirementLevel
+  readonly exposure: number
+  readonly confidence: number
+  readonly text: string
+}>> = {
+  "demo-cm-family-english": { level: "beginner_friendly", exposure: 0.9, confidence: 0.9, text: "데모: 초급자 지원이 있는 가족형 영어 활동" },
+  "demo-cebu-sports-english": { level: "no_requirement", exposure: 0.35, confidence: 0.75, text: "데모: 스포츠 활동 참여 자체가 영어 능력을 요구하지 않는 구성" },
+  "demo-singapore-stem-maker": { level: "general_english", exposure: 0.75, confidence: 0.75, text: "데모: 일반적인 영어 설명을 이해하며 프로젝트에 참여" },
+  "demo-auckland-school-bridge": { level: "academic_english", exposure: 0.55, confidence: 0.9, text: "데모: 영어 수업과 학교 활동 수행이 중요한 구성" },
+  "demo-dubai-stem-future-lab": { level: "general_english", exposure: 0.65, confidence: 0.75, text: "데모: 국제 STEM 프로젝트의 일반 영어 설명과 협업 참여" },
+}
+
+function demoProgram(input: Omit<DemoProgramDefinition, "country" | "englishRequirementLevel" | "englishExposure" | "englishRequirementConfidence" | "englishRequirementVersion" | "englishRequirementSource" | "englishRequirementText"> & Partial<Pick<DemoProgramDefinition, "englishRequirementLevel" | "englishExposure" | "englishRequirementConfidence" | "englishRequirementVersion" | "englishRequirementSource" | "englishRequirementText">>): DemoProgramDefinition {
+  const override = demoEnglishRequirementOverride(input)
+  return {
+    ...input,
+    country: cityCountry[input.city] ?? "",
+    englishRequirementLevel: input.englishRequirementLevel ?? override?.level ?? "unknown",
+    englishExposure: input.englishExposure ?? override?.exposure ?? 0.5,
+    englishRequirementConfidence: input.englishRequirementConfidence ?? override?.confidence ?? 0.6,
+    englishRequirementVersion: input.englishRequirementVersion ?? "campfit-v3-demo-english-requirement-v0.2",
+    englishRequirementSource: "demo_fixture",
+    englishRequirementText: input.englishRequirementText ?? override?.text,
+  }
+}
+
+function demoEnglishRequirementOverride(input: Pick<DemoProgramDefinition, "id" | "category" | "programType" | "parentMode" | "beginnerClass" | "primaryDirection" | "traits" | "strengths">): typeof demoEnglishRequirementOverrides[string] | undefined {
+  const exact = demoEnglishRequirementOverrides[input.id]
+  if (exact) return exact
+  if (input.id.endsWith("-family-english")) return { level: "beginner_friendly", exposure: 0.9, confidence: 0.9, text: "데모: 초급자 지원이 있는 가족형 영어 활동" }
+  if (input.id.endsWith("-stem-lab")) return { level: "general_english", exposure: 0.75, confidence: 0.75, text: "데모: 일반적인 영어 설명을 이해하며 프로젝트에 참여" }
+  if (input.id.endsWith("-school-experience")) return { level: "academic_english", exposure: 0.55, confidence: 0.9, text: "데모: 영어 수업과 학교 활동 수행이 중요한 구성" }
+  if (input.id.endsWith("-outdoor-discovery")) return { level: "beginner_friendly", exposure: 0.35, confidence: 0.75, text: "데모: 시범·체험 중심의 초급 친화형 야외 활동" }
+  if (input.category === "schooling") return { level: "academic_english", exposure: 0.55, confidence: 0.9, text: "데모: 학교형 루틴과 영어 수업 참여가 중요한 구성" }
+  if (input.category === "sports") return { level: "no_requirement", exposure: 0.35, confidence: 0.75, text: "데모: 스포츠 활동 중심으로 영어 수준이 핵심 참가 조건이 아닌 구성" }
+  if (input.category === "culture") return { level: "beginner_friendly", exposure: 0.4, confidence: 0.75, text: "데모: 문화·체험 중심의 초급 친화형 활동" }
+  if (input.category === "english" && input.parentMode === "family") return { level: "beginner_friendly", exposure: 0.85, confidence: 0.9, text: "데모: 가족형 영어 활동과 초급자 지원을 함께 제공하는 구성" }
+  if (input.category === "english") return { level: "general_english", exposure: 0.8, confidence: 0.75, text: "데모: 영어 설명과 일상적인 의사표현 참여가 필요한 구성" }
+  if (input.category === "stem" || input.category === "project") return { level: "general_english", exposure: 0.7, confidence: 0.75, text: "데모: 프로젝트 설명과 팀 협업에 일반 영어 참여가 필요한 구성" }
+  return { level: "beginner_friendly", exposure: 0.4, confidence: 0.6, text: "데모: 활동 참여 중심의 영어 부담이 낮은 구성" }
 }
 
 const familyDefaults = {
