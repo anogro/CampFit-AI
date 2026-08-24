@@ -61,6 +61,30 @@ describe("GeminiCampfitV3Provider", () => {
     expect(generationConfig).not.toHaveProperty("_responseJsonSchema")
   })
 
+  it("passes the current question and previous assistant context to semantic extraction", async () => {
+    const fetchMock = vi.fn(async () => geminiResponse(validModelResponse()))
+    vi.stubGlobal("fetch", fetchMock)
+    const provider = new GeminiCampfitV3Provider({ maxProviderRequests: 1 })
+    await provider.analyzeConversation({
+      ...input,
+      transcript: [{ role: "assistant", content: "선생님의 설명은 대체로 이해하고 따라갈 수 있나요?", questionKey: "child_english_level" }],
+      currentState: {
+        ...input.currentState,
+        currentQuestionKey: "child_english_level",
+        askedQuestionKeys: ["child_english_level"],
+      },
+      userMessage: "대체로 이해하고 따라갈 수 있어요.",
+    })
+
+    const body = requestBody(fetchMock, 0)
+    const contents = body["contents"] as Array<{ readonly parts?: Array<{ readonly text?: string }> }>
+    const prompt = contents[0]?.parts?.[0]?.text ?? ""
+    expect(prompt).toContain('"currentQuestionKey":"child_english_level"')
+    expect(prompt).toContain('"previousAssistantQuestion":"선생님의 설명은 대체로 이해하고 따라갈 수 있나요?"')
+    expect(prompt).toContain('"targetFactArea":"child English listening and speaking evidence"')
+    expect(prompt).toContain("evidence는 사용자 발화에서 그대로 복사한 짧은 연속 구간")
+  })
+
   it("repairs a response with missing required control fields", async () => {
     const raw = validModelResponse()
     delete raw.suggestedNextQuestionKey

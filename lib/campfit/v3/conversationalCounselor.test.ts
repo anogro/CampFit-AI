@@ -725,9 +725,113 @@ describe("CampFit v3 conversational counselor flow", () => {
     expect(response.assistantMessage).not.toContain("아직 답변을 충분히 파악하지 못했어요")
   })
 
+  it("does not repeat English when a natural sentence describes simple comprehension and response", async () => {
+    const start = startConversation(basicInfo)
+    const englishState = {
+      ...start.updatedState,
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: [...start.updatedState.askedQuestionKeys, "child_english_level"],
+    }
+    const userMessage = "꾸준히 영어수업을 해왔어요. 간단한 문장을 알아듣고 대답할 수 있어요."
+    const response = await processConversationMessage({
+      transcript: [],
+      currentState: englishState,
+      basicInfo,
+      userMessage,
+      quickReplyKey: null,
+      provider: fallbackProvider,
+    })
+
+    expect(response.updatedState.facts.childEnglishListening?.value).toBe("understands_simple_instructions")
+    expect(response.updatedState.facts.childEnglishSpeaking?.value).toBe("answers_simple_questions")
+    expect(response.updatedState.facts.childEnglishListening?.evidence).toContain(userMessage)
+    expect(response.updatedState.facts.childEnglishSpeaking?.evidence).toContain(userMessage)
+    expect(response.updatedState.facts.englishReadiness?.value).toBe("beginner_friendly")
+    expect(response.questionKey).not.toBe("child_english_level")
+    expect(response.assistantMessage).not.toContain("아직 답변을 충분히 파악하지 못했어요")
+  })
+
+  it("uses the current English question context for an elliptical provider answer", async () => {
+    const start = startConversation(basicInfo)
+    const englishState = {
+      ...start.updatedState,
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: [...start.updatedState.askedQuestionKeys, "child_english_level"],
+    }
+    const userMessage = "대체로 이해하고 따라갈 수 있어요."
+    const provider: CampfitV3LLMProvider = {
+      ...fallbackProvider,
+      analyzeConversation: async () => ({
+        assistantMessage: "영어 수업 설명을 대체로 이해하고 따라갈 수 있군요.",
+        facts: [{
+          key: "childEnglishListening",
+          subject: "child",
+          value: "understands_class_explanation",
+          source: "explicit_user_statement",
+          confidence: 1,
+          evidence: userMessage,
+        }],
+        unresolved: ["childEnglishSpeaking"],
+        conflicts: [],
+        suggestedNextQuestionKey: "child_english_level",
+        nextAction: "ask",
+        readyForRecommendation: false,
+      }),
+    }
+    const response = await processConversationMessage({
+      transcript: [{ role: "assistant", content: "선생님의 설명은 대체로 이해하고 따라갈 수 있나요?", questionKey: "child_english_level" }],
+      currentState: englishState,
+      basicInfo,
+      userMessage,
+      quickReplyKey: null,
+      provider,
+    })
+
+    expect(response.updatedState.facts.childEnglishListening?.value).toBe("understands_class_explanation")
+    expect(response.updatedState.facts.childEnglishListening?.evidence).toContain(userMessage)
+    expect(response.updatedState.facts.childEnglishSpeaking).toBeUndefined()
+    expect(response.questionKey).toBe("child_english_level")
+  })
+
+  it("uses the current English question context in deterministic fallback", async () => {
+    const start = startConversation(basicInfo)
+    const stateWithSpeaking = mergeFacts(start.updatedState, [createFact({
+      key: "childEnglishSpeaking",
+      subject: "child",
+      value: "can_converse",
+      source: "explicit_user_statement",
+      evidence: "간단한 대화는 할 수 있어요.",
+    })])
+    const englishState = {
+      ...stateWithSpeaking,
+      currentQuestionKey: "child_english_level" as const,
+      askedQuestionKeys: [...start.updatedState.askedQuestionKeys, "child_english_level"],
+    }
+    const response = await processConversationMessage({
+      transcript: [{ role: "assistant", content: "선생님의 설명은 대체로 이해하고 따라갈 수 있나요?", questionKey: "child_english_level" }],
+      currentState: englishState,
+      basicInfo,
+      userMessage: "대체로 이해하고 따라갈 수 있어요.",
+      quickReplyKey: null,
+      provider: fallbackProvider,
+    })
+
+    expect(response.updatedState.facts.childEnglishListening?.value).toBe("understands_class_explanation")
+    expect(response.updatedState.facts.childEnglishSpeaking?.value).toBe("can_converse")
+    expect(response.updatedState.facts.englishReadiness?.value).toBe("general_program_ready")
+    expect(response.questionKey).not.toBe("child_english_level")
+    expect(response.assistantMessage).not.toContain("아직 답변을 충분히 파악하지 못했어요")
+  })
+
   it.each([
     [
       "질문을 받으면 긴장해서 대답을 못해요.",
+      "childEnglishSpeaking",
+      "difficulty_initiating",
+      "answers_simple_questions",
+    ],
+    [
+      "질문을 받아도 긴장해서 말을 못해요.",
       "childEnglishSpeaking",
       "difficulty_initiating",
       "answers_simple_questions",
@@ -737,6 +841,18 @@ describe("CampFit v3 conversational counselor flow", () => {
       "childEnglishListening",
       "struggles_with_class_explanation",
       "understands_class_explanation",
+    ],
+    [
+      "거의 못 알아듣고 대답도 어려워요.",
+      "childEnglishListening",
+      "struggles_with_class_explanation",
+      "understands_class_explanation",
+    ],
+    [
+      "영어를 오래 배웠지만 실제 대화는 못해요.",
+      "childEnglishSpeaking",
+      "difficulty_initiating",
+      "can_converse",
     ],
   ] as const)("rejects a provider's positive %s fact when the evidence is negative", async (userMessage, factKey, expectedValue, rejectedValue) => {
     const start = startConversation(basicInfo)
