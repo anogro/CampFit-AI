@@ -356,7 +356,8 @@ export function extractDeterministicFacts(
   const parentOnlyEnglishStatement = /^(?:저는|제가|부모님?은|엄마는|아빠는|보호자는?).{0,24}(?:영어|영어로|소통)/iu.test(text)
     && !/(아이|자녀|첫째|둘째)/iu.test(text)
   const directEnglishAnswerContext = currentQuestionKey === "child_english_level"
-    && /(?:수업|설명|지시|안내).{0,20}(?:알아듣|이해|따라|어려|힘들)|(?:질문을?\s*받으면|물어보면).{0,32}(?:대답|응답|단어|짧은\s*(?:문장|표현))/iu.test(text)
+    && (/(?:수업|설명|지시|안내).{0,20}(?:알아듣|이해|따라|어려|힘들)|(?:질문을?\s*받으면|물어보면).{0,32}(?:대답|응답|단어|짧은\s*(?:문장|표현))/iu.test(text)
+      || /(?:알아듣|이해|따라|듣기|대화|대답|응답|말)/iu.test(text))
   const childEnglishText = !parentOnlyEnglishStatement && (
     /(아이|애|첫째|둘째|첫째 아이|둘째 아이).{0,40}(영어|수업|대화)/iu.test(text)
       || explicitEnglishEvidence
@@ -402,7 +403,7 @@ export function extractDeterministicFacts(
   }
   if (englishAssessments.length) push("childEnglishAssessment", "child", dedupeStructuredValues(englishAssessments))
 
-  const listening = childEnglishEvidenceContext ? listeningEvidence(text) : null
+  const listening = childEnglishEvidenceContext ? listeningEvidence(text, currentQuestionKey) : null
   if (listening !== null) push("childEnglishListening", "child", listening)
   const speaking = childEnglishEvidenceContext ? speakingEvidence(text) : null
   if (speaking !== null) push("childEnglishSpeaking", "child", speaking)
@@ -690,7 +691,8 @@ function experienceDurationContext(text: string, context: RegExp): string {
   return text.slice(match.index, match.index + 48)
 }
 
-function listeningEvidence(text: string): "understands_simple_instructions" | "understands_class_explanation" | "struggles_with_class_explanation" | null {
+function listeningEvidence(text: string, currentQuestionKey?: string | null): "understands_simple_instructions" | "understands_class_explanation" | "struggles_with_class_explanation" | null {
+  if (/(?:(?:이해|알아듣|따라|듣).{0,8}(?:못|안|않|어려|힘들|놓쳐|부담|버거)|(?:못|안|않|어려|힘들|놓쳐|부담|버거).{0,8}(?:이해|알아듣|따라|듣))/iu.test(text)) return "struggles_with_class_explanation"
   if (/(?:선생님|교사|수업|설명|말).{0,32}(?:길게|긴|오래).{0,16}(?:설명|말)?(?:하면|은|이|을)?\s*(?:어려|힘들|부담|버거)/iu.test(text)
     || /(?:빠른|빠르게|원어민이\s*빨리|속도가?\s*빠른).{0,20}(?:말|설명|영어|대화).{0,20}(?:어려|힘들|놓쳐|못\s*알아|잘\s*안\s*들)/iu.test(text)
     || /(?:말|설명|영어|대화).{0,20}(?:빠른|빠르게|속도가?\s*빠른).{0,20}(?:어려|힘들|놓쳐|못\s*알아|잘\s*안\s*들)/iu.test(text)
@@ -711,14 +713,20 @@ function listeningEvidence(text: string): "understands_simple_instructions" | "u
   if (/듣기(?:는|가)?\s*(?:괜찮|문제없|가능)/iu.test(text)
     || /(간단한|짧은)\s*(?:수업\s*)?(지시|안내|설명).{0,16}(알아듣|이해|따라)/iu.test(text)
     || /(간단한\s*(지시|안내|설명)|외국인\s*선생님.{0,20}(알아듣|이해)|듣고\s*말|말을\s*듣)/iu.test(text)) return "understands_simple_instructions"
+  if (/(?:간단한|짧은)\s*(?:문장|설명).{0,20}(?:알아듣|이해|따라)/iu.test(text)) return "understands_simple_instructions"
+  if (currentQuestionKey === "child_english_level"
+    && /(?:대체로|보통|천천히|간단히|잘|괜찮).{0,24}(?:알아듣|이해|따라|듣)/iu.test(text)
+    && !/(?:못|안|않|어려|힘들|놓쳐|부담|버거)/iu.test(text)) return "understands_class_explanation"
   return null
 }
 
 function speakingEvidence(text: string): "answers_simple_questions" | "can_converse" | "initiates_speech" | "can_present_in_english" | "difficulty_initiating" | "rarely_speaks" | null {
   const negativeResponse = /(?:대답|질문에\s*답|응답).{0,12}(?:긴장|못|안|않|어려|힘들)/iu.test(text)
+  const negativeSpeaking = /(?:(?:질문|대답|답|응답|문장|표현|대화)[^.!?。！？]{0,12}(?:긴장|못|안|않|어려|힘들|자신\s*없)|(?:긴장|못|안|않|어려|힘들|자신\s*없)[^.!?。！？]{0,12}(?:질문|대답|답|응답|문장|표현|대화)|말(?:을|하기|하는|할)?\s*(?:긴장|못|안|않|어려|힘들|자신\s*없)|(?:긴장|못|안|않|어려|힘들|자신\s*없)[^.!?。！？]{0,8}말(?:을|하기|하는|할)?)/iu.test(text)
   const canConverse = /(?:간단한\s*(?:일상\s*)?대화|짧은\s*대화).{0,12}(?:가능|할\s*수\s*있)/iu.test(text)
   const simpleResponse = /(?:질문을?\s*받으면|물어보면).{0,32}(?:단어|짧은\s*(?:문장|표현)|답|대답|응답)/iu.test(text)
     || /(간단한\s*(?:질문|(?:일상\s*)?대화)|질문(?:에|에도|에는)?\s*(?:영어로\s*)?(?:답|대답)|짧은\s*대화|대화가?\s*가능|간단히\s*대답|대답(?:은|을)?\s*(?:할\s*수|가능|할\s*수\s*있))/iu.test(text)
+  if (negativeSpeaking) return "difficulty_initiating"
   if (/(먼저\s*말|말을?\s*먼저|자발적으로\s*말)/iu.test(text) && /(잘\s*못|어려|힘들|않)/iu.test(text)) return "difficulty_initiating"
   if (/(말하기|영어로\s*말|회화).{0,20}(어려|힘들|잘\s*못|자신\s*없)|먼저\s*말하.{0,8}(못|어려|자신\s*없)/iu.test(text)) return "difficulty_initiating"
   if (negativeResponse) return "difficulty_initiating"

@@ -768,14 +768,14 @@ function isEnglishModelFactSupportedByUserText(
   const normalizedEvidence = normalizeForEnglishEvidence(fact.evidence)
   if (normalizedEvidence.length === 0 || !normalizedMessage.includes(normalizedEvidence)) return false
   if (fact.key === "childEnglishListening") {
-    const negativeListening = /(?:이해|알아듣|따라|듣).{0,6}(?:못|안|않|어려|힘들)/iu.test(fact.evidence)
+    const negativeListening = /(?:(?:이해|알아듣|따라|듣).{0,8}(?:못|안|않|어려|힘들|놓쳐|부담|버거)|(?:못|안|않|어려|힘들|놓쳐|부담|버거).{0,8}(?:이해|알아듣|따라|듣))/iu.test(fact.evidence)
     if (negativeListening && fact.value !== "struggles_with_class_explanation") return false
-    return /알아듣|이해|설명|지시|안내|수업|듣/iu.test(fact.evidence)
+    return /알아듣|이해|설명|지시|안내|수업|따라|듣/iu.test(fact.evidence)
   }
   if (fact.key === "childEnglishSpeaking") {
-    const negativeSpeaking = /(?:대답|답|응답).{0,12}(?:긴장|못|안|않|어려|힘들)/iu.test(fact.evidence)
+    const negativeSpeaking = /(?:(?:질문|대답|답|응답|문장|표현|대화)[^.!?。！？]{0,12}(?:긴장|못|안|않|어려|힘들|자신\s*없)|(?:긴장|못|안|않|어려|힘들|자신\s*없)[^.!?。！？]{0,12}(?:질문|대답|답|응답|문장|표현|대화)|말(?:을|하기|하는|할)?\s*(?:긴장|못|안|않|어려|힘들|자신\s*없)|(?:긴장|못|안|않|어려|힘들|자신\s*없)[^.!?。！？]{0,8}말(?:을|하기|하는|할)?)/iu.test(fact.evidence)
     if (negativeSpeaking && !["difficulty_initiating", "rarely_speaks"].includes(fact.value as string)) return false
-    return /질문|대답|답|응답|말|문장|표현/iu.test(fact.evidence)
+    return /질문|대답|답|응답|말|문장|표현|대화/iu.test(fact.evidence)
   }
   if (fact.key === "childEnglishReading") return /읽|책|파닉스|독해/iu.test(fact.evidence)
   if (fact.key === "childEnglishWriting") return /쓰|작문|문장/iu.test(fact.evidence)
