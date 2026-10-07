@@ -1,6 +1,6 @@
 import "server-only"
-
-import { demoCityDefinitions } from "@/data/campfit/v3/demoCatalog"
+import { canonicalCountry, mapDirectActivityCatalog, mapDirectSchoolCatalog } from "@/lib/campfit/v3/directCatalogAdapter"
+import type { DirectCatalogMetadata } from "@/lib/campfit/v3/directCatalogAdapter"
 
 import {
   extractSessionWindowsFromText,
@@ -18,7 +18,7 @@ import {
   type V3SessionWindow,
 } from "@/lib/campfit/v3/catalogPolicy"
 import { createServerSupabaseClient } from "@/lib/campfit/supabaseServer"
-import { inferCityRegionGroup } from "@/lib/campfit/v2/cityProfileAdapter"
+import { inferCityRegionGroup } from "@/lib/campfit/cityRegion"
 import {
   isEnglishRequirementLevel,
   isInstructionLanguageMode,
@@ -119,6 +119,7 @@ export type V3CatalogSessionVariant = {
 }
 
 export type V3CatalogProgram = {
+  readonly directCatalog?: DirectCatalogMetadata
   readonly id: string
   readonly slug: string | null
   readonly name: string
@@ -197,7 +198,7 @@ export async function loadV3Catalog(): Promise<V3Catalog> {
   const client = createServerSupabaseClient()
   if (client === null) return unavailableCatalog("Supabase 연결 설정을 확인할 수 없습니다.")
 
-  const [programResult, priceResult, profileResult, cityResult, sessionResult, claimResult, evidenceResult, observationResult, demoProgramResult] = await Promise.all([
+  const [programResult, priceResult, profileResult, cityResult, sessionResult, claimResult, evidenceResult, observationResult, activityResult, activityOfferingResult, schoolResult, schoolOfferingResult, schoolSessionResult] = await Promise.all([
     client.from("programs").select("*"),
     client.from("program_price_options").select("*"),
     client.from("campfit_program_profiles").select("*"),
@@ -206,7 +207,11 @@ export async function loadV3Catalog(): Promise<V3Catalog> {
     client.from("program_provider_claims").select("id, program_id, claim_status, valid_until"),
     client.from("program_evidence_sources").select("id, program_id, verification_status, valid_until"),
     client.from("program_fact_observations").select("program_id, evidence_source_id, provider_claim_id, dimension_key, fact_key, observation_status, valid_until"),
-    client.from("campfit_demo_programs").select("*"),
+    client.from("local_activity_camps").select("*"),
+    client.from("local_activity_camp_offerings").select("*"),
+    client.from("schools").select("*"),
+    client.from("school_offerings").select("*"),
+    client.from("school_sessions").select("*"),
   ])
 
   if (programResult.error) {
@@ -230,7 +235,6 @@ export async function loadV3Catalog(): Promise<V3Catalog> {
   const claimRows = optionalRows(claimResult, "program_provider_claims", warnings)
   const evidenceRows = optionalRows(evidenceResult, "program_evidence_sources", warnings)
   const observationRows = optionalRows(observationResult, "program_fact_observations", warnings)
-  const demoRows = optionalRows(demoProgramResult, "campfit_demo_programs", warnings)
   const activeProfiles = profileRows.filter((row) => readBoolean(row, ["active"]) === true)
   const profileById = new Map(activeProfiles.flatMap((row) => {
     const programId = readString(row, ["program_id"])
@@ -246,7 +250,7 @@ export async function loadV3Catalog(): Promise<V3Catalog> {
     const id = readString(row, ["id"])
     const name = readString(row, ["name", "title"])
     const city = readString(row, ["location_city", "city"])
-    const country = readString(row, ["location_country", "country"])
+    const country = canonicalCountry(readString(row, ["location_country", "country"]))
     if (!id || !name || !city || !country) return []
 
     const profile = profileById.get(id)
@@ -255,42 +259,19 @@ export async function loadV3Catalog(): Promise<V3Catalog> {
     const mapped = mapProductionProgram({ row, profile, priceOptions, sessionRows: sessionRowsForProgram, id, name, city, country, today, catalogSource: "supabase", officialEnglishVerified: verifiedOfficialEnglishPrograms.has(id) })
     return [mapped]
   })
-  const demoPrograms = mapDemoPrograms(demoRows, today)
-  const programs = mergeCatalogPrograms(productionPrograms, demoPrograms).programs
   const cities = cityRows.flatMap((row) => mapCity(row))
+  const activities = mapDirectActivityCatalog(
+    optionalRows(activityResult, "local_activity_camps", warnings),
+    optionalRows(activityOfferingResult, "local_activity_camp_offerings", warnings), today,
+  )
+  const schools = mapDirectSchoolCatalog(
+    optionalRows(schoolResult, "schools", warnings),
+    optionalRows(schoolOfferingResult, "school_offerings", warnings),
+    optionalRows(schoolSessionResult, "school_sessions", warnings), today,
+  )
 
   if (!cities.length) warnings.push("도시 카탈로그를 확인할 수 없어 프로그램 후보를 표시하지 않습니다.")
-  return { programs, cities, source: "supabase", warnings }
-}
-
-/** Load the isolated demo table without ever mixing it into production mode. */
-export async function loadDemoCatalogFromSupabase(): Promise<V3Catalog> {
-  const client = createServerSupabaseClient()
-  if (client === null) return unavailableCatalog("Supabase 연결 설정을 확인할 수 없습니다.")
-  const [programResult, cityResult] = await Promise.all([
-    client.from("campfit_demo_programs").select("*"),
-    client.from("Cities").select("*"),
-  ])
-  if (programResult.error || !Array.isArray(programResult.data)) {
-    if (programResult.error) console.error("CampFit v3 demo programs read failed", programResult.error.message)
-    return unavailableCatalog("데모 프로그램 카탈로그를 불러오지 못했습니다.")
-  }
-  const warnings: string[] = []
-  const cityRows = optionalRows(cityResult, "Cities", warnings)
-  const today = new Date().toISOString().slice(0, 10)
-  const programs = mapDemoPrograms(rowsFrom(programResult.data), today)
-  const cities = cityRows.flatMap((row) => mapCity(row, "demo")).map((city) => {
-    const demoDef = demoCityDefinitions.find((d) => d.name.toLowerCase() === city.name.toLowerCase())
-    if (!demoDef) return city
-    return {
-      ...city,
-      flightCostKrw: city.flightCostKrw ?? demoDef.flightCostKrw,
-      livingCostMonthlyKrw: city.livingCostMonthlyKrw ?? demoDef.livingCostMonthlyKrw,
-      housingCostMonthlyKrw: city.housingCostMonthlyKrw ?? demoDef.housingCostMonthlyKrw,
-    }
-  })
-  if (!cities.length) warnings.push("도시 카탈로그를 확인할 수 없어 프로그램 후보를 표시하지 않습니다.")
-  return { programs, cities, source: "demo", warnings }
+  return { programs: [...productionPrograms, ...activities, ...schools], cities, source: "supabase", warnings }
 }
 
 function mapProductionProgram(input: {
@@ -425,143 +406,6 @@ function unavailableCatalog(reason: string): V3Catalog {
 
 function isActivePublicProgram(row: Row, today: string): boolean {
   return isPublicV3ProgramRow(row, today)
-}
-
-function mapDemoPrograms(rows: readonly Row[], today: string): readonly V3CatalogProgram[] {
-  return rows.flatMap((row): readonly V3CatalogProgram[] => {
-    if (!isActivePublicProgram(row, today)) return []
-    const id = readString(row, ["id"])
-    const name = readString(row, ["name", "title"])
-    const city = readString(row, ["location_city", "city"])
-    const country = readString(row, ["location_country", "country"])
-    if (!id || !name || !city || !country) return []
-
-    let payload: Record<string, any> = {}
-    try {
-      const rawPayload = row["detail_payload"]
-      if (typeof rawPayload === "string") {
-        payload = JSON.parse(rawPayload) as Record<string, any>
-      } else if (rawPayload && typeof rawPayload === "object") {
-        payload = rawPayload as Record<string, any>
-      }
-    } catch (e) {
-      console.error("Failed to parse detail_payload for demo program", id, e)
-    }
-
-    const durationWeeks = demoDurationWeeks(row, payload)
-    const durationText = durationWeeks.map((weeks) => `${weeks}주`).join(", ")
-    const referencePriceValue = positiveNumber(readNumber(row, ["minimum_price_value", "base_price_value", "display_price"]) ?? readNumber(payload, ["priceBaseKrw", "minimumPriceKrw", "basePriceKrw", "price"]))
-    const referencePriceCurrency = readString(row, ["minimum_price_currency", "base_price_currency", "currency"]) ?? readString(payload, ["currency", "priceCurrency"])
-    const parentMode = readString(payload, ["parentMode", "parent_mode"]) ?? ""
-    const accommodationValues = readLooseStringArray(payload, ["accommodations", "accommodationOptions"])
-    const parentParticipationText = parentMode === "child_only"
-      ? "child only participation"
-      : parentMode === "family" || parentMode === "day"
-        ? "parent recommended"
-        : ""
-    const accommodationText = [
-      readString(row, ["accommodation_type", "item_accommodation"]),
-      ...accommodationValues,
-      parentMode === "family" ? "family stay" : null,
-      parentMode === "day" ? "day program" : null,
-    ].filter((value): value is string => Boolean(value && value.trim())).join(", ")
-
-    const mergedRow = {
-      ...row,
-      ...payload,
-      duration: durationText || readString(row, ["duration"]) || "",
-      duration_options: durationText || readString(row, ["duration_options"]) || "",
-      parent_participation_type: parentParticipationText || readString(row, ["parent_participation_type"]) || "",
-      accommodation_type: accommodationText || readString(row, ["accommodation_type"]) || "",
-      minimum_price_value: referencePriceValue ?? readNumber(row, ["minimum_price_value", "base_price_value"]),
-      minimum_price_currency: referencePriceCurrency ?? readString(row, ["minimum_price_currency", "base_price_currency", "currency"]),
-    }
-
-    const demoProfile = {
-      ...payload,
-      beginner_class: payload["beginnerClass"],
-      early_adaptation_support: payload["earlyAdaptationSupport"],
-      daily_parent_report: payload["dailyParentReport"],
-      special_care_support: payload["specialCareSupport"],
-      inferred_english_requirement_level: payload["demoEnglishRequirementLevel"],
-      inferred_english_requirement_confidence: payload["demoEnglishRequirementConfidence"],
-      inferred_english_requirement_version: payload["demoEnglishRequirementVersion"],
-      demo_english_requirement_source: payload["demoEnglishRequirementSource"],
-      demo_english_requirement_text: payload["demoEnglishRequirementText"],
-      demo_english_exposure: payload["demoEnglishExposure"],
-    }
-
-    const mapped = mapProductionProgram({ row: mergedRow, profile: demoProfile, priceOptions: [], sessionRows: [], id, name, city, country, today, catalogSource: "demo", officialEnglishVerified: false })
-    return [{
-      ...mapped,
-      demoProfile: mapDemoProgramProfile(payload, accommodationValues),
-      packageInclusions: mapDemoPackageInclusions(payload),
-    }]
-  })
-}
-
-function demoDurationWeeks(row: Row, payload: Row): readonly number[] {
-  const values = [
-    payload["durations"],
-    payload["durationWeeks"],
-    payload["availableDurationsWeeks"],
-    payload["duration_options"],
-    payload["duration"],
-    row["duration"],
-    row["duration_options"],
-    row["minimum_duration"],
-  ].flatMap(parseDemoDurationValue)
-  return uniqueNumbers(values.filter((weeks) => weeks >= 1 && weeks <= 12))
-}
-
-function parseDemoDurationValue(value: unknown): readonly number[] {
-  if (Array.isArray(value)) return value.flatMap(parseDemoDurationValue)
-  if (typeof value === "number" && Number.isFinite(value)) return [Math.trunc(value)]
-  if (typeof value !== "string") return []
-  return Array.from(value.matchAll(/\d+(?:\.\d+)?/gu)).flatMap((match) => {
-    const parsed = Number(match[0])
-    return Number.isFinite(parsed) ? [Math.trunc(parsed)] : []
-  })
-}
-
-function mapDemoProgramProfile(payload: Row, accommodations: readonly string[]): V3DemoProgramProfile {
-  const category = readString(payload, ["category", "productCategory"])
-  const priceQuality = readString(payload, ["priceQuality"])
-  return {
-    productCategory: isDemoProductCategory(category) ? category : "english",
-    accommodationOptions: accommodations,
-    priceQuality: isDemoPriceQuality(priceQuality) ? priceQuality : "reference",
-    priceNote: readString(payload, ["priceNote"]) ?? "참고 가격이며 기간·구성별 실제 견적은 확인이 필요합니다.",
-    packageInclusions: mapDemoPackageInclusions(payload),
-    strengths: readLooseStringArray(payload, ["strengths"]),
-    tradeoffs: readLooseStringArray(payload, ["tradeoffs"]),
-    availableSeasons: readLooseStringArray(payload, ["seasons", "availableSeasons"]),
-  }
-}
-
-function mapDemoPackageInclusions(payload: Row): V3ProgramPackageInclusions {
-  const raw = readRecord(payload, ["packageInclusions"]) ?? undefined
-  return {
-    accommodationIncluded: readBoolean(raw, ["accommodationIncluded"]) ?? false,
-    mealPlan: isDemoMealPlan(readString(raw, ["mealPlan"])) ? readString(raw, ["mealPlan"]) as V3ProgramMealPlan : "none",
-    localTransportIncluded: readBoolean(raw, ["localTransportIncluded"]) ?? false,
-    airportTransferIncluded: readBoolean(raw, ["airportTransferIncluded"]) ?? false,
-    registrationFeeKrw: positiveNumber(readNumber(raw, ["registrationFeeKrw"])) ?? null,
-    additionalAdultSurchargeKrw: positiveNumber(readNumber(raw, ["additionalAdultSurchargeKrw"])) ?? null,
-    additionalChildProgramPriceKrw: positiveNumber(readNumber(raw, ["additionalChildProgramPriceKrw"])) ?? null,
-  }
-}
-
-function isDemoProductCategory(value: string | undefined): value is V3DemoProgramProfile["productCategory"] {
-  return value === "english" || value === "stem" || value === "sports" || value === "culture" || value === "schooling" || value === "project"
-}
-
-function isDemoPriceQuality(value: string | undefined): value is V3DemoProgramProfile["priceQuality"] {
-  return value === "exact" || value === "official_surcharge" || value === "reference" || value === "inquiry"
-}
-
-function isDemoMealPlan(value: string | undefined): value is V3ProgramMealPlan {
-  return value === "none" || value === "weekday_lunch" || value === "weekday_two_meals" || value === "full_board"
 }
 
 export function mergeCatalogPrograms(
@@ -707,7 +551,7 @@ function mapCity(row: Row, catalogSource: "supabase" | "demo" = "supabase"): rea
   if (!isVisibleV3CityRow(row)) return []
   const id = readString(row, ["id"])
   const name = readString(row, ["City name", "name", "city_name", "title"])
-  const country = readString(row, ["Country", "country", "country_name"])
+  const country = canonicalCountry(readString(row, ["Country", "country", "country_name"]))
   if (!id || !name || !country) return []
   const description = readString(row, ["Description", "long Description", "Local Insight / Notes"]) ?? null
   const parentStayEvidence = [

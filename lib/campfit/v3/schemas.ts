@@ -207,6 +207,8 @@ export const CampfitV3RecommendationResultSchema = z.object({
   })).max(3),
   requiredSupportConditions: z.array(z.string()).max(30),
   programCandidates: z.array(z.object({
+    sourceKind: z.enum(["package", "program", "school"]).optional(),
+    sourceId: z.string().optional(), sourceOfferingId: z.string().optional(),
     programId: z.string().min(1), name: z.string().min(1), cityName: z.string().min(1), countryName: z.string().min(1),
     imageUrl: z.string().nullable(), ageLabel: z.string(), durationLabel: z.string(), priceLabel: z.string(), primaryDirection: z.string(),
     reason: z.string(), description: z.string().nullable().optional(), matchHighlights: z.array(z.string()).max(3).optional(), tradeoff: z.string().optional(), verify: z.array(z.string()),

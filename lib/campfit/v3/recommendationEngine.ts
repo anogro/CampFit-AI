@@ -3,6 +3,7 @@ import {
   parseDepartureRange,
   rangesOverlap,
 } from "@/lib/campfit/v3/catalogPolicy"
+import { directAgeLabel, directDurationLabel, directPriceLabel, directVerification } from "@/lib/campfit/v3/directCatalogPresentation"
 import type { ExperienceSignalStatus, V3ParentStayPreferences } from "@/lib/campfit/v3/catalogPolicy"
 import { activityCategoryPhrase, isActivityPreferenceProfileValue } from "@/lib/campfit/v3/activityPreferences"
 import type { ExperienceTag } from "@/lib/campfit/v3/catalogPolicy"
@@ -223,6 +224,12 @@ function evaluateProgram(input: {
 
   if (input.program.status !== "active") excluded.push("active 프로그램이 아님")
   const parentCheck = evaluateParentCompatibility(input.program.parentScope, input.parentPreferences)
+  verify.push(...directVerification(input.program, input.basicInfo.durationWeeks))
+  const direct = input.program.directCatalog
+  if (direct?.minAttendanceWeeks !== null && direct?.minAttendanceWeeks !== undefined
+    && input.basicInfo.durationWeeks < direct.minAttendanceWeeks) excluded.push("학교·과정의 최소 참여기간 미충족")
+  if (direct?.maxAttendanceWeeks !== null && direct?.maxAttendanceWeeks !== undefined
+    && input.basicInfo.durationWeeks > direct.maxAttendanceWeeks) excluded.push("학교·과정의 최대 참여기간 초과")
   excluded.push(...parentCheck.excluded)
   verify.push(...parentCheck.verify)
 
@@ -796,6 +803,9 @@ function toProgramCandidate(
   if (reasonProjection.selectedSignature !== null) usedReasonSignatures?.add(reasonProjection.selectedSignature)
   return {
     programId: item.program.id,
+    sourceKind: item.program.directCatalog?.sourceKind ?? "package",
+    sourceId: item.program.directCatalog?.sourceId ?? item.program.id,
+    sourceOfferingId: item.program.directCatalog?.sourceOfferingId ?? undefined,
     name: item.program.name,
     cityName: item.program.city,
     countryName: item.program.country,
@@ -803,9 +813,9 @@ function toProgramCandidate(
     // use the catalog city's own image rather than showing one generic UI asset
     // for every program. A real program image always remains the first choice.
     imageUrl: item.program.imageUrl ?? item.city?.imageUrl ?? null,
-    ageLabel: item.program.ageMin !== null && item.program.ageMax !== null ? `만 ${item.program.ageMin}~${item.program.ageMax}세` : "연령 확인 필요",
-    durationLabel: item.program.durationWeeks.length ? `${item.program.durationWeeks.join("·")}주 옵션` : "기간 확인 필요",
-    priceLabel,
+    ageLabel: directAgeLabel(item.program) ?? (item.program.ageMin !== null && item.program.ageMax !== null ? `만 ${item.program.ageMin}~${item.program.ageMax}세` : "연령 확인 필요"),
+    durationLabel: directDurationLabel(item.program) ?? (item.program.durationWeeks.length ? `${item.program.durationWeeks.join("·")}주 옵션` : "기간 확인 필요"),
+    priceLabel: directPriceLabel(item.program) ?? priceLabel,
     description: compactProgramDescription(item.program.description),
     primaryDirection: directionLabels[item.direction],
     reason: reasonProjection.reason,
@@ -817,7 +827,7 @@ function toProgramCandidate(
     englishMatchLabel: item.englishMatch.label,
     englishMatchExplanation: item.englishMatch.explanation,
     verify: item.verify.length ? item.verify : ["최신 일정과 실제 수업 구성"],
-    detailUrl: item.program.slug ? `${baseUrl}/program/${encodeURIComponent(item.program.slug)}` : null,
+    detailUrl: `${baseUrl.replace(/\/$/u, "")}${item.program.directCatalog?.detailPath ?? `/package/${encodeURIComponent(item.program.slug ?? item.program.id)}`}`,
     group,
     score: item.score,
   }

@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const loadV3Catalog = vi.hoisted(() => vi.fn())
-const loadDemoCatalog = vi.hoisted(() => vi.fn())
-const loadDemoCatalogFromSupabase = vi.hoisted(() => vi.fn())
 const isReadyForRecommendation = vi.hoisted(() => vi.fn())
 const isParentExperienceNeedsSufficient = vi.hoisted(() => vi.fn(() => true))
 const isPreferredRegionResolved = vi.hoisted(() => vi.fn(() => true))
@@ -10,8 +8,7 @@ const buildRecommendation = vi.hoisted(() => vi.fn())
 const explainRecommendation = vi.hoisted(() => vi.fn())
 const createConversationProvider = vi.hoisted(() => vi.fn(() => ({ explainRecommendation })))
 
-vi.mock("@/lib/campfit/v3/catalogRepository", () => ({ loadV3Catalog, loadDemoCatalogFromSupabase }))
-vi.mock("@/lib/campfit/v3/demoCatalog", () => ({ loadDemoCatalog }))
+vi.mock("@/lib/campfit/v3/catalogRepository", () => ({ loadV3Catalog }))
 vi.mock("@/lib/campfit/v3/progress", () => ({ isReadyForRecommendation, isParentExperienceNeedsSufficient, isPreferredRegionResolved }))
 vi.mock("@/lib/campfit/v3/recommendationEngine", () => ({ buildRecommendation }))
 vi.mock("@/lib/campfit/v3/server/providerFactory", () => ({ createConversationProvider }))
@@ -65,13 +62,12 @@ describe("CampFit v3 recommendation route", () => {
   beforeEach(() => {
     isReadyForRecommendation.mockReturnValue(true)
     loadV3Catalog.mockResolvedValue({ programs: [], cities: [], source: "supabase", warnings: [] })
-    loadDemoCatalogFromSupabase.mockResolvedValue({ programs: [], cities: [], source: "demo", warnings: [] })
-    loadDemoCatalog.mockReturnValue({ programs: [], cities: [], source: "demo", warnings: [] })
     buildRecommendation.mockReturnValue(result)
     explainRecommendation.mockResolvedValue(null)
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllEnvs()
     vi.clearAllMocks()
   })
@@ -86,31 +82,26 @@ describe("CampFit v3 recommendation route", () => {
     expect(payload["catalogSource"]).toBe("supabase")
   })
 
-  it("uses the Demo Catalog only when explicitly requested", async () => {
-    buildRecommendation.mockReturnValue({ ...result, catalogSource: "demo" })
+  it("uses the real catalog when demo=true and never falls back to demo data", async () => {
 
     const response = await POST(request(true))
     const payload = await response.json() as Record<string, unknown>
 
     expect(response.status).toBe(200)
-    expect(loadDemoCatalogFromSupabase).toHaveBeenCalledTimes(1)
-    expect(loadDemoCatalog).not.toHaveBeenCalled()
-    expect(loadV3Catalog).not.toHaveBeenCalled()
-    expect(buildRecommendation).toHaveBeenCalledWith(expect.objectContaining({ catalog: expect.objectContaining({ source: "demo" }) }))
-    expect(payload["catalogSource"]).toBe("demo")
+    expect(loadV3Catalog).toHaveBeenCalledTimes(1)
+    expect(buildRecommendation).toHaveBeenCalledWith(expect.objectContaining({ catalog: expect.objectContaining({ source: "supabase" }) }))
+    expect(payload["catalogSource"]).toBe("supabase")
   })
 
-  it("falls back to the local demo catalog without loading production programs", async () => {
-    loadDemoCatalogFromSupabase.mockResolvedValue({ programs: [], cities: [], source: "unavailable", warnings: ["demo read failed"] })
-    buildRecommendation.mockReturnValue({ ...result, catalogSource: "demo" })
+  it("does not fall back when the real catalog is unavailable with demo=true", async () => {
+    loadV3Catalog.mockResolvedValue({ programs: [], cities: [], source: "unavailable", warnings: ["read failed"] })
 
     const response = await POST(request(true))
+    const payload = await response.json() as Record<string, unknown>
 
-    expect(response.status).toBe(200)
-    expect(loadDemoCatalogFromSupabase).toHaveBeenCalledTimes(1)
-    expect(loadDemoCatalog).toHaveBeenCalledTimes(1)
-    expect(loadV3Catalog).not.toHaveBeenCalled()
-    expect(buildRecommendation).toHaveBeenCalledWith(expect.objectContaining({ catalog: expect.objectContaining({ source: "demo" }) }))
+    expect(response.status).toBe(503)
+    expect(payload).toEqual({ ok: false, error: { code: "CATALOG_UNAVAILABLE", message: "추천 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." } })
+    expect(buildRecommendation).not.toHaveBeenCalled()
   })
 
   it("returns an explicit service error when the production catalog is unavailable", async () => {
@@ -161,6 +152,9 @@ describe("CampFit v3 recommendation route", () => {
   })
 
   it("preserves durationWeeks of 4 all the way through the endpoint request", async () => {
+    // This fixture describes a July 2026 trip; do not depend on the wall clock.
+    vi.useFakeTimers({ toFake: ["Date"] })
+    vi.setSystemTime(new Date("2026-07-01T00:00:00.000Z"))
     vi.stubEnv("CAMPFIT_V3_AI_RESULT_EXPLANATION", "false")
     isReadyForRecommendation.mockReturnValue(true)
 

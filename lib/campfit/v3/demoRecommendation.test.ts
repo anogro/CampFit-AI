@@ -27,7 +27,7 @@ describe("CampFit v3 Demo Catalog recommendation coverage", () => {
     expect(new Set(result.destinationRecommendations.map((city) => city.cityName)).size).toBe(3)
     expect(result.destinationRecommendations.every((city) => city.citySlug)).toBe(true)
     expect(new Set(result.programCandidates.map((program) => program.programId)).size).toBe(result.programCandidates.length)
-    expect(result.programCandidates.every((program) => program.detailUrl?.includes("/program/campfit-demo-") === true)).toBe(true)
+    expect(result.programCandidates.every((program) => program.detailUrl?.includes("/package/campfit-demo-") === true)).toBe(true)
     expect(result.programCandidates.every((program) => program.imageUrl !== null)).toBe(true)
     expect(result.programCandidates.every((program, index, programs) => programs.findIndex((candidate) => candidate.programId === program.programId) === index)).toBe(true)
     expect(result.programCandidates[1]?.reason).not.toContain("점수")

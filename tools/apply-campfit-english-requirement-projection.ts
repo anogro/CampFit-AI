@@ -31,6 +31,7 @@ const DEMO_VERSION = "campfit-v3-demo-english-requirement-v0.2"
 const dryRunPath = "tmp-campfit-english-requirement-dry-run-20260811.json"
 const args = new Set(process.argv.slice(2))
 const applyDemo = args.has("--apply-demo")
+if (applyDemo) throw new Error("--apply-demo is retired; demo catalog rows are no longer maintained.")
 const applyProfiles = args.has("--apply-profiles")
 const overwriteInferred = args.has("--overwrite-inferred")
 const preview = args.has("--preview") || (!applyDemo && !applyProfiles)
@@ -56,9 +57,7 @@ const demoPlans = demoProgramDefinitions.map(toDemoPlan)
 const currentProfiles = preview || applyProfiles
   ? await getCurrentProfiles(actualPlans.map((plan) => plan.programId))
   : []
-const currentDemoRows = preview || applyDemo
-  ? await getRows("campfit_demo_programs?select=id,slug,detail_payload&demo_source=eq.campfit_v3&limit=1000")
-  : []
+const currentDemoRows: readonly JsonRecord[] = []
 
 if (preview) printPreview(actualPlans, currentProfiles, demoPlans, currentDemoRows)
 if (applyProfiles) await patchProfiles(actualPlans, currentProfiles)

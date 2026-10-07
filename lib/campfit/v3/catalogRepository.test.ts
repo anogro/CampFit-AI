@@ -13,35 +13,27 @@ describe("CampFit v3 catalog composition", () => {
     vi.clearAllMocks()
   })
 
-  it("combines production and demo programs while preserving demo mapping fields", async () => {
-    createServerSupabaseClient.mockReturnValue(mockClient({ demoRows: [demoRow()] }))
-
-    const catalog = await loadV3Catalog()
-    const production = catalog.programs.find((program) => program.catalogSource === "supabase")
-    const demo = catalog.programs.find((program) => program.catalogSource === "demo")
-
-    expect(catalog.source).toBe("supabase")
-    expect(catalog.programs).toHaveLength(2)
-    expect(production?.id).toBe("production-1")
-    expect(demo?.city).toBe("London")
-    expect(demo?.country).toBe("UK")
-    expect(demo?.durationWeeks).toEqual([2, 3, 4, 6])
-    expect(demo?.priceOptions).toEqual([])
-    expect(demo?.budgetMinKrw).toBe(3_900_000)
-    expect(demo?.sessionWindows).toEqual([])
-    expect(demo?.demoProfile?.availableSeasons).toEqual(["summer", "year_round"])
-    expect(demo?.englishRequirement?.level).toBe("beginner_friendly")
-    expect(demo?.parentScope.stayMode).toBe("family_stay")
-  })
-
-  it("keeps production programs when the optional demo query fails", async () => {
-    createServerSupabaseClient.mockReturnValue(mockClient({ demoError: "demo table unavailable" }))
+  it("never queries or includes rows from the demo table", async () => {
+    const client = mockClient({ demoRows: [demoRow()] })
+    createServerSupabaseClient.mockReturnValue(client)
 
     const catalog = await loadV3Catalog()
 
     expect(catalog.source).toBe("supabase")
     expect(catalog.programs.map((program) => program.id)).toEqual(["production-1"])
-    expect(catalog.warnings.some((warning) => warning.includes("campfit_demo_programs"))).toBe(true)
+    expect(catalog.programs.every((program) => program.catalogSource === "supabase")).toBe(true)
+    expect(client.queriedTables).not.toContain("campfit_demo_programs")
+  })
+
+  it("does not access the demo table even when its fixture is configured to fail", async () => {
+    const client = mockClient({ demoError: "demo table unavailable" })
+    createServerSupabaseClient.mockReturnValue(client)
+
+    const catalog = await loadV3Catalog()
+
+    expect(catalog.source).toBe("supabase")
+    expect(catalog.programs.map((program) => program.id)).toEqual(["production-1"])
+    expect(client.queriedTables).not.toContain("campfit_demo_programs")
   })
 
   it("keeps distinct programs and returns 15 production plus 148 demo entries", () => {
@@ -87,11 +79,16 @@ function mockClient(input: { readonly demoRows?: readonly Record<string, unknown
     program_fact_observations: [],
     campfit_demo_programs: input.demoRows ?? [],
   }
+  const queriedTables: string[] = []
   return {
+    queriedTables,
     from: (table: string) => ({
-      select: async () => table === "campfit_demo_programs" && input.demoError
-        ? { data: null, error: { message: input.demoError } }
-        : { data: tables[table] ?? [], error: null },
+      select: async () => {
+        queriedTables.push(table)
+        return table === "campfit_demo_programs" && input.demoError
+          ? { data: null, error: { message: input.demoError } }
+          : { data: tables[table] ?? [], error: null }
+      },
     }),
   }
 }

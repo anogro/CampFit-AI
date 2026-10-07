@@ -367,6 +367,9 @@ export type CampfitV3DestinationRecommendation = {
 }
 
 export type CampfitV3ProgramCandidate = {
+  readonly sourceKind?: "package" | "program" | "school" | undefined
+  readonly sourceId?: string | undefined
+  readonly sourceOfferingId?: string | undefined
   readonly programId: string
   readonly name: string
   readonly cityName: string

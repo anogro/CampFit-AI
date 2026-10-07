@@ -11,6 +11,23 @@ export type ProgramCostInput = {
 }
 
 export function calculateProgramCost(input: ProgramCostInput): TripCostLine {
+  if (input.program.directCatalog) {
+    const direct = input.program.directCatalog
+    const notes = ["확인 필요: 실제 참여기간·학년·회차에 적용되는 참가비와 별도 비용"]
+    if (direct.minPayableWeeks !== null && direct.minPayableWeeks > input.basicInfo.durationWeeks) {
+      notes.push(`희망 참여 ${input.basicInfo.durationWeeks}주와 별개로 최소 ${direct.minPayableWeeks}주 요금이 적용됩니다.`)
+    }
+    return {
+      ...emptyLine("inquiry", notes),
+      travelerCount: 1,
+      sourceAmounts: direct.fees.filter((fee) => fee.amount !== null && fee.currency !== null).map((fee) => ({
+        label: `공개 참가비 (${fee.unit ?? "단위 확인 필요"}${fee.appliesTo ? ` · ${fee.appliesTo}` : ""})`,
+        currency: fee.currency!, low: fee.amount, high: fee.amount,
+        lowKrw: null, highKrw: null, exchangeRateToKrw: null,
+        exchangeRateAsOf: null, exchangeRateSource: null,
+      })),
+    }
+  }
   const packageInclusions = input.program.packageInclusions
   const programChildCount = 1
   const packageAccommodation = packageInclusions?.accommodationIncluded === true

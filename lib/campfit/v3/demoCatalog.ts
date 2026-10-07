@@ -6,7 +6,7 @@ import {
   type DemoPriceQuality,
   type DemoSeason,
 } from "@/data/campfit/v3/demoCatalog"
-import { inferCityRegionGroup } from "@/lib/campfit/v2/cityProfileAdapter"
+import { inferCityRegionGroup } from "@/lib/campfit/cityRegion"
 import type { V3Catalog, V3CatalogCity, V3CatalogProgram, V3PriceOption } from "@/lib/campfit/v3/catalogRepository"
 import type { V3DirectionSignals, V3ParentScope, V3SessionWindow } from "@/lib/campfit/v3/catalogPolicy"
 import type { ExperienceDirectionKey } from "@/types/campfitV3"

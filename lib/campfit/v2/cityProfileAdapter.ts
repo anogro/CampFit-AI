@@ -1,12 +1,9 @@
 import type { CityFitProfile, CityRegionGroup } from "@/types/campfitCity"
+import { inferCityRegionGroup } from "@/lib/campfit/cityRegion"
+export { inferCityRegionGroup } from "@/lib/campfit/cityRegion"
 
 type CityRow = Record<string, unknown>
 
-const southeastAsiaCountries = ["Philippines", "Malaysia", "Singapore", "Thailand", "Vietnam", "Indonesia", "Taiwan", "Japan"] as const
-const oceaniaCountries = ["Australia", "New Zealand"] as const
-const northAmericaCountries = ["USA", "United States", "Canada"] as const
-const europeCountries = ["UK", "United Kingdom", "Ireland", "Malta", "France", "Germany", "Spain", "Portugal", "Denmark", "Netherlands"] as const
-const domesticCountries = ["Korea", "South Korea", "Republic of Korea"] as const
 
 export function toCityFitProfile(row: CityRow): CityFitProfile | null {
   const cityId = readString(row, ["id"])
@@ -75,14 +72,6 @@ export function toCityFitProfile(row: CityRow): CityFitProfile | null {
   }
 }
 
-export function inferCityRegionGroup(countryName: string): CityRegionGroup {
-  if (containsCountry(oceaniaCountries, countryName)) return "oceania"
-  if (containsCountry(southeastAsiaCountries, countryName)) return "southeast_asia"
-  if (containsCountry(northAmericaCountries, countryName)) return "north_america"
-  if (containsCountry(europeCountries, countryName)) return "europe"
-  if (containsCountry(domesticCountries, countryName)) return "domestic"
-  return "unknown"
-}
 
 function readRegion(row: CityRow): CityRegionGroup | undefined {
   const value = readString(row, ["region_group", "regionGroup", "region"])
@@ -225,9 +214,6 @@ function scoreTravelBurden(regionGroup: CityRegionGroup, flightCost: number | un
   return clampScore(base + flightPenalty)
 }
 
-function containsCountry(countries: readonly string[], countryName: string): boolean {
-  return countries.some((country) => country.toLowerCase() === countryName.trim().toLowerCase())
-}
 
 function clampScore(score: number): number {
   return Math.max(0, Math.min(100, Math.round(score)))
