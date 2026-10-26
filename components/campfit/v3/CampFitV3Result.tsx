@@ -4,7 +4,7 @@ import { useMemo, useRef, type ReactNode } from "react"
 import * as React from "react"
 import { CampFitV3DecisionRadar } from "@/components/campfit/v3/CampFitV3DecisionRadar"
 import { CampFitV3Frame, V3Header } from "@/components/campfit/v3/CampFitV3Frame"
-import { CampFitV3ResultActions, type CampFitV3EmailRequest } from "@/components/campfit/v3/CampFitV3ResultActions"
+import { CampFitV3ResultActions } from "@/components/campfit/v3/CampFitV3ResultActions"
 import {
   buildAnogroCityHref,
   buildCityComparisons,
@@ -37,7 +37,6 @@ type CampFitV3ResultProps = {
   readonly conversationState: CampfitV3ConversationState
   readonly onBack: () => void
   readonly onRestart: () => void
-  readonly onRequestEmail?: (request: CampFitV3EmailRequest) => void | Promise<void>
 }
 
 function getAxisDetail(axisKey: string, state: CampfitV3ConversationState): string {
@@ -130,7 +129,6 @@ export function CampFitV3Result({
   conversationState,
   onBack,
   onRestart,
-  onRequestEmail,
 }: CampFitV3ResultProps) {
   const reportRef = useRef<HTMLDivElement | null>(null)
   const axes = useMemo(
@@ -271,7 +269,6 @@ export function CampFitV3Result({
         <div data-campfit-export-ignore="true">
           <CampFitV3ResultActions
             reportRef={reportRef}
-            {...(onRequestEmail ? { onRequestEmail } : {})}
             onBack={onBack}
             onRestart={onRestart}
             resultId={resultId ?? null}

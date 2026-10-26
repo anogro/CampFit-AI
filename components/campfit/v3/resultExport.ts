@@ -37,25 +37,6 @@ export async function createCampFitResultPdfBlob(element: HTMLElement): Promise<
   return pdf.output("blob")
 }
 
-export async function sendCampFitResultEmail({
-  email,
-  pdf,
-  filename,
-}: {
-  readonly email: string
-  readonly pdf: Blob
-  readonly filename: string
-}): Promise<void> {
-  const formData = new FormData()
-  formData.append("email", email)
-  formData.append("pdf", pdf, filename)
-  const response = await fetch("/api/campfit/email-report", { method: "POST", body: formData })
-  const payload = await response.json().catch(() => null) as unknown
-  if (!response.ok) {
-    throw new Error(apiMessage(payload))
-  }
-}
-
 export function getCampFitReportFilename(format: CampFitResultExportFormat, date = new Date()): string {
   const dateStamp = [date.getFullYear(), date.getMonth() + 1, date.getDate()]
     .map((value) => String(value).padStart(2, "0"))
@@ -259,10 +240,4 @@ function downloadBlob(blob: Blob, filename: string): void {
   anchor.click()
   anchor.remove()
   URL.revokeObjectURL(url)
-}
-
-function apiMessage(value: unknown): string {
-  if (typeof value === "object" && value !== null && "message" in value && typeof value.message === "string") return value.message
-  if (typeof value === "object" && value !== null && "error" in value && typeof value.error === "object" && value.error !== null && "message" in value.error && typeof value.error.message === "string") return value.error.message
-  return "이메일을 보내지 못했어요. 잠시 후 다시 시도해 주세요."
 }
