@@ -254,7 +254,7 @@ describe("CampFitV3Result UI component", () => {
     expect(markup).not.toContain("총 예상 금액")
   })
 
-  it("renders the email CTA button with corrected copy", () => {
+  it("renders save actions without the disabled email delivery CTA", () => {
     const markup = renderToStaticMarkup(
       createElement(CampFitV3Result, {
         result,
@@ -265,10 +265,9 @@ describe("CampFitV3Result UI component", () => {
       })
     )
 
-    expect(markup).toContain("이메일로 받기")
     expect(markup).toContain("PNG 이미지 저장")
     expect(markup).toContain("PDF 저장하기")
-    expect(markup).not.toContain("이메일로 받기 · 준비 중")
+    expect(markup).not.toContain("이메일")
   })
 })
 
