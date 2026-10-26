@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { campfitRequestPolicies, guardCampfitRequest } from "@/lib/campfit/v3/requestGuard"
 import { loadV3Catalog } from "@/lib/campfit/v3/catalogRepository"
 import { attachTripCosts } from "@/lib/campfit/v3/cost/attachTripCosts"
 import { isReadyForRecommendation } from "@/lib/campfit/v3/progress"
@@ -10,6 +11,9 @@ import {
 import { createConversationProvider } from "@/lib/campfit/v3/server/providerFactory"
 
 export async function POST(request: Request) {
+  const refused = guardCampfitRequest(request, campfitRequestPolicies.recommend)
+  if (refused) return refused
+
   const parsed = CampfitV3RecommendRequestSchema.safeParse(await safeJson(request))
   if (!parsed.success) {
     return NextResponse.json({ message: "추천에 필요한 상담 정보를 다시 확인해 주세요." }, { status: 400 })

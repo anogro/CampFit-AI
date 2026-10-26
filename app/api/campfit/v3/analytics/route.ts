@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server"
+import { campfitRequestPolicies, guardCampfitRequest } from "@/lib/campfit/v3/requestGuard"
 import { CampfitV3AnalyticsEventSchema } from "@/lib/campfit/v3/analyticsSchema"
 import { recordCampfitV3AnalyticsEvent } from "@/lib/campfit/v3/analyticsRepository"
 
 export async function POST(request: Request) {
+  const refused = guardCampfitRequest(request, campfitRequestPolicies.analytics)
+  if (refused) return refused
+
   const parsed = CampfitV3AnalyticsEventSchema.safeParse(await safeJson(request))
   if (!parsed.success) {
     return NextResponse.json({ ok: false, message: "분석 이벤트 형식을 확인해 주세요." }, { status: 400 })

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { campfitRequestPolicies, guardCampfitRequest } from "@/lib/campfit/v3/requestGuard"
 import { processConversationMessage } from "@/lib/campfit/v3/conversationService"
 import {
   CampfitV3ConversationMessageRequestSchema,
@@ -9,6 +10,9 @@ import { createConversationProvider, resolveAiProvider } from "@/lib/campfit/v3/
 import type { CampfitV3ConversationResponse } from "@/types/campfitV3"
 
 export async function POST(request: Request) {
+  const refused = guardCampfitRequest(request, campfitRequestPolicies.conversationMessage)
+  if (refused) return refused
+
   const parsed = CampfitV3ConversationMessageRequestSchema.safeParse(await safeJson(request))
   if (!parsed.success) {
     return NextResponse.json({ message: "상담 답변을 다시 확인해 주세요." }, { status: 400 })
